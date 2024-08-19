@@ -130,7 +130,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<std::unique_ptr<Expression>> * expression_list;
   std::vector<Value> *                       value_list;
   std::vector<ConditionSqlNode> *            condition_list;
-  std::vector<JoinSqlNode> *                 join_block;
   std::vector<JoinSqlNode> *                 join_list;
   JoinSqlNode *                              join;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
@@ -159,7 +158,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list
 %type <condition_list>      where
 %type <join_list>           join_list
-%type <join_list>           join_block
 %type <join>                join
 %type <condition_list>      condition_list
 %type <string>              storage_format
@@ -458,7 +456,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_block where group_by
+    SELECT expression_list FROM rel_list join_list where group_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -486,27 +484,18 @@ select_stmt:        /*  select 语句的语法解析树*/
       }
     }
     ;
-join_block:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | JOIN join_list {
-      $$ = $2;
-    }
-    ;
 join_list:
     /* empty */
     {
       $$ = nullptr;
     }
-    | join join_list {
-      if ($2 != nullptr) {
-        $$ = $2;
+    | INNER JOIN join join_list {
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
         $$ = new std::vector<JoinSqlNode>;
       }
-      $$->emplace($$->begin(), *$1);
+      $$->emplace($$->begin(), *$3);
     }
     ;
 join:
