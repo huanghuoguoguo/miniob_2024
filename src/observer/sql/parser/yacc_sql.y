@@ -67,6 +67,11 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %token  SEMICOLON
         BY
         CREATE
+        JOIN
+        LEFT
+        RIGHT
+        INNER
+        OUTER
         DROP
         GROUP
         TABLE
@@ -125,6 +130,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<std::unique_ptr<Expression>> * expression_list;
   std::vector<Value> *                       value_list;
   std::vector<ConditionSqlNode> *            condition_list;
+  std::vector<JoinSqlNode> *                 join_block;
+  std::vector<JoinSqlNode> *                 join_list;
+  JoinSqlNode *                              join;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
   std::vector<std::string> *                 relation_list;
   char *                                     string;
@@ -150,6 +158,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_info>           attr_def
 %type <value_list>          value_list
 %type <condition_list>      where
+%type <join_list>           join_list
+%type <join_list>           join_block
+%type <join>                join
 %type <condition_list>      condition_list
 %type <string>              storage_format
 %type <relation_list>       rel_list
@@ -447,7 +458,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list FROM rel_list join_block where group_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -459,18 +470,54 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.relations.swap(*$4);
         delete $4;
       }
-
       if ($5 != nullptr) {
-        $$->selection.conditions.swap(*$5);
+        $$->selection.join_list.swap(*$5);
         delete $5;
       }
 
       if ($6 != nullptr) {
-        $$->selection.group_by.swap(*$6);
+        $$->selection.conditions.swap(*$6);
         delete $6;
+      }
+
+      if ($7 != nullptr) {
+        $$->selection.group_by.swap(*$7);
+        delete $7;
       }
     }
     ;
+join_block:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | JOIN join_list {
+      $$ = $2;
+    }
+    ;
+join_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | join join_list {
+      if ($2 != nullptr) {
+        $$ = $2;
+      } else {
+        $$ = new std::vector<JoinSqlNode>;
+      }
+      $$->emplace($$->begin(), *$1);
+    }
+    ;
+join:
+    relation ON condition_list {
+      $$ = new JoinSqlNode;
+      $$->relation = $1;
+      free($1);
+      $$->conditions.swap(*$3);
+    }
+    ;
+
 calc_stmt:
     CALC expression_list
     {
