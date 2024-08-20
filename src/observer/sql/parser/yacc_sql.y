@@ -489,6 +489,14 @@ join_list:
     {
       $$ = nullptr;
     }
+    | JOIN join join_list {
+          if ($3 != nullptr) {
+            $$ = $3;
+          } else {
+            $$ = new std::vector<JoinSqlNode>;
+          }
+          $$->emplace($$->begin(), *$2);
+        }
     | INNER JOIN join join_list {
       if ($4 != nullptr) {
         $$ = $4;
