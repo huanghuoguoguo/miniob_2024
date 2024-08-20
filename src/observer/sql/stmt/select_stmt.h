@@ -52,7 +52,6 @@ private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;
   std::vector<Table *>                     tables_;
   FilterStmt                              *filter_stmt_ = nullptr;
-  std::vector<FilterStmt *>                join_filter_stmts_;
   std::vector<std::unique_ptr<Expression>> group_by_;
 
 

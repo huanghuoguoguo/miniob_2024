@@ -48,6 +48,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     auto& table_name = select_sql.join_list[i].relation;
     select_sql.relations.push_back(table_name);
   }
+
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -92,21 +93,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-  // create filter statement in `where` statement
-  std::vector<FilterStmt*> join_filter_stmts;
+  // create filter statement in `join on` statement
   for(size_t i = 0; i < select_sql.join_list.size(); i++) {
-    FilterStmt *join_filter_stmt = nullptr;
-    RC          rc          = FilterStmt::create(db,
-        default_table,
-        &table_map,
-        select_sql.join_list[i].conditions.data(),
-        static_cast<int>(select_sql.join_list[i].conditions.size()),
-        join_filter_stmt);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot construct join stmt");
-      return rc;
+    auto& condition_sql_nodes = select_sql.join_list[i].conditions;
+    // 加入到filter中。
+    for (auto& condition_sql_node : condition_sql_nodes) {
+      select_sql.conditions.push_back(condition_sql_node);
     }
-    join_filter_stmts.push_back(join_filter_stmt);
   }
 
 
@@ -129,7 +122,6 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->tables_.swap(tables);
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
-  select_stmt->join_filter_stmts_.swap(join_filter_stmts);
   select_stmt->group_by_.swap(group_by_expressions);
   stmt                      = select_stmt;
   return RC::SUCCESS;
