@@ -47,12 +47,15 @@ public:
 
   std::vector<std::unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   std::vector<std::unique_ptr<Expression>> &group_by() { return group_by_; }
+  std::vector<std::pair<Table *, FilterStmt *>> join_filter_stmts() const {
+    return join_filter_stmts_;
+  }
 
 private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;
   std::vector<Table *>                     tables_;
   FilterStmt                              *filter_stmt_ = nullptr;
-  std::vector<FilterStmt *>                join_filter_stmts_;
+  std::vector<std::pair<Table*,FilterStmt*>>   join_filter_stmts_;  // 小数据量，用vector即可。
   std::vector<std::unique_ptr<Expression>> group_by_;
 
 

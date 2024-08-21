@@ -48,6 +48,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     auto& table_name = select_sql.join_list[i].relation;
     select_sql.relations.push_back(table_name);
   }
+
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
@@ -92,8 +93,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     default_table = tables[0];
   }
 
-  // create filter statement in `where` statement
-  std::vector<FilterStmt*> join_filter_stmts;
+  // create filter statement in `join` statement
+  std::vector<pair<Table*,FilterStmt*>> join_filter_stmts;
   for(size_t i = 0; i < select_sql.join_list.size(); i++) {
     FilterStmt *join_filter_stmt = nullptr;
     RC          rc          = FilterStmt::create(db,
@@ -106,7 +107,8 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("cannot construct join stmt");
       return rc;
     }
-    join_filter_stmts.push_back(join_filter_stmt);
+    auto& join_table = table_map[select_sql.join_list[i].relation];
+    join_filter_stmts.emplace_back(join_table,join_filter_stmt);
   }
 
 
