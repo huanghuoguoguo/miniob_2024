@@ -488,6 +488,7 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
   return rc;
 }
 
+
 Index *Table::find_index(const char *index_name) const
 {
   for (Index *index : indexes_) {
