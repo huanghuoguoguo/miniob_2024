@@ -8,7 +8,13 @@ MESSAGE("MAIN SRC: " ${MAIN_SRC})
 FOREACH (F ${ALL_SRC})
 
     IF (NOT ${F} STREQUAL ${MAIN_SRC})
-        SET(LIB_SRC ${LIB_SRC} ${F})
+        SET(LIB_SRC ${LIB_SRC} ${F}
+                sql/stmt/drop_table_stmt.cpp
+                sql/stmt/drop_table_stmt.h
+                sql/stmt/drop_table_stmt.cpp
+                sql/stmt/drop_table_stmt.h
+                sql/executor/drop_table_executor.cpp
+                sql/executor/drop_table_executor.h)
         MESSAGE("Use " ${F})
     ENDIF()
 

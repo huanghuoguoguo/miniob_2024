@@ -96,6 +96,8 @@ public:
   /// @brief 获取当前数据库的事务管理器
   TrxKit &trx_kit();
 
+  RC drop_table(const char *string);
+
 private:
   /// @brief 打开所有的表。在数据库初始化的时候会执行
   RC open_all_tables();

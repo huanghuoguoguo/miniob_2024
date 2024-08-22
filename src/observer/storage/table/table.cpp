@@ -127,6 +127,40 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   return rc;
 }
 
+RC Table::drop(Db *db, const char *path, const char *base_dir) {
+  RC rc = RC::SUCCESS;
+
+  // 判断表文件是否已经被删除
+  int fd = ::open(path, O_RDONLY);
+  if (fd <= 0) {
+    LOG_ERROR("Failed to drop table file, it has been deleted. %s, !EEXIST, %s", path, strerror(errno));
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  close(fd);
+  // 删除文件
+//  const vector<FieldMeta> *trx_fields = db->trx_kit().trx_fields();
+  // 删除文件
+  if (::unlink(path) != 0) {
+    LOG_ERROR("Failed to delete table file. file name=%s, errmsg=%s", path, strerror(errno));
+    return RC::IOERR_DELETE;
+  }
+
+  db_       = db;
+  base_dir_ = base_dir;
+
+  string             data_file = table_data_file(base_dir, table_meta_.name());
+
+  if (::unlink(data_file.c_str()) != 0) {
+    LOG_ERROR("Failed to delete table data file. file name=%s, errmsg=%s", data_file.c_str(), strerror(errno));
+    return RC::IOERR_DELETE;
+  }
+
+  LOG_INFO("Successfully delete table %s:%s", base_dir, table_meta_.name());
+  return rc;
+
+}
+
 RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 {
   // 加载元数据文件
@@ -526,3 +560,4 @@ RC Table::sync()
   LOG_INFO("Sync table over. table=%s", name());
   return rc;
 }
+
