@@ -30,9 +30,9 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
     return RC::SUCCESS;
   }
 
-  session_stage_.handle_request2(event);
+  session_stage_.handle_request2(event); //将指定会话设置到线程变量里，设置当前正在处理的请求。原理为设置指针。
 
-  SQLStageEvent sql_event(event, event->query());
+  SQLStageEvent sql_event(event, event->query()); // 创建一个新的查询对象，包括查询信息
 
   rc = handle_sql(&sql_event);
   if (OB_FAIL(rc)) {
@@ -57,31 +57,32 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
 
 RC SqlTaskHandler::handle_sql(SQLStageEvent *sql_event)
 {
+  // 查询缓存阶段 先初始化为空状态rc
   RC rc = query_cache_stage_.handle_request(sql_event);
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do query cache. rc=%s", strrc(rc));
     return rc;
   }
 
-  rc = parse_stage_.handle_request(sql_event);
+  rc = parse_stage_.handle_request(sql_event);  // parse_stage_  先进入解析阶段，词法分析--语法分析
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do parse. rc=%s", strrc(rc));
     return rc;
   }
 
-  rc = resolve_stage_.handle_request(sql_event);
+  rc = resolve_stage_.handle_request(sql_event);  // 语法树解析成数据库内部能识别的数据结构-stmt
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do resolve. rc=%s", strrc(rc));
     return rc;
   }
 
-  rc = optimize_stage_.handle_request(sql_event);
+  rc = optimize_stage_.handle_request(sql_event);  // 查询优化阶段--逻辑计划--物理计划
   if (rc != RC::UNIMPLENMENT && rc != RC::SUCCESS) {
     LOG_TRACE("failed to do optimize. rc=%s", strrc(rc));
     return rc;
   }
 
-  rc = execute_stage_.handle_request(sql_event);
+  rc = execute_stage_.handle_request(sql_event);  // 计划执行阶段
   if (OB_FAIL(rc)) {
     LOG_TRACE("failed to do execute. rc=%s", strrc(rc));
     return rc;

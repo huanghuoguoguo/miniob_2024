@@ -104,6 +104,26 @@ RC TableMeta::add_index(const IndexMeta &index)
   return RC::SUCCESS;
 }
 
+RC TableMeta::remove_index(const char *index_name) {
+  for (auto it = indexes_.begin(); it != indexes_.end(); ++it) {
+    if (strcmp(it->name(), index_name) == 0) {
+      indexes_.erase(it);
+      return RC::SUCCESS;
+    }
+  }
+  return RC::SCHEMA_INDEX_NOT_EXIST;
+}
+
+RC TableMeta::remove_all_index() {
+  if (indexes_.empty()) {
+    return RC::SUCCESS;
+  }
+
+  indexes_.clear();
+  return RC::SUCCESS;
+}
+
+
 const char *TableMeta::name() const { return name_.c_str(); }
 
 const FieldMeta *TableMeta::trx_field() const { return &fields_[0]; }
@@ -317,3 +337,6 @@ void TableMeta::desc(std::ostream &os) const
   }
   os << ')' << std::endl;
 }
+
+
+
