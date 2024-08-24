@@ -437,6 +437,64 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   return rc;
 }
 
+
+RC Table::drop_all_index() {
+  // 遍历并删除所有索引
+  for (Index *index : indexes_) {
+    const char *index_name = index->index_meta().name();
+    string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+
+    // 删除索引文件
+    if (remove(index_file.c_str()) != 0) {
+      LOG_ERROR("Failed to remove index file %s for index %s on table %s, system error=%d:%s",
+                index_file.c_str(), index_name, name(), errno, strerror(errno));
+      return RC::IOERR_DELETE;
+    }
+
+    // 释放内存
+    delete index;
+  }
+
+  indexes_.clear();
+
+  // 更新表元数据
+  TableMeta new_table_meta(table_meta_);
+  RC rc = new_table_meta.remove_all_index();
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to remove all indexes meta for table %s. error=%d:%s", name(), rc, strrc(rc));
+    return rc;
+  }
+
+  // 更新磁盘上的元数据文件
+  string tmp_file = table_meta_file(base_dir_.c_str(), name()) + ".tmp";
+  fstream fs;
+  fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
+  if (!fs.is_open()) {
+    LOG_ERROR("Failed to open file for write. file name=%s, errmsg=%s", tmp_file.c_str(), strerror(errno));
+    return RC::IOERR_OPEN;
+  }
+  if (new_table_meta.serialize(fs) < 0) {
+    LOG_ERROR("Failed to dump new table meta to file: %s. sys err=%d:%s", tmp_file.c_str(), errno, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+  fs.close();
+
+  // 覆盖原始元数据文件
+  string meta_file = table_meta_file(base_dir_.c_str(), name());
+  int ret = rename(tmp_file.c_str(), meta_file.c_str());
+  if (ret != 0) {
+    LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while dropping all indexes on table (%s). "
+              "system error=%d:%s",
+              tmp_file.c_str(), meta_file.c_str(), name(), errno, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+
+  table_meta_.swap(new_table_meta);
+  LOG_INFO("Successfully dropped all indexes on table %s", name());
+  return RC::SUCCESS;
+}
+
+
 RC Table::delete_record(const RID &rid)
 {
   RC     rc = RC::SUCCESS;
@@ -527,3 +585,4 @@ RC Table::sync()
   LOG_INFO("Sync table over. table=%s", name());
   return rc;
 }
+

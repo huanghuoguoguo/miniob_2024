@@ -176,7 +176,7 @@ RC Db::drop_table(const char *table_name) {
 
   Table  *table = opened_tables_[table_name]; // 找到要删除的表
   //  删除索引
-  //  table->drop_indexes();
+  table->drop_all_index();
   opened_tables_.erase(table_name);  // 从opened_tables_删除表
   delete table;
 
