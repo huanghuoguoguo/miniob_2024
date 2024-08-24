@@ -3,30 +3,11 @@ MESSAGE(STATUS "This is CMAKE_CURRENT_SOURCE_DIR dir " ${CMAKE_CURRENT_SOURCE_DI
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 
 FILE(GLOB_RECURSE ALL_SRC *.cpp *.c)
-SET(MAIN_SRC ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-        sql/stmt/drop_table_stmt.cpp
-        sql/stmt/drop_table_stmt.h
-        sql/executor/drop_table_executor.cpp)
+SET(MAIN_SRC ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp)
 MESSAGE("MAIN SRC: " ${MAIN_SRC})
-# 初始化 LIB_SRC
-SET(LIB_SRC "")
-
-# 遍历所有源文件
 FOREACH (F ${ALL_SRC})
 
-    # 标志变量，用于判断当前文件是否在 MAIN_SRC 列表中
-    SET(IN_MAIN_SRC FALSE)
-
-    # 遍历 MAIN_SRC 列表，检查当前文件是否在其中
-    FOREACH (M ${MAIN_SRC})
-        IF (${F} STREQUAL ${M})
-            SET(IN_MAIN_SRC TRUE)
-            BREAK()
-        ENDIF()
-    ENDFOREACH()
-
-    # 如果当前文件不在 MAIN_SRC 列表中，则将其添加到 LIB_SRC
-    IF (NOT ${IN_MAIN_SRC})
+    IF (NOT ${F} STREQUAL ${MAIN_SRC})
         SET(LIB_SRC ${LIB_SRC} ${F})
         MESSAGE("Use " ${F})
     ENDIF()
