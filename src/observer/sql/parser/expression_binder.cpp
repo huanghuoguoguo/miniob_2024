@@ -33,14 +33,18 @@ Table *BinderContext::find_table(const char *table_name) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions)
+static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions,bool is_muti)
 {
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num();
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field.field_name());
+    string      field_name = field.field_name();
+    if(is_muti) {
+      field_name = string(table->table_meta().name())+"."+field_name;
+    }
+    field_expr->set_name(field_name.c_str());
     expressions.emplace_back(field_expr);
   }
 }
@@ -126,7 +130,7 @@ RC ExpressionBinder::bind_star_expression(
   }
 
   for (Table *table : tables_to_wildcard) {
-    wildcard_fields(table, bound_expressions);
+    wildcard_fields(table, bound_expressions, tables_to_wildcard.size() > 1);
   }
 
   return RC::SUCCESS;
@@ -161,7 +165,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(table, bound_expressions);
+    wildcard_fields(table, bound_expressions, false);
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr == field_meta) {
@@ -171,7 +175,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field_name);
+    string     name       = string(table->table_meta().name()) + "." + string(field.field_name());
+    field_expr->set_name(name);
     bound_expressions.emplace_back(field_expr);
   }
 
