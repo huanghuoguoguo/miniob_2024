@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/optimizer/rewrite_rule.h"
 #include <vector>
+#include <sql/operator/table_get_logical_operator.h>
 
 /**
  * @brief 将一些谓词表达式下推到表数据扫描中
@@ -25,13 +26,20 @@ See the Mulan PSL v2 for more details. */
 class PredicatePushdownRewriter : public RewriteRule
 {
 public:
-  PredicatePushdownRewriter()          = default;
-  virtual ~PredicatePushdownRewriter() = default;
+    PredicatePushdownRewriter() = default;
+    virtual ~PredicatePushdownRewriter() = default;
 
-  RC rewrite(std::unique_ptr<LogicalOperator> &oper, bool &change_made) override;
+
+    RC try_rewriter_table_get(std::unique_ptr<Expression>& predicate_expr, bool& change_made,
+                              std::unique_ptr<LogicalOperator>& child_oper);
+    RC rewrite(std::unique_ptr<LogicalOperator>& oper, bool& change_made) override;
 
 private:
-  RC get_exprs_can_pushdown(
-      std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &pushdown_exprs);
-  bool is_empty_predicate(std::unique_ptr<Expression> &expr);
+    RC get_exprs_can_pushdown(
+        std::unique_ptr<Expression>& expr, std::vector<std::unique_ptr<Expression>>& pushdown_exprs,
+        TableGetLogicalOperator* table_get_oper);
+    bool is_empty_predicate(std::unique_ptr<Expression>& expr);
+    RC try_rewrite_join(std::unique_ptr<LogicalOperator>& oper,
+                        std::unique_ptr<Expression>& predicate_oper_exprs,
+                        bool& change_made);
 };

@@ -109,7 +109,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       // 在这里补充 join 的逻辑，如果是有join的话，将二者通过join连接之后再传回。
 
       for(auto& join_filter:join_filter_stmts) {
-        if(join_filter.first==table) {
+        if(join_filter.first == table) {
           // 存在该table的join条件。
           unique_ptr<LogicalOperator> predicate_oper(nullptr);
           RC rc = create_plan(join_filter.second, predicate_oper);
