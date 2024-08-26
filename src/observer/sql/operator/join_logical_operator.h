@@ -30,6 +30,4 @@ public:
   LogicalOperatorType type() const override { return LogicalOperatorType::JOIN; }
 
 private:
-    // 可能存在的filter条件
-    // std::vector<FilterStmt *>       join_filter_stmts_;
 };
