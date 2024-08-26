@@ -172,7 +172,7 @@ int Value::compare(const Value &other) const
             other.str_value_.length());
       } break;
       case AttrType::BOOLEANS: {
-        return common::compare_int((void *)&this->num_value_.bool_value_, (void *)&other.num_value_.bool_value_);
+        return this->get_int() - other.get_int();
       }
       default: {
         LOG_WARN("unsupported type: %d", this->attr_type_);

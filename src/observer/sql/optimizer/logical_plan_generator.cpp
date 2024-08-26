@@ -94,6 +94,7 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   last_oper = &table_oper;
 
   const std::vector<Table *> &tables = select_stmt->tables();
+  auto join_filter_stmts = select_stmt->join_filter_stmts();
   for (Table *table : tables) {
 
     unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
@@ -104,6 +105,23 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
       join_oper->add_child(std::move(table_oper));
       join_oper->add_child(std::move(table_get_oper));
       table_oper = unique_ptr<LogicalOperator>(join_oper);
+
+      // 在这里补充 join 的逻辑，如果是有join的话，将二者通过join连接之后再传回。
+
+      for(auto& join_filter:join_filter_stmts) {
+        if(join_filter.first == table) {
+          // 存在该table的join条件。
+          unique_ptr<LogicalOperator> predicate_oper(nullptr);
+          RC rc = create_plan(join_filter.second, predicate_oper);
+          if (OB_FAIL(rc)) {
+            LOG_WARN("failed to create join predicate logical plan. rc=%s", strrc(rc));
+            return rc;
+          }
+          // 创建join过滤条件之后，在joinLogicalOperator的上方添加predicate
+          predicate_oper->add_child(std::move(table_oper));
+          table_oper = std::move(predicate_oper);
+        }
+      }
     }
   }
 
