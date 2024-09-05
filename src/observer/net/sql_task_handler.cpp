@@ -77,7 +77,7 @@ RC SqlTaskHandler::handle_sql(SQLStageEvent *sql_event)
   }
 
   rc = optimize_stage_.handle_request(sql_event);  // 查询优化阶段--逻辑计划--物理计划
-  if (rc != RC::UNIMPLENMENT && rc != RC::SUCCESS) {
+  if (rc != RC::UNIMPLEMENTED && rc != RC::SUCCESS) {
     LOG_TRACE("failed to do optimize. rc=%s", strrc(rc));
     return rc;
   }
