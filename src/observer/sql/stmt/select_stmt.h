@@ -33,20 +33,20 @@ class Table;
 class SelectStmt : public Stmt
 {
 public:
-  SelectStmt() = default;
-  ~SelectStmt() override;
+  SelectStmt() = default; //初始化stmt对象
+  ~SelectStmt() override; // 析构函数负责清理内存资源
 
-  StmtType type() const override { return StmtType::SELECT; }
+  StmtType type() const override { return StmtType::SELECT; } //返回select 表示这是一个select语句
 
 public:
   static RC create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt);
 
 public:
-  const std::vector<Table *> &tables() const { return tables_; }
-  FilterStmt                 *filter_stmt() const { return filter_stmt_; }
+  const std::vector<Table *> &tables() const { return tables_; } //返回当前select语句涉及的表
+  FilterStmt                 *filter_stmt() const { return filter_stmt_; } //返回where生成的FilterStmt指针
 
-  std::vector<std::unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
-  std::vector<std::unique_ptr<Expression>> &group_by() { return group_by_; }
+  std::vector<std::unique_ptr<Expression>> &query_expressions() { return query_expressions_; } // 返回select语句的查询表达式
+  std::vector<std::unique_ptr<Expression>> &group_by() { return group_by_; } // 返回group_by子句的表达式
 
 private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;

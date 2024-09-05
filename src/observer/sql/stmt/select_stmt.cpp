@@ -24,7 +24,8 @@ using namespace std;
 using namespace common;
 
 SelectStmt::~SelectStmt()
-{
+{//在析构函数中，如果filter_stmt_不为空（即WHERE子句存在）
+  // 则删除该对象并将指针设为空。避免内存泄漏。
   if (nullptr != filter_stmt_) {
     delete filter_stmt_;
     filter_stmt_ = nullptr;
@@ -43,13 +44,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   // collect tables in `from` statement
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
-  for (size_t i = 0; i < select_sql.relations.size(); i++) {
+  for (size_t i = 0; i < select_sql.relations.size(); i++) {//select_sql.relations表示from子句的表
     const char *table_name = select_sql.relations[i].c_str();
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
     }
 
+    // 将找到的表存入tables列表，并添加到table_map哈希表中。
     Table *table = db->find_table(table_name);
     if (nullptr == table) {
       LOG_WARN("no such table. db=%s, table_name=%s", db->name(), table_name);
@@ -73,6 +75,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  //  绑定group_by子句的表达式
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
     RC rc = expression_binder.bind_expression(expression, group_by_expressions);
