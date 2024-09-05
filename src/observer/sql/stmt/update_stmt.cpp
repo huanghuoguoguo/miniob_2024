@@ -103,7 +103,6 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
   update_stmt->attribute_name_  = update_sql.attribute_name;
   update_stmt->value_           = update_sql.value;
   update_stmt->filter_stmt_     = filter_stmt;
-  update_stmt->bound_expressions_ = std::move(bound_expressions);
   stmt                          = update_stmt;
   return RC::SUCCESS;
 }
