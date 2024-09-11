@@ -37,6 +37,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression_iterator.h"
 
+#include <sql/operator/update_logical_operator.h>
 #include <sql/stmt/update_stmt.h>
 
 using namespace std;
@@ -185,14 +186,14 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     }
     last_oper = &predicate_oper;
   }
+  auto expression = std::move(update_stmt->bound_expressions()[0]);
 
-
-  auto project_oper = make_unique<ProjectLogicalOperator>(std::move(update_stmt->bound_expressions()));
+  auto update_oper = make_unique<UpdateLogicalOperator>(table,expression);
   if (*last_oper) {
-    project_oper->add_child(std::move(*last_oper));
+    update_oper->add_child(std::move(*last_oper));
   }
 
-  logical_operator = std::move(project_oper);
+  logical_operator = std::move(update_oper);
   return RC::SUCCESS;
 }
 

@@ -42,6 +42,7 @@ enum class PhysicalOperatorType
   INDEX_SCAN,
   NESTED_LOOP_JOIN,
   EXPLAIN,
+  UPDATE,
   PREDICATE,
   PREDICATE_VEC,
   PROJECT,

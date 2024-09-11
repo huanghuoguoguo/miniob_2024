@@ -100,8 +100,8 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
   UpdateStmt *update_stmt = new UpdateStmt();
 
   update_stmt->table_           = table;
-  update_stmt->attribute_name_  = update_sql.attribute_name;
-  update_stmt->value_           = update_sql.value;
+  update_stmt->attribute_name_  = update_sql.attribute_name; //不需要了，可以获得
+  update_stmt->value_           = update_sql.value;//不需要了，可以获得
   update_stmt->filter_stmt_     = filter_stmt;
   update_stmt->bound_expressions_ = std::move(bound_expressions);
   stmt                          = update_stmt;
