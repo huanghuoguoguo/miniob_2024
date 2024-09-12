@@ -13,20 +13,20 @@
 class UpdateLogicalOperator : public LogicalOperator
 {
 public:
-  UpdateLogicalOperator(Table *table, std::unique_ptr<Expression> &expression)
-  {
-    this->table_     = table;
-    this->expression = std::move(expression);
-  }
-  Table   *table() const { return table_; }
-  virtual ~                   UpdateLogicalOperator() = default;
-  Expression* get_expression() const { return expression.get(); }
+    UpdateLogicalOperator(Table* table, std::unique_ptr<ComparisonExpr>& expression)
+    {
+        this->table_ = table;
+        this->expression = std::move(expression);
+    }
 
-  LogicalOperatorType type() const override { return LogicalOperatorType::UPDATE; }
+    Table* table() const { return table_; }
+    virtual ~ UpdateLogicalOperator() = default;
+    ComparisonExpr* get_expression() { return expression.release(); }
+
+    LogicalOperatorType type() const override { return LogicalOperatorType::UPDATE; }
 
 private:
-  Table                      *table_ = nullptr;
-  std::unique_ptr<Expression> expression;
-  // 属性还有父类的expression 和childrens
+    Table* table_ = nullptr;
+    std::unique_ptr<ComparisonExpr> expression;
+    // 属性还有父类的expression 和childrens
 };
-#include "sql/parser/parse_defs.h"

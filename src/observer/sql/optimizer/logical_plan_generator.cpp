@@ -186,7 +186,7 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     }
     last_oper = &predicate_oper;
   }
-  auto expression = std::move(update_stmt->bound_expressions()[0]);
+  std::unique_ptr<ComparisonExpr>& expression = update_stmt->getComparisonExpr();
 
   auto update_oper = make_unique<UpdateLogicalOperator>(table,expression);
   if (*last_oper) {

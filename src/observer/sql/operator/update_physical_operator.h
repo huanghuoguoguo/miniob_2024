@@ -18,7 +18,7 @@ class UpdatePhysicalOperator : public PhysicalOperator
 {
 public:
   UpdatePhysicalOperator() = default;
-  UpdatePhysicalOperator(Table *table, unique_ptr<Expression> expression);
+  UpdatePhysicalOperator(Table *table, unique_ptr<ComparisonExpr> expression);
 
   ~UpdatePhysicalOperator() override = default;
 
@@ -32,7 +32,7 @@ public:
 
 private:
   Table                      *table_      = nullptr;
-  std::unique_ptr<Expression> expression_ = nullptr;
+  ComparisonExpr* expression_ = nullptr;
   Trx                        *trx_        = nullptr;
   std::vector<Record>         records_;
 };

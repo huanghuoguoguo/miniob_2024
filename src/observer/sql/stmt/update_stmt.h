@@ -27,26 +27,26 @@ class Table;
 class UpdateStmt : public Stmt
 {
 public:
-  UpdateStmt() = default;//初始化stmt对象
-  ~UpdateStmt() override;// 析构函数负责清理内存资源
+    UpdateStmt() = default; //初始化stmt对象
+    ~UpdateStmt() override; // 析构函数负责清理内存资源
 
-  StmtType type() const override { return StmtType::UPDATE; }//返回update 表示这是一个update语句
+    StmtType type() const override { return StmtType::UPDATE; } //返回update 表示这是一个update语句
 
-
-public:
-  static RC create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt);
 
 public:
-  Table *table() const { return table_; }  // 返回需要update的表
-  const std::string &attribute_name() const { return attribute_name_; }
-  const Value &value() const { return value_; }
-  FilterStmt *filter_stmt() const { return filter_stmt_; } //返回where生成的FilterStmt指针
-  std::vector<std::unique_ptr<Expression>> &bound_expressions() { return bound_expressions_; } // 返回select语句的查询表达式
+    static RC create(Db* db, const UpdateSqlNode& update_sql, Stmt*& stmt);
+
+public:
+    Table* table() const { return table_; } // 返回需要update的表
+    const std::string& attribute_name() const { return attribute_name_; }
+    const Value& value() const { return value_; }
+    FilterStmt* filter_stmt() const { return filter_stmt_; } //返回where生成的FilterStmt指针
+    std::unique_ptr<ComparisonExpr>& getComparisonExpr() { return comparisonExpr; } // 返回select语句的查询表达式
 
 private:
-  Table                                                        *table_        = nullptr;
-  std::string                                                   attribute_name_;
-  Value                                                         value_;
-  FilterStmt                                                   *filter_stmt_ = nullptr;
-  vector<unique_ptr<Expression>>                                bound_expressions_;
+    Table* table_ = nullptr;
+    std::string attribute_name_;
+    Value value_;
+    FilterStmt* filter_stmt_ = nullptr;
+    std::unique_ptr<ComparisonExpr> comparisonExpr = nullptr;
 };

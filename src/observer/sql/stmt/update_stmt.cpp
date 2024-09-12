@@ -49,12 +49,11 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-
   binder_context.add_table(table);
   // 验证字段名
 
   const std::string &field_name = update_sql.attribute_name; // 属性名
-  const Value &value = update_sql.value;
+  const Value &      value      = update_sql.value;
 
   //创建字段表达式和值表达式
   unique_ptr<Expression> unbound_field_expr = std::make_unique<UnboundFieldExpr>(table_name, field_name);
@@ -63,14 +62,14 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
   // 2. 创建一个未绑定的比较表达式，用于表示 field_name = value
   std::unique_ptr<Expression> unbound_comp_expr = std::make_unique<ComparisonExpr>(
       EQUAL_TO,
-      std::move(unbound_field_expr),  // 使用std::move转移所有权
-      std::move(value_expr)           // 使用std::move转移所有权
-  );
-
+      std::move(unbound_field_expr),
+      // 使用std::move转移所有权
+      std::move(value_expr) // 使用std::move转移所有权
+      );
 
   // 创建表达式绑定器并执行绑定操作
   vector<unique_ptr<Expression>> bound_expressions;
-  ExpressionBinder expression_binder(binder_context);
+  ExpressionBinder               expression_binder(binder_context);
 
   RC rc = expression_binder.bind_expression(unbound_comp_expr, bound_expressions);
   if (OB_FAIL(rc)) {
@@ -78,16 +77,17 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
     return rc;
   }
 
-  if(rc == RC::SUCCESS) {
+  if (rc == RC::SUCCESS) {
     // 如果绑定成功，bound_expressions 中将包含绑定后的比较表达式
     LOG_INFO("Successfully bound the comparison expression: %s = %s", field_name.c_str(), value.to_string().c_str());
   }
 
   // 处理WHERE子句
   FilterStmt *filter_stmt = nullptr;
-        rc = FilterStmt::create(db,
+  rc                      = FilterStmt::create(db,
       table,
-      nullptr,  // 由于只涉及单个表，传递空的table_map
+      nullptr,
+      // 由于只涉及单个表，传递空的table_map
       update_sql.conditions.data(),
       static_cast<int>(update_sql.conditions.size()),
       filter_stmt);
@@ -99,11 +99,13 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
   // everything alright
   UpdateStmt *update_stmt = new UpdateStmt();
 
-  update_stmt->table_           = table;
-  update_stmt->attribute_name_  = update_sql.attribute_name; //不需要了，可以获得
-  update_stmt->value_           = update_sql.value;//不需要了，可以获得
-  update_stmt->filter_stmt_     = filter_stmt;
-  update_stmt->bound_expressions_ = std::move(bound_expressions);
-  stmt                          = update_stmt;
+  update_stmt->table_          = table;
+  update_stmt->attribute_name_ = update_sql.attribute_name; //不需要了，可以获得
+  update_stmt->value_          = update_sql.value;          //不需要了，可以获得
+  update_stmt->filter_stmt_    = filter_stmt;
+  ComparisonExpr *expression   = static_cast<ComparisonExpr *>(bound_expressions[0].release());
+
+  update_stmt->comparisonExpr = std::unique_ptr<ComparisonExpr>(expression);
+  stmt                        = update_stmt;
   return RC::SUCCESS;
 }

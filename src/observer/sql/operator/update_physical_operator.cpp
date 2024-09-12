@@ -9,15 +9,20 @@
 
 using namespace std;
 
-UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table,unique_ptr<Expression> expression)
-    : table_(table), expression_(std::move(expression))
-{}
+UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table, unique_ptr<ComparisonExpr> expression)
+{
+  this->table_      = table;
+  this->expression_ = std::move(expression).release();
+}
 
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
-  if (children_.empty()) {
-    return RC::SUCCESS;
-  }
+  auto leftExpr  = std::move(expression_->left());
+  auto rightExpr = std::move(expression_->right());
+
+  [[maybe_unused]] std::unique_ptr<FieldExpr> fieldExpression(static_cast<FieldExpr *>(leftExpr.get()));
+
+  [[maybe_unused]] ValueExpr *valueExpression(static_cast<ValueExpr *>(rightExpr.release()));;
 
   std::unique_ptr<PhysicalOperator> &child = children_[0];
 
@@ -37,7 +42,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     }
 
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
-    Record   &record    = row_tuple->record();
+    Record &  record    = row_tuple->record();
     records_.emplace_back(std::move(record));
   }
 
@@ -45,29 +50,19 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
   // 先收集记录再删除
   // 记录的有效性由事务来保证，如果事务不保证删除的有效性，那说明此事务类型不支持并发控制，比如VacuousTrx
-//  for (Record &record : records_) {
-//    rc = trx_->delete_record(table_, record);
-//    if (rc != RC::SUCCESS) {
-//      LOG_WARN("failed to delete record: %s", strrc(rc));
-//      return rc;
-//    }
-//  }
+  for (Record &record : records_) {
+    rc = trx_->delete_record(table_, record);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to delete record: %s", strrc(rc));
+      return rc;
+    }
+  }
 
   return RC::SUCCESS;
 }
 
 RC UpdatePhysicalOperator::next()
 {
-//  RC rc = RC::SUCCESS;
-  if (children_.empty()) {
-    return RC::RECORD_EOF;
-  }
-
-
-
-	std::unique_ptr<ComparisonExpr> comp = std::unique_ptr<ComparisonExpr>(static_cast<ComparisonExpr*>(expression_.release()));
-    comp.get();
-
   return RC::RECORD_EOF;
 }
 

@@ -259,13 +259,14 @@ RC PhysicalPlanGenerator::create_plan(InsertLogicalOperator &insert_oper, unique
 }
 RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &update_oper, unique_ptr<PhysicalOperator> &oper)
 {
-  Table                               *table       = update_oper.table();
-  Expression                          *expression = update_oper.get_expression();
+  Table *                              table       = update_oper.table();
+  ComparisonExpr *                         expression  = update_oper.get_expression();
   vector<unique_ptr<LogicalOperator>> &child_opers = update_oper.children();
 
-  RC                           rc         = RC::SUCCESS;
+  RC                           rc = RC::SUCCESS;
   unique_ptr<PhysicalOperator> update_physical_oper(
-      new UpdatePhysicalOperator(table, unique_ptr<Expression>(std::move(expression))));
+      new UpdatePhysicalOperator(table, unique_ptr<ComparisonExpr>(expression)));
+
   for (unique_ptr<LogicalOperator> &child_oper : child_opers) {
     unique_ptr<PhysicalOperator> child_physical_oper;
     rc = create(*child_oper, child_physical_oper);
