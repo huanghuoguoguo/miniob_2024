@@ -20,11 +20,13 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   auto leftExpr  = std::move(expression_->left());
   auto rightExpr = std::move(expression_->right());
 
-  [[maybe_unused]] std::unique_ptr<FieldExpr> fieldExpression(static_cast<FieldExpr *>(leftExpr.get()));
+  std::unique_ptr<FieldExpr> fieldExpression(static_cast<FieldExpr *>(leftExpr.release()));
 
-  [[maybe_unused]] ValueExpr *valueExpression(static_cast<ValueExpr *>(rightExpr.release()));;
+  ValueExpr *valueExpression(static_cast<ValueExpr *>(rightExpr.release()));
 
-  std::unique_ptr<PhysicalOperator> &child = children_[0];
+  auto                               field_name = fieldExpression->field().field_name();
+  auto                               value      = valueExpression->get_value();
+  std::unique_ptr<PhysicalOperator> &child      = children_[0];
 
   RC rc = child->open(trx);
   if (rc != RC::SUCCESS) {
@@ -32,8 +34,8 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     return rc;
   }
 
-  trx_ = trx;
-
+  trx_      = trx;
+  int index = -1;
   while (OB_SUCC(rc = child->next())) {
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
@@ -42,16 +44,43 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     }
 
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
-    Record &  record    = row_tuple->record();
-    records_.emplace_back(std::move(record));
+
+    if (index == -1) {
+      // 找到index
+      TupleCellSpec tupleCellSpec;
+      int           cell_num = row_tuple->cell_num();
+      for (int i = 0; i < cell_num; i++) {
+        row_tuple->spec_at(i, tupleCellSpec);
+        if (strcmp(tupleCellSpec.field_name(), field_name) == 0) {
+          index = i;
+          break;
+        }
+      }
+    }
+    // 找到所有的value
+    int           cell_num = row_tuple->cell_num();
+    vector<Value> values;
+    for (int i = 0; i < cell_num; ++i) {
+      Value value;
+      row_tuple->cell_at(i, value);
+      values.push_back(value);
+    }
+    // 修改对应index的value
+    values[index] = value;
+
+    Record new_record_test;
+    new_record_test.set_rid(row_tuple->record().rid());
+    RC rc = table_->make_record(static_cast<int>(values.size()), values.data(), new_record_test);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to make record. rc=%s", strrc(rc));
+      return rc;
+    }
+   records_.push_back(new_record_test);
   }
 
   child->close();
-
-  // 先收集记录再删除
-  // 记录的有效性由事务来保证，如果事务不保证删除的有效性，那说明此事务类型不支持并发控制，比如VacuousTrx
   for (Record &record : records_) {
-    rc = trx_->delete_record(table_, record);
+    rc = trx_->update_record(table_, record);;
     if (rc != RC::SUCCESS) {
       LOG_WARN("failed to delete record: %s", strrc(rc));
       return rc;
@@ -61,9 +90,6 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   return RC::SUCCESS;
 }
 
-RC UpdatePhysicalOperator::next()
-{
-  return RC::RECORD_EOF;
-}
+RC UpdatePhysicalOperator::next() { return RC::RECORD_EOF; }
 
 RC UpdatePhysicalOperator::close() { return RC::SUCCESS; }

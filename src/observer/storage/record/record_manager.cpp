@@ -700,6 +700,20 @@ RC RecordFileHandler::visit_record(const RID &rid, function<bool(Record &)> upda
   return rc;
 }
 
+RC RecordFileHandler::update_record(const Record &record){
+  unique_ptr<RecordPageHandler> page_handler(RecordPageHandler::create(storage_format_));
+  auto rid = record.rid();
+  RC rc = page_handler->init(*disk_buffer_pool_, *log_handler_, rid.page_num, ReadWriteMode::READ_WRITE);
+  if (OB_FAIL(rc)) {
+    LOG_ERROR("Failed to init record page handler.page number=%d", rid.page_num);
+    return rc;
+  }
+
+  rc = page_handler->update_record(rid, record.data());
+
+  return rc;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 RecordFileScanner::~RecordFileScanner() { close_scan(); }
