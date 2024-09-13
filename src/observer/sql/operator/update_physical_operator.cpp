@@ -12,17 +12,17 @@ using namespace std;
 UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table, unique_ptr<ComparisonExpr> expression)
 {
   this->table_      = table;
-  this->expression_ = std::move(expression).release();
+  this->expression_ = std::move(expression);
 }
 
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
-  auto leftExpr  = std::move(expression_->left());
-  auto rightExpr = std::move(expression_->right());
+  auto leftExpr  = expression_->left().get();
+  auto rightExpr = expression_->right().get();
 
-  std::unique_ptr<FieldExpr> fieldExpression(static_cast<FieldExpr *>(leftExpr.release()));
+  FieldExpr *fieldExpression(static_cast<FieldExpr *>(leftExpr));
 
-  ValueExpr *valueExpression(static_cast<ValueExpr *>(rightExpr.release()));
+  ValueExpr *valueExpression(static_cast<ValueExpr *>(rightExpr));
 
   auto                               field_name = fieldExpression->field().field_name();
   auto                               value      = valueExpression->get_value();
@@ -61,9 +61,9 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     int           cell_num = row_tuple->cell_num();
     vector<Value> values;
     for (int i = 0; i < cell_num; ++i) {
-      Value value;
-      row_tuple->cell_at(i, value);
-      values.push_back(value);
+      Value cell;
+      row_tuple->cell_at(i, cell);
+      values.push_back(cell);
     }
     // 修改对应index的value
     values[index] = value;
@@ -75,7 +75,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       LOG_WARN("failed to make record. rc=%s", strrc(rc));
       return rc;
     }
-   records_.push_back(new_record_test);
+    records_.push_back(new_record_test);
   }
 
   child->close();
@@ -92,4 +92,8 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
 RC UpdatePhysicalOperator::next() { return RC::RECORD_EOF; }
 
-RC UpdatePhysicalOperator::close() { return RC::SUCCESS; }
+RC UpdatePhysicalOperator::close()
+{
+  // return children()[0]->close();
+  return RC::SUCCESS;
+}

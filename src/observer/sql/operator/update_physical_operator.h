@@ -17,22 +17,22 @@ class UpdateStmt;
 class UpdatePhysicalOperator : public PhysicalOperator
 {
 public:
-  UpdatePhysicalOperator() = default;
-  UpdatePhysicalOperator(Table *table, unique_ptr<ComparisonExpr> expression);
+    UpdatePhysicalOperator() = default;
+    UpdatePhysicalOperator(Table* table, unique_ptr<ComparisonExpr> expression);
 
-  ~UpdatePhysicalOperator() override = default;
+    ~UpdatePhysicalOperator() override = default;
 
-  PhysicalOperatorType type() const override { return PhysicalOperatorType::UPDATE; }
+    PhysicalOperatorType type() const override { return PhysicalOperatorType::UPDATE; }
 
-  RC open(Trx *trx) override;
-  RC next() override;
-  RC close() override;
+    RC open(Trx* trx) override;
+    RC next() override;
+    RC close() override;
 
-  Tuple *current_tuple() override { return nullptr; }
+    Tuple* current_tuple() override { return nullptr; }
 
 private:
-  Table                      *table_      = nullptr;
-  ComparisonExpr* expression_ = nullptr;
-  Trx                        *trx_        = nullptr;
-  std::vector<Record>         records_;
+    Table* table_ = nullptr;
+    unique_ptr<ComparisonExpr> expression_ = nullptr;
+    Trx* trx_ = nullptr;
+    std::vector<Record> records_;
 };
