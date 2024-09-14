@@ -116,6 +116,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LE
         GE
         NE
+        IS
+        NOT
+        NULL_
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -351,6 +354,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
+      $$->nullable = true;
       free($1);
     }
     | ID type
@@ -359,6 +363,25 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+      $$->nullable = true;
+      free($1);
+    }
+    | ID type LBRACE number RBRACE NOT NULL_
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = $4;
+      $$->nullable = false;
+      free($1);
+    }
+    | ID type NOT NULL_
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      $$->nullable = false;
       free($1);
     }
     ;
@@ -402,7 +425,11 @@ value_list:
     }
     ;
 value:
-    NUMBER {
+    NULL_ {
+      $$ = new Value();
+      @$ = @1;
+    }
+    | NUMBER {
       $$ = new Value((int)$1);
       @$ = @1;
     }
@@ -689,6 +716,64 @@ condition:
       delete $1;
       delete $3;
     }
+    | rel_attr IS NULL_
+     {
+       $$ = new ConditionSqlNode;
+       $$->left_is_attr = 1;
+       $$->left_attr = *$1;
+       $$->comp = IS_NULL;
+       $$->right_is_attr = 0;
+       $$->right_value = Value();
+       delete $1;
+     }
+     | value IS NULL_
+      {
+        $$ = new ConditionSqlNode;
+        $$->left_is_attr = 0;
+        $$->left_value = *$1;
+        $$->comp = IS_NULL;
+        $$->right_is_attr = 0;
+        $$->right_value = Value();
+        delete $1;
+      }
+      | value IS NOT NULL_
+      {
+        $$ = new ConditionSqlNode;
+        $$->left_is_attr = 0;
+        $$->left_value = *$1;
+        $$->comp = IS_NOT_NULL;
+        $$->right_is_attr = 0;
+        $$->right_value = Value();
+        delete $1;
+      }
+     | rel_attr IS NOT NULL_
+      {
+        $$ = new ConditionSqlNode;
+        $$->left_is_attr = 1;
+        $$->left_attr = *$1;
+        $$->comp = IS_NOT_NULL;
+        $$->right_is_attr = 0;
+        $$->right_value = Value();
+        delete $1;
+      }
+      | NULL_ IS NOT NULL_
+      {
+        $$ = new ConditionSqlNode;
+        $$->left_is_attr = 0;
+        $$->left_value = Value();
+        $$->comp = IS_NOT_NULL;
+        $$->right_is_attr = 0;
+        $$->right_value = Value();
+      }
+      | NULL_ IS  NULL_
+      {
+        $$ = new ConditionSqlNode;
+        $$->left_is_attr = 0;
+        $$->left_value = Value();
+        $$->comp = IS_NULL;
+        $$->right_is_attr = 0;
+        $$->right_value = Value();
+      }
     ;
 
 comp_op:

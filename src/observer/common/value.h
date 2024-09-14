@@ -35,7 +35,10 @@ public:
   friend class BooleanType;
   friend class CharType;
 
-  Value() = default;
+  Value()
+  {
+    this->attr_type_ = AttrType::NULL_;
+  };
 
   ~Value() { reset(); }
 
@@ -108,6 +111,8 @@ public:
   float  get_float() const;
   string get_string() const;
   bool   get_boolean() const;
+  bool   is_null() const;
+
 
 private:
   void set_int(int val);

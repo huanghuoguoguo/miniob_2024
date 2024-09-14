@@ -123,6 +123,9 @@ INNER                                   RETURN_TOKEN(INNER);
 OUTER                                   RETURN_TOKEN(OUTER);
 LEFT                                    RETURN_TOKEN(LEFT);
 RIGHT                                   RETURN_TOKEN(RIGHT);
+NULL                                    RETURN_TOKEN(NULL_);
+IS                                      RETURN_TOKEN(IS);
+NOT                                     RETURN_TOKEN(NOT);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
