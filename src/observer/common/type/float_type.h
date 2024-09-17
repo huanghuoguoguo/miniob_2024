@@ -28,9 +28,10 @@ public:
   RC subtract(const Value &left, const Value &right, Value &result) const override;
   RC multiply(const Value &left, const Value &right, Value &result) const override;
   RC divide(const Value &left, const Value &right, Value &result) const override;
-  RC negative(const Value &val, Value &result) const override;
-
-  RC set_value_from_str(Value &val, const string &data) const override;
+  RC negative(const Value& val, Value& result) const override;
+  int cast_cost(AttrType type) override;
+  RC cast_to(const Value& val, AttrType type, Value& result) const override;
+  RC set_value_from_str(Value& val, const string& data) const override;
 
   RC to_string(const Value &val, string &result) const override;
 };
