@@ -260,6 +260,7 @@ struct ErrorSqlNode
   std::string error_msg;
   int         line;
   int         column;
+  bool        flag;
 };
 
 /**
@@ -290,6 +291,7 @@ enum SqlCommandFlag
   SCF_EXIT,
   SCF_EXPLAIN,
   SCF_SET_VARIABLE,  ///< 设置变量
+  SCF_DATE
 };
 /**
  * @brief 表示一个SQL语句
