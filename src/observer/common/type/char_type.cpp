@@ -30,7 +30,7 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
   auto extract_number = [](const std::string &str) -> std::string {
-    std::regex re("([0-9]+\\.?[0-9]*)");
+    std::regex re("^([0-9]+\\.?[0-9]*)");
     std::smatch match;
     if (std::regex_search(str, match, re)) {
       return match.str(0); // 返回匹配到的第一个数字部分
