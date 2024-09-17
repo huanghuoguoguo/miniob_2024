@@ -29,6 +29,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/show_tables_stmt.h"
 #include "sql/stmt/trx_begin_stmt.h"
 #include "sql/stmt/trx_end_stmt.h"
+#include "drop_table_stmt.h"
 
 bool stmt_type_ddl(StmtType type)
 {
@@ -69,6 +70,10 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
 
     case SCF_CREATE_TABLE: {
       return CreateTableStmt::create(db, sql_node.create_table, stmt);
+    }
+
+    case SCF_DROP_TABLE: {
+      return DropTableStmt::create(db, sql_node.drop_table, stmt);
     }
 
     case SCF_DESC_TABLE: {
@@ -112,5 +117,5 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
       LOG_INFO("Command::type %d doesn't need to create statement.", sql_node.flag);
     } break;
   }
-  return RC::UNIMPLENMENT;
+  return RC::UNIMPLEMENTED;
 }

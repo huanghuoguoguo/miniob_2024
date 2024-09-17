@@ -140,25 +140,65 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
 {
   RC rc = RC::SUCCESS;
   // check table_name
-  if (opened_tables_.count(table_name) != 0) {
-    LOG_WARN("%s has been opened before.", table_name);
+  if (opened_tables_.count(table_name) != 0) {  // opened_tables_是一个map容器，里面存放了 数据库中作用的表名
+    LOG_WARN("%s has been opened before.", table_name); // 检查将要创建的表名是否存在
     return RC::SCHEMA_TABLE_EXIST;
   }
 
   // 文件路径可以移到Table模块
   string  table_file_path = table_meta_file(path_.c_str(), table_name);
   Table  *table           = new Table();
-  int32_t table_id        = next_table_id_++;
+  int32_t table_id        = next_table_id_++; // 给每一个table都分配一个id 用来记录日志
+
+  // 下面是建表的简陋实现
   rc = table->create(this, table_id, table_file_path.c_str(), table_name, path_.c_str(), attributes, storage_format);
-  if (rc != RC::SUCCESS) {
-    LOG_ERROR("Failed to create table %s.", table_name);
-    delete table;
+  // 表id 表文件的路径 表名  父路径 字段数量
+
+  if (rc != RC::SUCCESS) {  // 创表失败后的操作
+    LOG_ERROR("Failed to create table %s.", table_name);   //输出日志
+    delete table; // 创建失败要删除
     return rc;
   }
 
-  opened_tables_[table_name] = table;
-  LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);
+  opened_tables_[table_name] = table; // 将创建的新表加入到map容器中
+  LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);  // 输出日志
   return RC::SUCCESS;
+}
+
+RC Db::drop_table(const char *table_name) {
+  RC rc = RC::SUCCESS;
+  // 查看表是否存在
+  auto it = opened_tables_.find(table_name);
+  if (it == opened_tables_.end()) {  // opened_tables_是一个map容器，里面存放了 数据库中作用的表名
+    LOG_WARN("%s does not exist .", table_name); // 检查将要删除的表名是否存在
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  Table  *table = opened_tables_[table_name]; // 找到要删除的表
+  //  删除索引
+  table->drop_all_index();
+  opened_tables_.erase(table_name);  // 从opened_tables_删除表
+  delete table;
+
+  // 获取表的元数据文件路径
+  auto  table_meta_name = table_meta_file(path_.c_str(), table_name);
+
+  //表的实际数据文件路径
+  auto table_data_name = table_data_file(path_.c_str(), table_name);
+
+  if(unlink(table_data_name.c_str()) == -1){
+    // 删除实际文件数据
+    LOG_ERROR("failed to delete table (%s) data file %s.",table_name,table_data_name.c_str());
+    return RC::IOERR_UNLINK;
+  }
+  if(unlink(table_meta_name.c_str()) == -1){
+    // 删除元文件数据
+    LOG_ERROR("failed to delete table (%s) meta file %s.",table_name,table_meta_name.c_str());
+    return RC::IOERR_UNLINK;
+  }
+
+  return RC::SUCCESS;
+  return rc;
 }
 
 Table *Db::find_table(const char *table_name) const
@@ -400,3 +440,4 @@ RC Db::init_dblwr_buffer()
 LogHandler        &Db::log_handler() { return *log_handler_; }
 BufferPoolManager &Db::buffer_pool_manager() { return *buffer_pool_manager_; }
 TrxKit            &Db::trx_kit() { return *trx_kit_; }
+
