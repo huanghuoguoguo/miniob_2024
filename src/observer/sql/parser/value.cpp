@@ -158,6 +158,7 @@ std::string Value::to_string() const
 
 int Value::compare(const Value &other) const
 {
+  // TODO 性能问题先不解决。
   auto extract_number = [](const std::string &str) -> std::string {
     std::regex re("([0-9]+\\.?[0-9]*)");
     std::smatch match;
