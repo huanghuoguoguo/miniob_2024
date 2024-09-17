@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 // Created by WangYunlai on 2023/06/28.
 //
 
+#include <regex>
 #include "sql/parser/value.h"
 #include "common/lang/comparator.h"
 #include "common/lang/string.h"
@@ -157,6 +158,14 @@ std::string Value::to_string() const
 
 int Value::compare(const Value &other) const
 {
+  auto extract_number = [](const std::string &str) -> std::string {
+    std::regex re("([0-9]+\\.?[0-9]*)");
+    std::smatch match;
+    if (std::regex_search(str, match, re)) {
+      return match.str(0); // 返回匹配到的第一个数字部分
+    }
+    return "0"; // 如果没有找到数字部分，返回 0
+  };
   if (this->attr_type_ == other.attr_type_) {
     switch (this->attr_type_) {
       case AttrType::INTS: {
@@ -183,6 +192,22 @@ int Value::compare(const Value &other) const
     return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
   } else if (this->attr_type_ == AttrType::FLOATS && other.attr_type_ == AttrType::INTS) {
     float other_data = other.num_value_.int_value_;
+    return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
+  } else if (this->attr_type_ == AttrType::CHARS && other.attr_type_ == AttrType::INTS) {
+    // 使用 Lambda 提取字符串中的数字部分，并转换为整数
+    int this_data = std::stoi(extract_number(this->str_value_));
+    return common::compare_int((void *)&this_data, (void *)&other.num_value_.int_value_);
+  } else if (this->attr_type_ == AttrType::INTS && other.attr_type_ == AttrType::CHARS) {
+    // 使用 Lambda 提取字符串中的数字部分，并转换为整数
+    int other_data = std::stoi(extract_number(other.str_value_));
+    return common::compare_int((void *)&this->num_value_.int_value_, (void *)&other_data);
+  } else if (this->attr_type_ == AttrType::CHARS && other.attr_type_ == AttrType::FLOATS) {
+    // 使用 Lambda 提取字符串中的数字部分，并转换为浮点数
+    float this_data = std::stof(extract_number(this->str_value_));
+    return common::compare_float((void *)&this_data, (void *)&other.num_value_.float_value_);
+  } else if (this->attr_type_ == AttrType::FLOATS && other.attr_type_ == AttrType::CHARS) {
+    // 使用 Lambda 提取字符串中的数字部分，并转换为浮点数
+    float other_data = std::stof(extract_number(other.str_value_));
     return common::compare_float((void *)&this->num_value_.float_value_, (void *)&other_data);
   }
   LOG_WARN("not supported");
