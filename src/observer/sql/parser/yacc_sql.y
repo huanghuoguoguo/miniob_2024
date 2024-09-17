@@ -119,6 +119,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         IS
         NOT
         NULL_
+        NULLABLE
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -375,6 +376,15 @@ attr_def:
       $$->nullable = false;
       free($1);
     }
+    | ID type LBRACE number RBRACE NULLABLE
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = $4;
+      $$->nullable = true;
+      free($1);
+    }
     | ID type NOT NULL_
     {
       $$ = new AttrInfoSqlNode;
@@ -382,6 +392,15 @@ attr_def:
       $$->name = $1;
       $$->length = 4;
       $$->nullable = false;
+      free($1);
+    }
+    | ID type NULLABLE
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      $$->nullable = true;
       free($1);
     }
     ;

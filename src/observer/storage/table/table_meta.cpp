@@ -103,6 +103,10 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       return rc;
     }
 
+    if(visible == false) {
+      // 手动加入到trx数组中。
+      trx_fields_.push_back(fields_[i]);
+    }
     field_offset += attr_info.length;
   }
 
