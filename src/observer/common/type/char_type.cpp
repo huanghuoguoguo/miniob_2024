@@ -8,6 +8,7 @@ EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
+#include <regex>
 #include "common/lang/comparator.h"
 #include "common/log/log.h"
 #include "common/type/char_type.h"
@@ -28,7 +29,21 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
+  auto extract_number = [](const std::string &str) -> std::string {
+    std::regex re("^([0-9]+\\.?[0-9]*)");
+    std::smatch match;
+    if (std::regex_search(str, match, re)) {
+      return match.str(0); // 返回匹配到的第一个数字部分
+    }
+    return "0"; // 如果没有找到数字部分，返回 0
+  };
   switch (type) {
+    case AttrType::INTS:
+      result.set_int(std::stoi(extract_number(val.get_string())));
+      break;
+    case AttrType::FLOATS:
+      result.set_float(std::stof(extract_number(val.get_string())));
+      break;
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;
@@ -38,6 +53,8 @@ int CharType::cast_cost(AttrType type)
 {
   if (type == AttrType::CHARS) {
     return 0;
+  } else if (type == AttrType::INTS || type == AttrType::FLOATS) {
+    return 1;
   }
   return INT32_MAX;
 }
