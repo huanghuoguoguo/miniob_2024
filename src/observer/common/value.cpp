@@ -255,8 +255,7 @@ int Value::get_int() const
         return 0;
       }
     }
-    case AttrType::INTS:
-    case AttrType::DATES: {
+    case AttrType::INTS:{
       return value_.int_value_;
     }
     case AttrType::FLOATS: {
@@ -285,8 +284,7 @@ float Value::get_float() const
         return 0.0;
       }
     } break;
-    case AttrType::INTS:
-    case AttrType::DATES: {
+    case AttrType::INTS:{
       return float(value_.int_value_);
     } break;
     case AttrType::FLOATS: {
@@ -326,8 +324,7 @@ bool Value::get_boolean() const
         return value_.pointer_value_ != nullptr;
       }
     } break;
-    case AttrType::INTS:
-    case AttrType::DATES: {
+    case AttrType::INTS: {
       return value_.int_value_ != 0;
     } break;
     case AttrType::FLOATS: {

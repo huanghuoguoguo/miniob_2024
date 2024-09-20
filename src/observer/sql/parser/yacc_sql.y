@@ -11,6 +11,7 @@
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/yacc_sql.hpp"
 #include "sql/parser/lex_sql.h"
+#include "common/type/date_type.h"
 #include "sql/expr/expression.h"
 
 using namespace std;
@@ -145,6 +146,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %token <floats> FLOAT
 %token <string> ID
 %token <string> SSS
+%token <string> DATE_STR
 //非终结符
 
 /** type 定义了各种解析后的结果输出的是什么类型。类型对应了 union 中的定义的成员变量名称 **/
@@ -418,6 +420,25 @@ value:
       $$ = new Value(tmp);
       free(tmp);
       free($1);
+    }
+    |DATE_STR {
+      char *tmp = common::substr($1,1,strlen($1)-2);
+      std::string str(tmp);
+      Value * value = new Value();
+      int date;
+       DateType date_type;
+      if(date_type.string_to_date(str,date) < 0)
+      {
+        yyerror(&@$,sql_string,sql_result,scanner,"date invaid",true);
+        YYERROR;
+
+      }
+      else
+      {
+        value->set_date(date);
+      }
+      $$ = value;
+      free(tmp);
     }
     ;
 storage_format:

@@ -11,7 +11,6 @@ RC DateType::to_string(const Value &val, string &result) const
 {
   std::stringstream ss;
 
-  //todo 成员无法访问
   int32_t int_value = val.value_.int_value_;
   std::string       ans       = "YYYY-MM-DD";
   std::string       tmp       = std::to_string(int_value);
@@ -30,15 +29,10 @@ RC DateType::to_string(const Value &val, string &result) const
 }
 
 int DateType::compare(const Value &left, const Value &right) const
-{
-  ASSERT(left.attr_type() == AttrType::INTS, "left type is not integer");
-  ASSERT(right.attr_type() == AttrType::INTS || right.attr_type() == AttrType::FLOATS, "right type is not numeric");
-  if (right.attr_type() == AttrType::INTS) {
+{   if (left.attr_type() == AttrType::DATES && right.attr_type() == AttrType::DATES)
     return common::compare_int((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
-  } else if (right.attr_type() == AttrType::FLOATS) {
-    return common::compare_float((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
-  }
-  return INT32_MAX;
+
+    return INT32_MAX;
 }
 
 RC DateType::set_value_from_str(Value &val, const string &data) const
