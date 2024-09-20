@@ -20,11 +20,12 @@ int IntegerType::compare(const Value &left, const Value &right) const
   ASSERT(right.attr_type() == AttrType::INTS || right.attr_type() == AttrType::FLOATS, "right type is not numeric");
   if (right.attr_type() == AttrType::INTS)
     return common::compare_int((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
-  // } else if (right.attr_type() == AttrType::FLOATS) {
-  //   return common::compare_float((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
-  // }
+  else if (right.attr_type() == AttrType::FLOATS) {
+    return common::compare_float((void *)&left.value_.int_value_, (void *)&right.value_.int_value_);
+  }
   return INT32_MAX;
 }
+
 
 RC IntegerType::add(const Value &left, const Value &right, Value &result) const
 {
