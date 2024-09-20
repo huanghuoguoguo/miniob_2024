@@ -8,7 +8,7 @@
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
-#include "../../common/type/date_type.h"
+#include "common/type/date_type.h"
 #include "sql/parser/parse_defs.h"
 #include "sql/parser/yacc_sql.hpp"
 #include "sql/parser/lex_sql.h"
@@ -426,7 +426,7 @@ value:
       std::string str(tmp);
       Value * value = new Value();
       int date;
-      if(string_to_date(str,date) < 0)
+      if(DateType::string_to_date(str,date) < 0)
       {
         yyerror(&@$,sql_string,sql_result,scanner,"date invaid",true);
         YYERROR;
