@@ -32,7 +32,15 @@ public:
   CreateTableStmt(
       const std::string &table_name, const std::vector<AttrInfoSqlNode> &attr_infos, StorageFormat storage_format)
       : table_name_(table_name), attr_infos_(attr_infos), storage_format_(storage_format)
-  {}
+  {
+    // 插入null
+    AttrInfoSqlNode attr_info;
+    attr_info.name = "null_list";
+    attr_info.length = 4;
+    attr_info.nullable = false;
+    attr_info.type = AttrType::INTS;
+    attr_infos_.insert(attr_infos_.begin(), attr_info);
+  }
   virtual ~CreateTableStmt() = default;
 
   StmtType type() const override { return StmtType::CREATE_TABLE; }

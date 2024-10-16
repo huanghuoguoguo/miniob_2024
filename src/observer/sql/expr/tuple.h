@@ -171,7 +171,15 @@ public:
     speces_.clear();
   }
 
-  void set_record(Record *record) { this->record_ = record; }
+  void set_record(Record *record)
+  {
+    this->record_ = record;
+    char* data = record_->data();
+    const FieldMeta* null_list_meta = table_->table_meta().field("null_list");
+    int v;
+    memcpy(&v, data + null_list_meta->offset(), sizeof(int));
+    null_list = std::bitset<32>(v);
+  }
 
   void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
   {
@@ -195,6 +203,13 @@ public:
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
       LOG_WARN("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
+    }
+
+    int null_index = index - table_->table_meta().sys_field_num();
+    if (null_index >= 0 && null_list[null_index])
+    {
+      cell.set_type(AttrType::NULL_);
+      return RC::SUCCESS;
     }
 
     FieldExpr       *field_expr = speces_[index];
@@ -249,6 +264,7 @@ private:
   Record                  *record_ = nullptr;
   const Table             *table_  = nullptr;
   std::vector<FieldExpr *> speces_;
+  std::bitset<32>         null_list;
 };
 
 /**

@@ -24,6 +24,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/limits.h"
 #include "storage/field/field_meta.h"
 #include "storage/index/index_meta.h"
+#include <bitset>
 
 class Field;
 
@@ -238,10 +239,8 @@ public:
   }
   RID       &rid() { return rid_; }
   const RID &rid() const { return rid_; }
-
 private:
   RID rid_;
-
   char *data_  = nullptr;
   int   len_   = 0;      /// 如果不是record自己来管理内存，这个字段可能是无效的
   bool  owner_ = false;  /// 表示当前是否由record来管理内存

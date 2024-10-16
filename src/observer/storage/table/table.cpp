@@ -14,7 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <limits.h>
 #include <string.h>
-
+#include <bitset>
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/lang/span.h"
@@ -268,12 +268,13 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   // 复制所有字段的值
   int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
+  std::bitset<32> null_list;
   memset(record_data, 0, record_size);
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &    value = values[i];
-    if (field->type() != value.attr_type()) {
+    if (field->type() != value.attr_type() && !value.is_null()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
       if (OB_FAIL(rc)) {
@@ -282,10 +283,17 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
         break;
       }
       rc = set_value_to_record(record_data, real_value, field);
-    } else {
+    } else if(value.is_null()) {
+      // 将bitmap对应位置置为true。
+      null_list.set(i);
+    }
+    else {
       rc = set_value_to_record(record_data, value, field);
     }
   }
+  const FieldMeta *field = table_meta_.field("null_list");
+  rc = set_value_to_record(record_data, Value(static_cast<int>(null_list.to_ulong())), field);
+
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to make record. table name:%s", table_meta_.name());
     free(record_data);
@@ -298,6 +306,9 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
+  if(value.is_null()) {
+    return RC::SUCCESS;
+  }
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
   if (field->type() == AttrType::CHARS) {

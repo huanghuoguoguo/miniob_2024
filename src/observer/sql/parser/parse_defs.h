@@ -46,13 +46,15 @@ struct RelAttrSqlNode
  */
 enum CompOp
 {
-  EQUAL_TO,     ///< "="
-  LESS_EQUAL,   ///< "<="
-  NOT_EQUAL,    ///< "<>"
-  LESS_THAN,    ///< "<"
-  GREAT_EQUAL,  ///< ">="
-  GREAT_THAN,   ///< ">"
-  NO_OP
+    EQUAL_TO, ///< "="
+    LESS_EQUAL, ///< "<="
+    NOT_EQUAL, ///< "<>"
+    LESS_THAN, ///< "<"
+    GREAT_EQUAL, ///< ">="
+    GREAT_THAN, ///< ">"
+    IS_NULL, ///< is null
+    IS_NOT_NULL, ///< is not null
+    NO_OP,
 };
 
 /**
@@ -155,9 +157,10 @@ struct UpdateSqlNode
  */
 struct AttrInfoSqlNode
 {
-  AttrType    type;    ///< Type of attribute
-  std::string name;    ///< Attribute name
-  size_t      length;  ///< Length of attribute
+    AttrType type; ///< Type of attribute
+    std::string name; ///< Attribute name
+    size_t length; ///< Length of attribute
+    bool nullable;  ///< Type the attribute nullable
 };
 
 /**

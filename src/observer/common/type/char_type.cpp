@@ -16,6 +16,8 @@ See the Mulan PSL v2 for more details. */
 
 int CharType::compare(const Value &left, const Value &right) const
 {
+  if (right.is_null())
+    return INT32_MAX;
   ASSERT(left.attr_type() == AttrType::CHARS && right.attr_type() == AttrType::CHARS, "invalid type");
   return common::compare_string(
       (void *)left.value_.pointer_value_, left.length_, (void *)right.value_.pointer_value_, right.length_);

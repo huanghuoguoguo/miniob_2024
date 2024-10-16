@@ -123,6 +123,8 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   RC  rc         = RC::SUCCESS;
   int cmp_result = left.compare(right);
   result         = false;
+  if (cmp_result == INT32_MAX)
+    return rc;
   switch (comp_) {
     case EQUAL_TO: {
       result = (0 == cmp_result);
@@ -142,10 +144,25 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     case GREAT_THAN: {
       result = (cmp_result > 0);
     } break;
+    case IS_NULL: {
+      if (left.attr_type() == AttrType::NULL_)
+        result = true;
+      else
+        result = false;
+    }
+    break;
+    case IS_NOT_NULL: {
+      if (left.attr_type() != AttrType::NULL_)
+        result = true;
+      else
+        result = false;
+    }
+    break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
       rc = RC::INTERNAL;
-    } break;
+    }
+    break;
   }
 
   return rc;
