@@ -34,6 +34,7 @@ public:
   friend class FloatType;
   friend class BooleanType;
   friend class CharType;
+  friend class DateType;
 
   Value() = default;
 
@@ -86,6 +87,7 @@ public:
 
   void set_type(AttrType type) { this->attr_type_ = type; }
   void set_data(char *data, int length);
+  void set_date(int val);
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
