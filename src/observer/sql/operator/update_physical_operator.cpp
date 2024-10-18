@@ -53,7 +53,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       for (int i = table->table_meta().sys_field_num(); i < cell_num; i++) {
         row_tuple->spec_at(i, tupleCellSpec);
         if (strcmp(tupleCellSpec.field_name(), field_name) == 0) {
-          index = i;
+          index = i - table->table_meta().sys_field_num();
           break;
         }
       }
@@ -61,7 +61,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
     // 找到所有的value
     int           cell_num = row_tuple->cell_num();
     vector<Value> values;
-    for (int i = 0; i < cell_num; ++i) {
+    for (int i = table->table_meta().sys_field_num(); i < cell_num; ++i) {
       Value cell;
       row_tuple->cell_at(i, cell);
       values.push_back(cell);

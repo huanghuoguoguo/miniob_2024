@@ -37,14 +37,18 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
     if (std::regex_search(str, match, re)) {
       return match.str(0); // 返回匹配到的第一个数字部分
     }
-    return "0"; // 如果没有找到数字部分，返回 0
+    return "error"; // 如果没有找到数字部分，返回 0
   };
+  auto str = extract_number(val.get_string());
+  if (str == "error") {
+        return RC::INVALID_ARGUMENT;
+  }
   switch (type) {
     case AttrType::INTS:
-      result.set_int(std::stoi(extract_number(val.get_string())));
+      result.set_int(std::stoi(str));
       break;
     case AttrType::FLOATS:
-      result.set_float(std::stof(extract_number(val.get_string())));
+      result.set_float(std::stof(str));
       break;
     default: return RC::UNIMPLEMENTED;
   }

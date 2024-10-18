@@ -280,14 +280,13 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
       if (OB_FAIL(rc)) {
         LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
             table_meta_.name(), field->name(), value.to_string().c_str());
-        break;
+        return rc;
       }
       rc = set_value_to_record(record_data, real_value, field);
     } else if(value.is_null()) {
       // 将bitmap对应位置置为true。
       null_list.set(i);
-    }
-    else {
+    } else {
       rc = set_value_to_record(record_data, value, field);
     }
   }
