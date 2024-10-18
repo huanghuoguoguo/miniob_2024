@@ -259,7 +259,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 {
   RC rc = RC::SUCCESS;
   // 检查字段类型是否一致
-  if (value_num != table_meta_.field_num()) {
+  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
     LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
     return RC::SCHEMA_FIELD_MISSING;
   }
@@ -271,8 +271,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   std::bitset<32> null_list;
   memset(record_data, 0, record_size);
 
-  int normal_field_index = value_num - table_meta_.sys_field_num();
-  for (int i = 0; i < normal_field_index && OB_SUCC(rc); i++) {
+  for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value &    value = values[i];
     if (field->type() != value.attr_type() && !value.is_null()) {

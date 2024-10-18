@@ -25,6 +25,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   ValueExpr *valueExpression(static_cast<ValueExpr *>(rightExpr));
 
   auto                               field_name = fieldExpression->field().field_name();
+  auto                               table      = fieldExpression->field().table();
   auto                               value      = valueExpression->get_value();
   std::unique_ptr<PhysicalOperator> &child      = children_[0];
 
@@ -49,7 +50,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       // 找到index
       TupleCellSpec tupleCellSpec;
       int           cell_num = row_tuple->cell_num();
-      for (int i = 0; i < cell_num; i++) {
+      for (int i = table->table_meta().sys_field_num(); i < cell_num; i++) {
         row_tuple->spec_at(i, tupleCellSpec);
         if (strcmp(tupleCellSpec.field_name(), field_name) == 0) {
           index = i;
