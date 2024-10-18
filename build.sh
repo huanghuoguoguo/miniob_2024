@@ -91,7 +91,6 @@ function do_init
     ${CMAKE_COMMAND} .. && \
     ${MAKE_COMMAND} -j4 && \
     ${MAKE_COMMAND} install
-
   # build google benchmark
   cd ${TOPDIR}/deps/3rd/benchmark && \
     mkdir -p build && \

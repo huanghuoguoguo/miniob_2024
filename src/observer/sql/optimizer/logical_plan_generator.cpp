@@ -37,6 +37,9 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression_iterator.h"
 
+#include <sql/operator/update_logical_operator.h>
+#include <sql/stmt/update_stmt.h>
+
 using namespace std;
 using namespace common;
 
@@ -54,6 +57,12 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
       SelectStmt *select_stmt = static_cast<SelectStmt *>(stmt);
 
       rc = create_plan(select_stmt, logical_operator);
+    } break;
+
+    case StmtType::UPDATE: {
+      UpdateStmt *update_stmt = static_cast<UpdateStmt *>(stmt);
+
+      rc = create_plan(update_stmt, logical_operator);
     } break;
 
     case StmtType::INSERT: {
@@ -164,6 +173,48 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
   logical_operator = std::move(project_oper);
   return RC::SUCCESS;
 }
+
+RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<LogicalOperator> &logical_operator)
+{
+  unique_ptr<LogicalOperator> *last_oper = nullptr;
+
+  unique_ptr<LogicalOperator> table_oper(nullptr);
+  last_oper = &table_oper;
+
+  Table *table = update_stmt->table();
+
+  unique_ptr<LogicalOperator> table_get_oper(new TableGetLogicalOperator(table, ReadWriteMode::READ_ONLY));
+
+  if (table_oper == nullptr) {
+    table_oper = std::move(table_get_oper);
+  }
+
+  unique_ptr<LogicalOperator> predicate_oper;
+
+  RC rc = create_plan(update_stmt->filter_stmt(), predicate_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // todo
+  if (predicate_oper) {
+    if (*last_oper) {
+      predicate_oper->add_child(std::move(*last_oper));
+    }
+    last_oper = &predicate_oper;
+  }
+  std::unique_ptr<ComparisonExpr>& expression = update_stmt->getComparisonExpr();
+
+  auto update_oper = make_unique<UpdateLogicalOperator>(table,expression);
+  if (*last_oper) {
+    update_oper->add_child(std::move(*last_oper));
+  }
+
+  logical_operator = std::move(update_oper);
+  return RC::SUCCESS;
+}
+
 
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {

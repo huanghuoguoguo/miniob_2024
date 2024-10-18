@@ -462,12 +462,12 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   return rc;
 }
 
-
-RC Table::drop_all_index() {
+RC Table::drop_all_index()
+{
   // 遍历并删除所有索引
   for (Index *index : indexes_) {
     const char *index_name = index->index_meta().name();
-    string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+    string      index_file = table_index_file(base_dir_.c_str(), name(), index_name);
 
     // 删除索引文件
     if (remove(index_file.c_str()) != 0) {
@@ -484,14 +484,14 @@ RC Table::drop_all_index() {
 
   // 更新表元数据
   TableMeta new_table_meta(table_meta_);
-  RC rc = new_table_meta.remove_all_index();
+  RC        rc = new_table_meta.remove_all_index();
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to remove all indexes meta for table %s. error=%d:%s", name(), rc, strrc(rc));
     return rc;
   }
 
   // 更新磁盘上的元数据文件
-  string tmp_file = table_meta_file(base_dir_.c_str(), name()) + ".tmp";
+  string  tmp_file = table_meta_file(base_dir_.c_str(), name()) + ".tmp";
   fstream fs;
   fs.open(tmp_file, ios_base::out | ios_base::binary | ios_base::trunc);
   if (!fs.is_open()) {
@@ -506,7 +506,7 @@ RC Table::drop_all_index() {
 
   // 覆盖原始元数据文件
   string meta_file = table_meta_file(base_dir_.c_str(), name());
-  int ret = rename(tmp_file.c_str(), meta_file.c_str());
+  int    ret       = rename(tmp_file.c_str(), meta_file.c_str());
   if (ret != 0) {
     LOG_ERROR("Failed to rename tmp meta file (%s) to normal meta file (%s) while dropping all indexes on table (%s). "
               "system error=%d:%s",
@@ -518,7 +518,6 @@ RC Table::drop_all_index() {
   LOG_INFO("Successfully dropped all indexes on table %s", name());
   return RC::SUCCESS;
 }
-
 
 RC Table::delete_record(const RID &rid)
 {
@@ -542,6 +541,16 @@ RC Table::delete_record(const Record &record)
            name(), index->index_meta().name(), record.rid().to_string().c_str(), strrc(rc));
   }
   rc = record_handler_->delete_record(&record.rid());
+  return rc;
+}
+
+RC Table::update_record(const Record &record_)
+{
+  RC rc = RC::SUCCESS;
+  rc    = record_handler_->visit_record(record_.rid(), [&record_](Record &record) {
+              record.copy_data(record_.data(), record_.len());
+              return true;
+  });
   return rc;
 }
 
@@ -570,7 +579,6 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
   }
   return rc;
 }
-
 
 Index *Table::find_index(const char *index_name) const
 {

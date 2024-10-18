@@ -78,6 +78,7 @@ public:
   RC insert_record(Record &record);
   RC delete_record(const Record &record);
   RC delete_record(const RID &rid);
+  RC update_record(const Record & record);
   RC get_record(const RID &rid, Record &record);
 
   RC recover_insert_record(Record &record);
@@ -110,6 +111,8 @@ public:
   const TableMeta &table_meta() const;
 
   RC sync();
+
+
 
 private:
   RC insert_entry_of_indexes(const char *record, const RID &rid);

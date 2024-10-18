@@ -700,6 +700,8 @@ RC RecordFileHandler::visit_record(const RID &rid, function<bool(Record &)> upda
   return rc;
 }
 
+
+
 ////////////////////////////////////////////////////////////////////////////////
 
 RecordFileScanner::~RecordFileScanner() { close_scan(); }
