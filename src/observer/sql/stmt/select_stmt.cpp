@@ -79,35 +79,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
-  // 将表达式绑定。
-  vector<unique_ptr<Expression>> where_expressions;
-  for (ConditionSqlNode &expression : select_sql.conditions) {
-    std::unique_ptr<Expression> left(expression.left_expr);
-    RC                          rc = expression_binder.bind_expression(left, where_expressions);
-    if (OB_FAIL(rc)) {
-      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
-      return rc;
-    }
-
-    if(!where_expressions.empty()) {
-      expression.left_expr = where_expressions[0].release();
-    }else {
-      expression.left_expr = left.release();
-    }
-    where_expressions.clear();
-
-    std::unique_ptr<Expression> right(expression.right_expr);
-    rc            = expression_binder.bind_expression(right, where_expressions);
-    if(!where_expressions.empty()) {
-      expression.right_expr = where_expressions[0].release();
-    }else {
-      expression.right_expr = right.release();
-    }
-
-    if (OB_FAIL(rc)) {
-      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
-      return rc;
-    }
+  RC rc = expression_binder.bind_condition_expression(select_sql.conditions);
+  if (OB_FAIL(rc)) {
+    LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+    return rc;
   }
 
   // group
@@ -146,7 +121,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC         rc         = FilterStmt::create(db,
+  rc         = FilterStmt::create(db,
       default_table,
       &table_map,
       select_sql.conditions.data(),
