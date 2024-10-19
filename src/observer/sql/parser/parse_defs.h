@@ -89,6 +89,10 @@ struct GroupBySqlNode
 {
   std::vector<FieldExpr *> exprs_;
 };
+struct GroupBySqlNode
+{
+  std::vector<FieldExpr *> exprs_;
+};
 
 /**
  * @brief 描述一个select语句
