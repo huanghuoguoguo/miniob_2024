@@ -1,4 +1,4 @@
-%debug
+
 %{
 
 #include <stdio.h>
