@@ -79,6 +79,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  // conditions
+  RC rc = expression_binder.bind_condition_expression(select_sql.conditions);
+  if (OB_FAIL(rc)) {
+    LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+    return rc;
+  }
+
   // group
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
@@ -98,7 +105,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   std::vector<pair<Table*,FilterStmt*>> join_filter_stmts;
   for(size_t i = 0; i < select_sql.join_list.size(); i++) {
     FilterStmt *join_filter_stmt = nullptr;
-    RC          rc          = FilterStmt::create(db,
+    // conditions
+    RC rc = expression_binder.bind_condition_expression(select_sql.join_list[i].conditions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    rc          = FilterStmt::create(db,
         default_table,
         &table_map,
         select_sql.join_list[i].conditions.data(),
@@ -115,7 +129,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC         rc         = FilterStmt::create(db,
+  rc         = FilterStmt::create(db,
       default_table,
       &table_map,
       select_sql.conditions.data(),

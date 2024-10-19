@@ -59,7 +59,7 @@ extern double atof();
 %option case-insensitive
 %option bison-locations
 
-WHITE_SAPCE      [\ \t\b\f]
+WHITE_SPACE      [\ \t\b\f]
 DIGIT            [0-9]+
 
 ID               [A-Za-z_]+[A-Za-z0-9_]*
@@ -74,11 +74,11 @@ QUOTE            [\'\"]
 /* yylval 就可以认为是 yacc 中 %union 定义的结构体(union 结构) */
 %%
 
-{WHITE_SAPCE}                                        // ignore whitespace
+{WHITE_SPACE}                                        // ignore whitespace
 \n                                                   ;
 
-[\-]?{DIGIT}+                           yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
-[\-]?{DIGIT}+{DOT}{DIGIT}+              yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
+{DIGIT}+                           yylval->number=atoi(yytext); RETURN_TOKEN(NUMBER);
+{DIGIT}+{DOT}{DIGIT}+              yylval->floats=(float)(atof(yytext)); RETURN_TOKEN(FLOAT);
 
 ";"                                     RETURN_TOKEN(SEMICOLON);
 {DOT}                                   RETURN_TOKEN(DOT);
@@ -152,6 +152,10 @@ IS                                      RETURN_TOKEN(IS);
 {QUOTE}([0-9]{4})\-([0-9]|[0-9]{2})\-([0-9]|[0-9]{2}){QUOTE} yylval->string=strdup(yytext); RETURN_TOKEN(DATE_STR);
 \"[^"]*\"                               yylval->string = strdup(yytext); RETURN_TOKEN(SSS);
 '[^']*\'                                yylval->string = strdup(yytext); RETURN_TOKEN(SSS);
+
+
+
+
 
 .                                       LOG_DEBUG("Unknown character [%c]",yytext[0]); return yytext[0];
 %%

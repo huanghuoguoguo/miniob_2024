@@ -111,6 +111,7 @@ public:
   virtual const char *name() const { return name_.c_str(); }
   virtual void        set_name(std::string name) { name_ = name; }
 
+
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
    */
@@ -387,6 +388,8 @@ public:
   RC try_get_value(Value &value) const override;
 
   Type arithmetic_type() const { return arithmetic_type_; }
+
+  bool isNegative() const { return this->arithmetic_type_ == Type::NEGATIVE; }
 
   std::unique_ptr<Expression> &left() { return left_; }
   std::unique_ptr<Expression> &right() { return right_; }

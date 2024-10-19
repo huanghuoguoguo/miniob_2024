@@ -48,6 +48,9 @@ RC PredicatePhysicalOperator::next()
 
     Value value;
     rc = expression_->get_value(*tuple, value);
+    if(rc == RC::DIVIDE_ZERO) {
+      continue;
+    }
     if (rc != RC::SUCCESS) {
       return rc;
     }

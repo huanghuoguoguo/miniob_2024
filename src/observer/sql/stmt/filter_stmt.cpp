@@ -13,6 +13,9 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/filter_stmt.h"
+
+#include <common/lang/defer.h>
+
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "common/rc.h"
@@ -88,44 +91,13 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
     return RC::INVALID_ARGUMENT;
   }
 
-  filter_unit = new FilterUnit;
+  filter_unit = new FilterUnit; //filterUnit 左右应该都是表达式
 
-  if (condition.left_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_left(filter_obj);
-  } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.left_value);
-    filter_unit->set_left(filter_obj);
-  }
-
-  if (condition.right_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_right(filter_obj);
-  } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.right_value);
-    filter_unit->set_right(filter_obj);
-  }
-
+  filter_unit->set_left(std::unique_ptr<Expression>(condition.left_expr));
+  // condition.left_expr = nullptr;
+  filter_unit->set_right(std::unique_ptr<Expression>(condition.right_expr));
+  // condition.right_expr = nullptr;
   filter_unit->set_comp(comp);
-
   // 检查两个类型是否能够比较
   return rc;
 }
