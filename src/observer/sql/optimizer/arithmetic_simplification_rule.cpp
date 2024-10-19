@@ -31,18 +31,11 @@ RC ArithmeticSimplificationRule::rewrite(std::unique_ptr<Expression> &expr, bool
     // 如果二者都是值，可以优先直接将其计算出来。
     if (left->type() == ExprType::VALUE && right->type() == ExprType::VALUE) {
       Value value;
-      RC    sub_rc = arithmetic_expr->try_get_value(value);
-      if (sub_rc == RC::SUCCESS) {
-        std::unique_ptr<Expression> new_expr(new ValueExpr(value));
-        expr.swap(new_expr);
-        change_made = true;
-        LOG_TRACE("arithmetic expression is simplified");
-      }else {
-        value.set_boolean(false);
-        std::unique_ptr<Expression> new_expr(new ValueExpr(value));
-        expr.swap(new_expr);
-        change_made = true;
-      }
+      arithmetic_expr->try_get_value(value);
+      std::unique_ptr<Expression> new_expr(new ValueExpr(value));
+      expr.swap(new_expr);
+      change_made = true;
+      LOG_TRACE("arithmetic expression is simplified");
     }
   }
   return rc;
