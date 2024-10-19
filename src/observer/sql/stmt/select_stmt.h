@@ -23,6 +23,7 @@ See the Mulan PSL v2 for more details. */
 
 class FieldMeta;
 class FilterStmt;
+class GroupByStmt;
 class Db;
 class Table;
 

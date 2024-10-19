@@ -97,9 +97,27 @@ public:
   void set_boolean(bool val);
 
   string to_string() const;
+  static const Value &max(const Value &a, const Value &b);
+  static const Value &min(const Value &a, const Value &b);
+  static const Value add(const Value &left, const Value &right);
+  static const Value div(const Value &left, const Value &right);
+
+  void add(const Value& rhs) {
+    *this = Value::add(*this, rhs);
+
+  }
+  void div(const Value& rhs) {
+    *this = Value::div(*this, rhs);
+  }
 
   int compare(const Value &other) const;
 
+  bool operator<(const Value &other) {
+    return compare(other) < 0;
+  }
+  bool operator>(const Value &other) {
+    return compare(other) > 0;
+  }
   const char *data() const;
 
   int      length() const { return length_; }
@@ -115,11 +133,13 @@ public:
   string get_string() const;
   bool   get_boolean() const;
   bool   is_null() const;
+  double get_double() const;
 
 
 private:
   void set_int(int val);
   void set_float(float val);
+  void set_double(double val)
   void set_string(const char *s, int len = 0);
   void set_string_from_other(const Value &other);
 
@@ -133,6 +153,7 @@ private:
     float   float_value_;
     bool    bool_value_;
     char   *pointer_value_;
+    double double_value_;
   } value_ = {.int_value_ = 0};
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false

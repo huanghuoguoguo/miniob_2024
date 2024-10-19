@@ -145,7 +145,12 @@ void Value::set_int(int val)
   value_.int_value_ = val;
   length_           = sizeof(val);
 }
-
+void Value::set_double(double val)
+{
+  attr_type_ = AttrType::DOUBLES;
+  value_.double_value_ = val;
+  length_ = sizeof(val);
+}
 void Value::set_float(float val)
 {
   reset();
@@ -281,6 +286,37 @@ int Value::get_int() const
   }
   return 0;
 }
+double Value::get_double() const
+{
+  ASSERT(attr_type_ != AttrType::DATES,"date can not get_double()");
+  switch (attr_type_) {
+    case AttrType::CHARS: {
+      try {
+        return (double)(std::stol(value_.pointer_value_));
+      } catch (std::exception const &ex) {
+        LOG_TRACE("failed to convert string to float. s=%s, ex=%s", value_.pointer_value_, ex.what());
+        return 0.0;
+      }
+    } break;
+    case AttrType::INTS: {
+      return double(value_.int_value_);
+    } break;
+    case AttrType::FLOATS: {
+      return double(value_.float_value_);
+    } break;
+    case AttrType::DOUBLES: {
+      return  value_.double_value_;
+    } break;
+    case AttrType::BOOLEANS: {
+      return double(value_.bool_value_);
+    } break;
+    default: {
+      LOG_WARN("unknown data type. type=%d", attr_type_);
+      return 0;
+    }
+  }
+  return 0;
+}
 
 float Value::get_float() const
 {
@@ -350,4 +386,56 @@ bool Value::get_boolean() const
     }
   }
   return false;
+}
+const Value& Value::min(const Value &a, const Value &b)
+{
+  if (a.is_null()) {
+    return b;  // even if b is also null
+  }
+  return a.compare(b) <= 0 ? a : b;
+}
+const Value& Value::max(const Value &a, const Value &b)
+{
+  if (a.is_null()) {
+    return b;  // even if b is also null
+  }
+  return a.compare(b) >= 0 ? a : b;
+}
+
+const Value Value::add(const Value &left, const Value &right)
+{
+  Value result_cell;
+  if (left.is_null() || right.is_null()) {
+    result_cell.attr_type_ = AttrType::NULL_;
+    return result_cell;
+  }
+  if (left.attr_type() == AttrType::INTS && right.attr_type() == AttrType::INTS) {
+    int result = left.get_int()+right.get_int();
+    result_cell.set_int(result);
+  } else {
+    double tmp_left = left.;
+    double tmp_right = right.get_double();
+    double result = tmp_left + tmp_right;
+    result_cell.set_double(result);
+  }
+  return result_cell;
+}
+
+const Value Value::div(const Value &left, const Value &right)
+{
+  Value result_cell;
+  if (left.is_null() || right.is_null()) {
+    result_cell.attr_type_ = AttrType::NULL_;
+    return result_cell;
+  }
+  if(right.get_double() == 0) {
+    result_cell.attr_type_ = AttrType::NULL_;
+  }
+  else {
+    double tmp_left = left.get_double();
+    double tmp_right = right.get_double();
+    double result = tmp_left / tmp_right;
+    result_cell.set_double(result);
+  }
+  return result_cell;
 }
