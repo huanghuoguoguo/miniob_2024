@@ -1,4 +1,4 @@
-
+%debug
 %{
 
 #include <stdio.h>
@@ -451,11 +451,7 @@ value_list:
     }
     ;
 value:
-    NULL_ {
-      $$ = new Value();
-      @$ = @1;
-    }
-    | NUMBER {
+    NUMBER {
       $$ = new Value((int)$1);
       @$ = @1;
     }
@@ -485,6 +481,10 @@ value:
       }
       $$ = value;
       free(tmp);
+    }
+    | NULL_ {
+      $$ = new Value();
+      @$ = @1;
     }
     ;
 storage_format:

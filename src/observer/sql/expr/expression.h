@@ -396,6 +396,8 @@ public:
 
   Type arithmetic_type() const { return arithmetic_type_; }
 
+  bool isNegative() const { return this->arithmetic_type_ == Type::NEGATIVE; }
+
   std::unique_ptr<Expression> &left() { return left_; }
   std::unique_ptr<Expression> &right() { return right_; }
 

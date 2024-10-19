@@ -326,19 +326,33 @@ RC ExpressionBinder::bind_arithmetic_expression(
   unique_ptr<Expression>        &left_expr  = arithmetic_expr->left();
   unique_ptr<Expression>        &right_expr = arithmetic_expr->right();
 
+  if (arithmetic_expr->isNegative()) {
+    if (left_expr->type() == ExprType::VALUE) {
+      Value value;
+      RC    sub_rc = arithmetic_expr->try_get_value(value);
+      if (sub_rc == RC::SUCCESS) {
+        std::unique_ptr<Expression> new_expr(new ValueExpr(value));
+        expr.swap(new_expr);
+        return RC::SUCCESS;
+      }
+    }
+  }
+
   RC rc = bind_expression(left_expr, child_bound_expressions);
   if (OB_FAIL(rc)) {
     return rc;
   }
 
-  if (child_bound_expressions.size() != 1) {
+  if (!arithmetic_expr->isNegative() && child_bound_expressions.size() > 1) {
     LOG_WARN("invalid left children number of comparison expression: %d", child_bound_expressions.size());
     return RC::INVALID_ARGUMENT;
   }
 
-  unique_ptr<Expression> &left = child_bound_expressions[0];
-  if (left.get() != left_expr.get()) {
-    left_expr.reset(left.release());
+  if (!child_bound_expressions.empty()) {
+    unique_ptr<Expression> &left = child_bound_expressions[0];
+    if (left.get() != left_expr.get()) {
+      left_expr.reset(left.release());
+    }
   }
 
   child_bound_expressions.clear();
@@ -347,14 +361,16 @@ RC ExpressionBinder::bind_arithmetic_expression(
     return rc;
   }
 
-  if (child_bound_expressions.size() != 1) {
+  if (!arithmetic_expr->isNegative() && child_bound_expressions.size() > 1) {
     LOG_WARN("invalid right children number of comparison expression: %d", child_bound_expressions.size());
     return RC::INVALID_ARGUMENT;
   }
 
-  unique_ptr<Expression> &right = child_bound_expressions[0];
-  if (right.get() != right_expr.get()) {
-    right_expr.reset(right.release());
+  if (!child_bound_expressions.empty()) {
+    unique_ptr<Expression> &right = child_bound_expressions[0];
+    if (right.get() != right_expr.get()) {
+      right_expr.reset(right.release());
+    }
   }
 
   bound_expressions.emplace_back(std::move(expr));

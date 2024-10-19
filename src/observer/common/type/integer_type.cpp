@@ -73,7 +73,7 @@ int IntegerType::cast_cost(AttrType type)
   if (type == AttrType::INTS) {
     return 0;
   } else if (type == AttrType::CHARS || type == AttrType::FLOATS) {
-    return 1;
+    return -1;
   }
   return INT32_MAX;
 }

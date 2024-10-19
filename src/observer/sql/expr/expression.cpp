@@ -353,7 +353,7 @@ RC ArithmeticExpr::calc_value(const Value &left_value, const Value &right_value,
     } break;
 
     case Type::DIV: {
-      Value::divide(left_value, right_value, value);
+      rc = Value::divide(left_value, right_value, value);
     } break;
 
     case Type::NEGATIVE: {
@@ -446,6 +446,10 @@ RC ArithmeticExpr::get_value(const Tuple &tuple, Value &value) const
   rc = left_->get_value(tuple, left_value);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get value of left expression. rc=%s", strrc(rc));
+    return rc;
+  }
+  // 取负值没有右表达式。
+  if (this->isNegative()) {
     return rc;
   }
   rc = right_->get_value(tuple, right_value);
