@@ -92,24 +92,6 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   }
 
   filter_unit = new FilterUnit; //filterUnit 左右应该都是表达式
-  DEFER([&](){
-    if (RC::SUCCESS != rc && nullptr != filter_unit) {
-      delete filter_unit;
-      filter_unit = nullptr;
-    }
-  });
-
-  const std::vector<Table *> table_arr; // 因为条件表达式里的 FieldExpr 一定是 t1.c1 所以传入个空的 table vector 就行
-  rc = condition.left_expr->check_field(*tables, table_arr, db, default_table);
-  if(rc != RC::SUCCESS ) {
-    LOG_WARN("filter_stmt check_field lhs expression error");
-    return rc;
-  }
-  rc = condition.right_expr->check_field(*tables, table_arr, db, default_table);
-  if(rc != RC::SUCCESS) {
-    LOG_WARN("filter_stmt check_field rhs expression error");
-    return rc;
-  }
 
   filter_unit->set_left(std::unique_ptr<Expression>(condition.left_expr));
   // condition.left_expr = nullptr;

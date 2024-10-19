@@ -111,14 +111,7 @@ public:
   virtual const char *name() const { return name_.c_str(); }
   virtual void        set_name(std::string name) { name_ = name; }
 
-  /**
-     * @brief 检查 FieldExpr
-     * @details 在生成 SelectStmt 的时候调用
-     */
-  virtual RC check_field(const std::unordered_map<std::string, Table *> &table_map,
-    const std::vector<Table *> &tables, Db *db, Table* default_table = nullptr) {
-    return RC::SUCCESS;
-  }
+
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
    */

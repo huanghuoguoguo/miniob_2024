@@ -481,6 +481,7 @@ RC ExpressionBinder::bind_condition_expression(std::vector<ConditionSqlNode>& co
   // 将表达式绑定。
   vector<unique_ptr<Expression>> where_expressions;
   for (ConditionSqlNode &expression : condition_sql_nodes) {
+    where_expressions.clear();
     std::unique_ptr<Expression> left(expression.left_expr);
     RC                          rc = this->bind_expression(left, where_expressions);
     if (OB_FAIL(rc)) {

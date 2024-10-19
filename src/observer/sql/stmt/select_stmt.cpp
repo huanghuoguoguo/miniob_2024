@@ -79,6 +79,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  // conditions
   RC rc = expression_binder.bind_condition_expression(select_sql.conditions);
   if (OB_FAIL(rc)) {
     LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
