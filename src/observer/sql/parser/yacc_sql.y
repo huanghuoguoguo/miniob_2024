@@ -124,6 +124,11 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NOT
         NULL_
         NULLABLE
+        AGGR_MAX
+        AGGR_MIN
+        AGGR_SUM
+        AGGR_AVG
+        AGGR_COUNT
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -171,6 +176,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <string>              storage_format
 %type <relation_list>       rel_list
 %type <expression>          expression
+%type <expression>          aggr_func_expr
+%type <number>              aggr_func_type
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
 %type <sql_node>            calc_stmt
@@ -625,6 +632,49 @@ expression:
     }
     | '*' {
       $$ = new StarExpr();
+    }
+    // your code here
+    |aggr_func_expr{
+      $$ = $1;
+    }
+    ;
+aggr_func_type:
+    AGGR_MAX {
+      $$ = AggrFuncType::AGG_MAX;
+    }
+    | AGGR_MIN {
+      $$ = AggrFuncType::AGG_MIN;
+    }
+    | AGGR_SUM {
+      $$ = AggrFuncType::AGG_SUM;
+    }
+    | AGGR_AVG {
+      $$ = AggrFuncType::AGG_AVG;
+    }
+    | AGGR_COUNT {
+      $$ = AggrFuncType::AGG_COUNT;
+    }
+    ;
+aggr_func_expr:
+    aggr_func_type LBRACE expression RBRACE
+    {
+      AggrFuncType funtype = (AggrFuncType)$1;
+      AggrFuncExpr *afexpr = new AggrFuncExpr(funtype, $3);
+      $$ = afexpr;
+      $$->set_name(token_name(sql_string, &@$));
+    }
+    | aggr_func_type LBRACE '*' RBRACE
+    {
+      if($1 != AggrFuncType::AGG_COUNT) {
+        yyerror(&@$, sql_string, sql_result, scanner, "only support count(*)");
+        YYERROR;
+      }
+      // regard count(*) as count(1)
+      AggrFuncType funtype = (AggrFuncType)$1;
+      AggrFuncExpr *afexpr = new AggrFuncExpr(funtype, new ValueExpr(Value(1)));
+      // afexpr->set_param_constexpr(true);
+      $$ = afexpr;
+      $$->set_name(token_name(sql_string, &@$));
     }
     ;
 

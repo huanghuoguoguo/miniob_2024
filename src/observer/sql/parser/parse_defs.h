@@ -22,7 +22,9 @@ See the Mulan PSL v2 for more details. */
 
 struct JoinSqlNode;
 class Expression;
+class FieldExpr;
 
+typedef enum { AGG_MAX, AGG_MIN, AGG_SUM, AGG_AVG, AGG_COUNT, AGGR_FUNC_TYPE_NUM } AggrFuncType;
 /**
  * @defgroup SQLParser SQL Parser
  */
@@ -82,6 +84,10 @@ struct ConditionSqlNode
     Expression* left_expr;
     CompOp comp; ///< comparison operator
     Expression* right_expr;
+};
+struct GroupBySqlNode
+{
+  std::vector<FieldExpr *> exprs_;
 };
 
 /**
