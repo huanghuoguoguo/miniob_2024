@@ -78,6 +78,25 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return rc;
     }
   }
+  // 将表达式绑定。
+  vector<unique_ptr<Expression>> where_expressions;
+  for (ConditionSqlNode &expression : select_sql.conditions) {
+    std::unique_ptr<Expression> left(expression.left_expr);
+    RC                          rc = expression_binder.bind_expression(left, where_expressions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+    std::unique_ptr<Expression> right(expression.right_expr);
+    rc            = expression_binder.bind_expression(right, where_expressions);
+
+    expression.left_expr = where_expressions[0].release();
+    expression.right_expr = where_expressions[1].release();
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
 
   // group
   vector<unique_ptr<Expression>> group_by_expressions;
