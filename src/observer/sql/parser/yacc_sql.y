@@ -678,7 +678,7 @@ aggr_func_expr:
     aggr_func_type LBRACE expression RBRACE
     {
       AggrFuncType funtype = (AggrFuncType)$1;
-      AggrFuncExpr *afexpr = new AggrFuncExpr(funtype, $3);
+      AggregateExpr *afexpr = new AggregateExpr(funtype, $3);
       $$ = afexpr;
       $$->set_name(token_name(sql_string, &@$));
     }
@@ -690,7 +690,7 @@ aggr_func_expr:
       }
       // regard count(*) as count(1)
       AggrFuncType funtype = (AggrFuncType)$1;
-      AggrFuncExpr *afexpr = new AggrFuncExpr(funtype, new ValueExpr(Value(1)));
+      AggregateExpr *afexpr = new AggregateExpr(funtype, new ValueExpr(Value(1)));
       // afexpr->set_param_constexpr(true);
       $$ = afexpr;
       $$->set_name(token_name(sql_string, &@$));
