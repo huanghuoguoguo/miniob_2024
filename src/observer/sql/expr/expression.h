@@ -112,6 +112,14 @@ public:
   virtual void        set_name(std::string name) { name_ = name; }
 
   /**
+     * @brief 检查 FieldExpr
+     * @details 在生成 SelectStmt 的时候调用
+     */
+  virtual RC check_field(const std::unordered_map<std::string, Table *> &table_map,
+    const std::vector<Table *> &tables, Db *db, Table* default_table = nullptr) {
+    return RC::SUCCESS;
+  }
+  /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
    */
   virtual int  pos() const { return pos_; }
@@ -387,6 +395,8 @@ public:
   RC try_get_value(Value &value) const override;
 
   Type arithmetic_type() const { return arithmetic_type_; }
+
+  bool isNegative() const { return this->arithmetic_type_ == Type::NEGATIVE; }
 
   std::unique_ptr<Expression> &left() { return left_; }
   std::unique_ptr<Expression> &right() { return right_; }

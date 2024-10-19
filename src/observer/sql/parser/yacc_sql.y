@@ -1,4 +1,4 @@
-
+%debug
 %{
 
 #include <stdio.h>
@@ -21,7 +21,7 @@ string token_name(const char *sql_string, YYLTYPE *llocp)
   return string(sql_string + llocp->first_column, llocp->last_column - llocp->first_column + 1);
 }
 
-int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result, yyscan_t scanner, const char *msg,bool flag = false)
+int yyerror(YYLTYPE *llocp, const char *sql_string, ParsedSqlResult *sql_result, yyscan_t scanner, const char *msg, bool flag = false)
 {
   std::unique_ptr<ParsedSqlNode> error_sql_node = std::make_unique<ParsedSqlNode>(SCF_ERROR);
   error_sql_node->error.error_msg = msg;
@@ -164,7 +164,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
-%type <value_list>          value_list
 %type <condition_list>      where
 %type <join_list>           join_list
 %type <join>                join
@@ -420,56 +419,35 @@ type:
     | DATE_T  { $$ = static_cast<int>(AttrType::DATES); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE 
+    INSERT INTO ID VALUES LBRACE expression_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
-      if ($7 != nullptr) {
-        $$->insertion.values.swap(*$7);
-        delete $7;
+      if ($6 != nullptr) {
+        $$->insertion.values.swap(*$6);
+        delete $6;
       }
-      $$->insertion.values.emplace_back(*$6);
-      std::reverse($$->insertion.values.begin(), $$->insertion.values.end());
-      delete $6;
       free($3);
     }
     ;
 
-value_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | COMMA value value_list  { 
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new std::vector<Value>;
-      }
-      $$->emplace_back(*$2);
-      delete $2;
-    }
-    ;
+
 value:
-    NULL_ {
-      $$ = new Value();
-      @$ = @1;
-    }
-    | NUMBER {
+    NUMBER {
       $$ = new Value((int)$1);
       @$ = @1;
     }
-    |FLOAT {
+    | FLOAT {
       $$ = new Value((float)$1);
       @$ = @1;
     }
-    |SSS {
+    | SSS {
       char *tmp = common::substr($1,1,strlen($1)-2);
       $$ = new Value(tmp);
       free(tmp);
       free($1);
     }
-    |DATE_STR {
+    | DATE_STR {
       char *tmp = common::substr($1,1,strlen($1)-2);
       std::string str(tmp);
       Value * value = new Value();
@@ -478,7 +456,6 @@ value:
       {
         yyerror(&@$,sql_string,sql_result,scanner,"date invaid",true);
         YYERROR;
-
       }
       else
       {
@@ -486,6 +463,10 @@ value:
       }
       $$ = value;
       free(tmp);
+    }
+    | NULL_ {
+      $$ = new Value();
+      @$ = @1;
     }
     ;
 storage_format:
@@ -645,7 +626,6 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
-    // your code here
     ;
 
 rel_attr:
@@ -712,112 +692,27 @@ condition_list:
     }
     ;
 condition:
-    rel_attr comp_op value
+    expression comp_op expression
     {
       $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
+      $$->left_expr = $1;
+      $$->right_expr = $3;
       $$->comp = $2;
-
-      delete $1;
-      delete $3;
     }
-    | value comp_op value 
+    | expression IS expression
     {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 0;
-      $$->right_value = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 1;
-      $$->left_attr = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | value comp_op rel_attr
-    {
-      $$ = new ConditionSqlNode;
-      $$->left_is_attr = 0;
-      $$->left_value = *$1;
-      $$->right_is_attr = 1;
-      $$->right_attr = *$3;
-      $$->comp = $2;
-
-      delete $1;
-      delete $3;
-    }
-    | rel_attr IS NULL_
-     {
        $$ = new ConditionSqlNode;
-       $$->left_is_attr = 1;
-       $$->left_attr = *$1;
+       $$->left_expr = $1;
+       $$->right_expr = $3;
        $$->comp = IS_NULL;
-       $$->right_is_attr = 0;
-       $$->right_value = Value();
-       delete $1;
+    }
+     | expression IS NOT expression
+    {
+        $$ = new ConditionSqlNode;
+        $$->left_expr = $1;
+        $$->right_expr = $4;
+        $$->comp = IS_NOT_NULL;
      }
-     | value IS NULL_
-      {
-        $$ = new ConditionSqlNode;
-        $$->left_is_attr = 0;
-        $$->left_value = *$1;
-        $$->comp = IS_NULL;
-        $$->right_is_attr = 0;
-        $$->right_value = Value();
-        delete $1;
-      }
-      | value IS NOT NULL_
-      {
-        $$ = new ConditionSqlNode;
-        $$->left_is_attr = 0;
-        $$->left_value = *$1;
-        $$->comp = IS_NOT_NULL;
-        $$->right_is_attr = 0;
-        $$->right_value = Value();
-        delete $1;
-      }
-     | rel_attr IS NOT NULL_
-      {
-        $$ = new ConditionSqlNode;
-        $$->left_is_attr = 1;
-        $$->left_attr = *$1;
-        $$->comp = IS_NOT_NULL;
-        $$->right_is_attr = 0;
-        $$->right_value = Value();
-        delete $1;
-      }
-      | NULL_ IS NOT NULL_
-      {
-        $$ = new ConditionSqlNode;
-        $$->left_is_attr = 0;
-        $$->left_value = Value();
-        $$->comp = IS_NOT_NULL;
-        $$->right_is_attr = 0;
-        $$->right_value = Value();
-      }
-      | NULL_ IS  NULL_
-      {
-        $$ = new ConditionSqlNode;
-        $$->left_is_attr = 0;
-        $$->left_value = Value();
-        $$->comp = IS_NULL;
-        $$->right_is_attr = 0;
-        $$->right_value = Value();
-      }
     ;
 
 comp_op:
