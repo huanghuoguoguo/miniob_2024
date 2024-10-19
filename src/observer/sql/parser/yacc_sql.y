@@ -164,7 +164,6 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
-%type <value_list>          value_list
 %type <condition_list>      where
 %type <join_list>           join_list
 %type <join>                join
@@ -420,36 +419,19 @@ type:
     | DATE_T  { $$ = static_cast<int>(AttrType::DATES); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE value value_list RBRACE 
+    INSERT INTO ID VALUES LBRACE expression_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
-      if ($7 != nullptr) {
-        $$->insertion.values.swap(*$7);
-        delete $7;
+      if ($6 != nullptr) {
+        $$->insertion.values.swap(*$6);
+        delete $6;
       }
-      $$->insertion.values.emplace_back(*$6);
-      std::reverse($$->insertion.values.begin(), $$->insertion.values.end());
-      delete $6;
       free($3);
     }
     ;
 
-value_list:
-    /* empty */
-    {
-      $$ = nullptr;
-    }
-    | COMMA value value_list  { 
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new std::vector<Value>;
-      }
-      $$->emplace_back(*$2);
-      delete $2;
-    }
-    ;
+
 value:
     NUMBER {
       $$ = new Value((int)$1);
