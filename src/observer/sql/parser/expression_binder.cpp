@@ -176,6 +176,10 @@ RC ExpressionBinder::bind_unbound_field_expression(
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
     string     name       = string(table->table_meta().name()) + "." + string(field.field_name());
+    if(context_.query_tables().size() == 1) {
+      name = string(field.field_name());
+    }
+
     field_expr->set_name(name);
     bound_expressions.emplace_back(field_expr);
   }
@@ -469,4 +473,40 @@ RC ExpressionBinder::bind_aggregate_expression(
 
   bound_expressions.emplace_back(std::move(aggregate_expr));
   return RC::SUCCESS;
+}
+
+RC ExpressionBinder::bind_condition_expression(std::vector<ConditionSqlNode>& condition_sql_nodes)
+{
+  RC rc = RC::SUCCESS;
+  // 将表达式绑定。
+  vector<unique_ptr<Expression>> where_expressions;
+  for (ConditionSqlNode &expression : condition_sql_nodes) {
+    std::unique_ptr<Expression> left(expression.left_expr);
+    RC                          rc = this->bind_expression(left, where_expressions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    if(!where_expressions.empty()) {
+      expression.left_expr = where_expressions[0].release();
+    }else {
+      expression.left_expr = left.release();
+    }
+    where_expressions.clear();
+
+    std::unique_ptr<Expression> right(expression.right_expr);
+    rc            = this->bind_expression(right, where_expressions);
+    if(!where_expressions.empty()) {
+      expression.right_expr = where_expressions[0].release();
+    }else {
+      expression.right_expr = right.release();
+    }
+
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+  return rc;
 }
