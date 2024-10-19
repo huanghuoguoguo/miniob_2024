@@ -44,8 +44,8 @@ public:
   ExpressionBinder(BinderContext &context) : context_(context) {}
   virtual ~ExpressionBinder() = default;
 
-  RC bind_expression(std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
-
+  RC bind_expression(std::unique_ptr<Expression>& expr, std::vector<std::unique_ptr<Expression>>& bound_expressions);
+  RC bind_condition_expression(std::vector<ConditionSqlNode>& condition_sql_nodes);
 private:
   RC bind_star_expression(
       std::unique_ptr<Expression> &star_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
@@ -65,6 +65,7 @@ private:
       std::unique_ptr<Expression> &arithmetic_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_aggregate_expression(
       std::unique_ptr<Expression> &aggregate_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+
 
 private:
   BinderContext &context_;

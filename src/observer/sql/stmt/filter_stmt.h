@@ -47,22 +47,50 @@ class FilterUnit
 {
 public:
   FilterUnit() = default;
-  ~FilterUnit() {}
+  ~FilterUnit()
+  {}
 
-  void set_comp(CompOp comp) { comp_ = comp; }
+  void set_comp(CompOp comp)
+  {
+    comp_ = comp;
+  }
 
-  CompOp comp() const { return comp_; }
+  CompOp comp() const
+  {
+    return comp_;
+  }
 
-  void set_left(const FilterObj &obj) { left_ = obj; }
-  void set_right(const FilterObj &obj) { right_ = obj; }
+  void set_left(std::unique_ptr<Expression>&& left)
+  {
+    left_ = std::move(left);
+  }
+  void set_right(std::unique_ptr<Expression>&& right)
+  {
+    right_ = std::move(right);
+  }
 
-  const FilterObj &left() const { return left_; }
-  const FilterObj &right() const { return right_; }
+  std::unique_ptr<Expression> &left()
+  {
+    return left_;
+  }
+  std::unique_ptr<Expression> &right()
+  {
+    return right_;
+  }
+
+  const std::unique_ptr<Expression> &left() const
+  {
+    return left_;
+  }
+  const std::unique_ptr<Expression> &right() const
+  {
+    return right_;
+  }
 
 private:
-  CompOp    comp_ = NO_OP;
-  FilterObj left_;
-  FilterObj right_;
+  CompOp comp_ = NO_OP;
+  std::unique_ptr<Expression> left_;
+  std::unique_ptr<Expression> right_;
 };
 
 /**

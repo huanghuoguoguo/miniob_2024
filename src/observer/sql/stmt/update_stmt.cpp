@@ -25,7 +25,7 @@ UpdateStmt::~UpdateStmt()
   }
 }
 
-RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
+RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
 {
   // TODO
   if (nullptr == db) {
@@ -82,6 +82,12 @@ RC UpdateStmt::create(Db *db, const UpdateSqlNode &update_sql, Stmt *&stmt)
     LOG_INFO("Successfully bound the comparison expression: %s = %s", field_name.c_str(), value.to_string().c_str());
   }
 
+  // conditions
+  rc = expression_binder.bind_condition_expression(update_sql.conditions);
+  if (OB_FAIL(rc)) {
+    LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+    return rc;
+  }
   // 处理WHERE子句
   FilterStmt *filter_stmt = nullptr;
   rc                      = FilterStmt::create(db,

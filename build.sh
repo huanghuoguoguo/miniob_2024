@@ -180,6 +180,8 @@ function main
       ;;
     *)
       parse_args
+      cd ./src/observer/sql/parser && bash gen_parser.sh && cd ../../../../
+      echo "gen parser finish"
       build
       try_make
       ;;
