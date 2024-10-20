@@ -17,7 +17,7 @@ See the Mulan PSL v2 for more details. */
 
 RC SumAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED) {
+  if (value_.attr_type() == AttrType::UNDEFINED || value_.attr_type() == AttrType::NULL_) {
     value_ = value;
     return RC::SUCCESS;
   }
