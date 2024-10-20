@@ -360,7 +360,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type
@@ -369,7 +369,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type LBRACE number RBRACE NOT NULL_

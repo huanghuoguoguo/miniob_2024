@@ -208,7 +208,7 @@ public:
     int null_index = index - table_->table_meta().sys_field_num();
     if (null_index >= 0 && null_list[null_index])
     {
-      cell.set_type(AttrType::NULL_);
+      cell.set_type(AttrType::UNDEFINED);
       return RC::SUCCESS;
     }
 

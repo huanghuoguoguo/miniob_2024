@@ -146,15 +146,16 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   RC  rc         = RC::SUCCESS;
   // int cmp_result = left.compare(right);
   int cmp_result;
-  if(comp_ != LIKE_OP && comp_ != NOT_LIKE_OP)
+  if(comp_ < IS_NULL)
   {
     cmp_result = left.compare(right);
   }
 
   result         = false;
 
-  if (cmp_result == INT32_MAX)
+  if (cmp_result == INT32_MAX) {
     return rc;
+  }
   switch (comp_) {
     case EQUAL_TO: {
       result = (0 == cmp_result);
@@ -181,14 +182,14 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
       result = !str_like(left,right);
     }break;
     case IS_NULL: {
-      if (left.attr_type() == AttrType::NULL_)
+      if (left.attr_type() == AttrType::UNDEFINED)
         result = true;
       else
         result = false;
     }
     break;
     case IS_NOT_NULL: {
-      if (left.attr_type() != AttrType::NULL_)
+      if (left.attr_type() != AttrType::UNDEFINED)
         result = true;
       else
         result = false;
