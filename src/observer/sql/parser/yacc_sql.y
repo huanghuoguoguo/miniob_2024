@@ -122,6 +122,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         IS
         NOT
+        LIKE
         NULL_
         NULLABLE
 
@@ -722,6 +723,8 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | LIKE {$$ = LIKE_OP; }
+    | NOT LIKE {$$ = NOT_LIKE_OP; }
     ;
 
 // your code here
