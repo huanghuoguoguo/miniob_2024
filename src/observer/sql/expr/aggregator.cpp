@@ -24,10 +24,10 @@ RC SumAggregator::accumulate(const Value &value)
     value_ = value;
     return RC::SUCCESS;
   }
-  
-  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s", 
+
+  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s",
         attr_type_to_string(value.attr_type()), attr_type_to_string(value_.attr_type()));
-  
+
   Value::add(value, value_, value_);
   return RC::SUCCESS;
 }
@@ -47,7 +47,7 @@ RC MaxAggregator::accumulate(const Value &value)
   ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s",
         attr_type_to_string(value.attr_type()), attr_type_to_string(value_.attr_type()));
 
-  if(this->value_.compare(value)) {
+  if (this->value_.compare(value) < 0) {
     this->value_ = value;
   }
   return RC::SUCCESS;
@@ -79,18 +79,8 @@ RC MinAggregator::evaluate(Value &result)
 }
 RC CountAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED || value_.attr_type() == AttrType::NULL_) {
-    value_ = value;
-    return RC::SUCCESS;
-  }
-
-  ASSERT(value.attr_type() == value_.attr_type(), "type mismatch. value type: %s, value_.type: %s",
-        attr_type_to_string(value.attr_type()), attr_type_to_string(value_.attr_type()));
-
-
+  // TODO 考察null算不算。
   countNum++;
-
-
   return RC::SUCCESS;
 }
 RC CountAggregator::evaluate(Value &result)

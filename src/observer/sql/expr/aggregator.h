@@ -64,7 +64,10 @@ private:
 class AvgAggregator : public Aggregator
 {
 public:
-  AvgAggregator() : sum_(0), countNum(0) {}
+  AvgAggregator() : countNum(0)
+  {
+    sum_ = Value(0.0f);
+  }
   RC accumulate(const Value &value) override;
   RC evaluate(Value &result) override;
 
