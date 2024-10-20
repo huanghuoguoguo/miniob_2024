@@ -122,6 +122,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         IS
         NOT
+        LIKE
         NULL_
         NULLABLE
 
@@ -361,7 +362,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type
@@ -370,7 +371,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type LBRACE number RBRACE NOT NULL_
@@ -765,6 +766,8 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | LIKE {$$ = LIKE_OP; }
+    | NOT LIKE {$$ = NOT_LIKE_OP; }
     ;
 
 // your code here

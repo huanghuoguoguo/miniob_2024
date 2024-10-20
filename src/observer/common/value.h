@@ -39,7 +39,7 @@ public:
 
   Value()
   {
-    this->attr_type_ = AttrType::NULL_;
+    this->attr_type_ = AttrType::UNDEFINED;
   };
 
   ~Value() { reset(); }

@@ -129,7 +129,7 @@ void Value::set_data(char *data, int length)
       value_.int_value_ = *(int *)data;
       length_            = length;
     } break;
-    case AttrType::NULL_: {
+    case AttrType::UNDEFINED: {
 
     } break;
     default: {
@@ -228,7 +228,7 @@ const char *Value::data() const
     case AttrType::CHARS: {
       return value_.pointer_value_;
     } break;
-    case AttrType::NULL_: {
+    case AttrType::UNDEFINED: {
       return nullptr;
     } break;
     default: {
@@ -311,7 +311,7 @@ float Value::get_float() const
 }
 
 string Value::get_string() const { return this->to_string(); }
-bool Value::is_null() const { return this->attr_type_ == AttrType::NULL_; }
+bool Value::is_null() const { return this->attr_type_ == AttrType::UNDEFINED; }
 
 bool Value::get_boolean() const
 {
