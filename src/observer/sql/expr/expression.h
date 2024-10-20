@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <memory>
 #include <string>
+#include <sql/stmt/select_stmt.h>
 
 #include "common/value.h"
 #include "storage/field/field.h"
@@ -39,7 +40,7 @@ enum class ExprType
   STAR,                 ///< 星号，表示所有字段
   UNBOUND_FIELD,        ///< 未绑定的字段，需要在resolver阶段解析为FieldExpr
   UNBOUND_AGGREGATION,  ///< 未绑定的聚合函数，需要在resolver阶段解析为AggregateExpr
-
+  SUB_QUERY,    ///< 子查询表达式
   FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
   VALUE,        ///< 常量值
   CAST,         ///< 需要做类型转换的表达式
@@ -426,6 +427,23 @@ public:
 private:
   std::string                 aggregate_name_;
   std::unique_ptr<Expression> child_;
+};
+
+class SubQueryExpr : public Expression
+{
+public:
+  SubQueryExpr(const char *aggregate_name, Expression *child);
+  virtual ~SubQueryExpr() = default;
+
+  ExprType type() const override { return ExprType::SUB_QUERY; }
+
+  std::unique_ptr<Expression> &child() { return child_; }
+
+  RC       get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
+
+
+private:
+  SelectStmt select_stmt_;
 };
 
 class AggregateExpr : public Expression
