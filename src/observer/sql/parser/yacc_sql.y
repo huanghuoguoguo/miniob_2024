@@ -166,6 +166,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_info>           attr_def
 %type <condition_list>      where
 %type <string>              aggre_type
+%type <expression_list>     aggre_list
 %type <join_list>           join_list
 %type <join>                join
 %type <condition_list>      condition_list
@@ -596,9 +597,26 @@ expression_list:
 aggre_type:
     ID { $$ = $1; }
     ;
+aggre_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | expression_list {
+        $$ = $1;
+    }
 expression:
-    aggre_type LBRACE expression RBRACE {
-      $$ = create_aggregate_expression($1, $3, sql_string, &@$);
+    aggre_type LBRACE aggre_list RBRACE {
+      $$ = nullptr;
+      if ($3 != nullptr) {
+        if($3->size() == 1){
+            $$ = create_aggregate_expression($1, $3->front().release(), sql_string, &@$);
+        } else {
+            $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+        }
+      }else{
+        $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+      }
     }
     | expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);

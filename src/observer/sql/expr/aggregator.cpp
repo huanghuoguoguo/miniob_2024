@@ -92,10 +92,8 @@ RC AvgAggregator::accumulate(const Value &value)
 {
   // 忽略 UNDEFINED 和 NULL 值
   if (value.attr_type() != AttrType::UNDEFINED && value.attr_type() != AttrType::NULL_) {
-    Value temp;
     // 累加值
-    if (Value::add(sum_, value, temp) == RC::SUCCESS) {
-      sum_ = temp;  // 更新总和
+    if (Value::add(sum_, value, sum_) == RC::SUCCESS) {
       countNum++;  // 计数
     }
   }
@@ -104,7 +102,7 @@ RC AvgAggregator::accumulate(const Value &value)
 RC AvgAggregator::evaluate(Value &result)
 {
   if (countNum > 0) {
-    Value temp;
+    Value temp(0.0f);
     // 计算平均值
     if (Value::divide(sum_, Value(countNum), temp) == RC::SUCCESS) {
       result = temp;  // 返回平均值
