@@ -165,6 +165,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <condition_list>      where
+%type <string>              aggre_type
 %type <join_list>           join_list
 %type <join>                join
 %type <condition_list>      condition_list
@@ -592,8 +593,14 @@ expression_list:
       $$->emplace($$->begin(), $1);
     }
     ;
+aggre_type:
+    ID { $$ = $1; }
+    ;
 expression:
-    expression '+' expression {
+    aggre_type LBRACE expression RBRACE {
+      $$ = create_aggregate_expression($1, $3, sql_string, &@$);
+    }
+    | expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
     | expression '-' expression {
