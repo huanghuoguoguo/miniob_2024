@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 
 RC SumAggregator::accumulate(const Value &value)
 {
-  if (!value_.is_null()) {
+  if (value_.is_null()) {
     value_ = value;
     return RC::SUCCESS;
   }
@@ -39,7 +39,7 @@ RC SumAggregator::evaluate(Value &result)
 }
 RC MaxAggregator::accumulate(const Value &value)
 {
-  if (!value_.is_null()) {
+  if (value_.is_null()) {
     value_ = value;
     return RC::SUCCESS;
   }
@@ -59,7 +59,7 @@ RC MaxAggregator::evaluate(Value &result)
 }
 RC MinAggregator::accumulate(const Value &value)
 {
-  if (!value_.is_null()) {
+  if (value_.is_null()) {
     value_ = value;
     return RC::SUCCESS;
   }
