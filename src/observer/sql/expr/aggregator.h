@@ -24,9 +24,11 @@ public:
 
   virtual RC accumulate(const Value &value) = 0;
   virtual RC evaluate(Value &result)        = 0;
+  void setNullable(bool nullable) { this->nullable = nullable; };
 
 protected:
   Value value_;
+  bool nullable = false;
 };
 
 class SumAggregator : public Aggregator

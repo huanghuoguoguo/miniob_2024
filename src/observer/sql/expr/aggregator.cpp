@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 
 RC SumAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED || value_.attr_type() == AttrType::NULL_) {
+  if (!value_.is_null()) {
     value_ = value;
     return RC::SUCCESS;
   }
@@ -39,7 +39,7 @@ RC SumAggregator::evaluate(Value &result)
 }
 RC MaxAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED || value_.attr_type() == AttrType::NULL_) {
+  if (!value_.is_null()) {
     value_ = value;
     return RC::SUCCESS;
   }
@@ -59,7 +59,7 @@ RC MaxAggregator::evaluate(Value &result)
 }
 RC MinAggregator::accumulate(const Value &value)
 {
-  if (value_.attr_type() == AttrType::UNDEFINED || value_.attr_type() == AttrType::NULL_) {
+  if (!value_.is_null()) {
     value_ = value;
     return RC::SUCCESS;
   }
@@ -79,7 +79,9 @@ RC MinAggregator::evaluate(Value &result)
 }
 RC CountAggregator::accumulate(const Value &value)
 {
-  // TODO 考察null算不算。
+  if(value.is_null() && !this->nullable) {
+    return RC::SUCCESS;
+  }
   countNum++;
   return RC::SUCCESS;
 }
@@ -91,7 +93,7 @@ RC CountAggregator::evaluate(Value &result)
 RC AvgAggregator::accumulate(const Value &value)
 {
   // 忽略 UNDEFINED 和 NULL 值
-  if (value.attr_type() != AttrType::UNDEFINED && value.attr_type() != AttrType::NULL_) {
+  if (!value.is_null()) {
     // 累加值
     if (Value::add(sum_, value, sum_) == RC::SUCCESS) {
       countNum++;  // 计数
