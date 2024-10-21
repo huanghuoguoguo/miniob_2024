@@ -107,6 +107,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         FROM
         WHERE
         AND
+        ASC
         SET
         ON
         LOAD
@@ -184,7 +185,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression_list>     group_by
 %type <order_unit>          order_unit
 %type <order_unit_list>     order_unit_list
-%type <order_unit_list>     order_by
+%type <order_unit_list>     opt_order_by
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -538,7 +539,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by having_condition order_by
+    SELECT expression_list FROM rel_list join_list where group_by having_condition opt_order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -827,21 +828,21 @@ order_unit:
     }
     ;
 order_unit_list:
-	order_by
+	order_unit
 	{
     $$ = new std::vector<OrderBySqlNode>;
     $$->emplace_back(*$1);
     delete $1;
 	}
   |
-	order_by COMMA order_unit_list
+	order_unit COMMA order_unit_list
 	{
     $3->emplace_back(*$1);
     $$ = $3;
     delete $1;
 	}
 	;
-order_by_list:
+opt_order_by:
 	/* empty */ {
    $$ = nullptr;
   }
