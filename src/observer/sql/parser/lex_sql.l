@@ -132,6 +132,7 @@ NULLABLE                                RETURN_TOKEN(NULLABLE);
 IS                                      RETURN_TOKEN(IS);
 NOT                                     RETURN_TOKEN(NOT);
 HAVING                                  RETURN_TOKEN(HAVING);
+IN                                      RETURN_TOKEN(IN);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);

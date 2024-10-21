@@ -126,6 +126,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NULL_
         NULLABLE
         HAVING
+        IN
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -677,6 +678,9 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
+    | select_stmt {
+      $$ = new SubQueryExpr(&($1->selection));
+    }
     ;
 
 rel_attr:
@@ -750,20 +754,6 @@ condition:
       $$->right_expr = $3;
       $$->comp = $2;
     }
-    | expression IS expression
-    {
-       $$ = new ConditionSqlNode;
-       $$->left_expr = $1;
-       $$->right_expr = $3;
-       $$->comp = IS_NULL;
-    }
-     | expression IS NOT expression
-    {
-        $$ = new ConditionSqlNode;
-        $$->left_expr = $1;
-        $$->right_expr = $4;
-        $$->comp = IS_NOT_NULL;
-     }
     ;
 
 comp_op:
@@ -775,6 +765,10 @@ comp_op:
     | NE { $$ = NOT_EQUAL; }
     | LIKE {$$ = LIKE_OP; }
     | NOT LIKE {$$ = NOT_LIKE_OP; }
+    | IS {  $$ = IS_NULL;}
+    | IS NOT {  $$ = IS_NOT_NULL;}
+    | IN {  $$ = IN_;}
+    | NOT IN {  $$ = NOT_IN;}
     ;
 
 // your code here

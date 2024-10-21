@@ -13,6 +13,8 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/operator/predicate_physical_operator.h"
+
+#include "project_physical_operator.h"
 #include "common/log/log.h"
 #include "sql/stmt/filter_stmt.h"
 #include "storage/field/field.h"
@@ -28,6 +30,20 @@ RC PredicatePhysicalOperator::open(Trx *trx)
   if (children_.size() != 1) {
     LOG_WARN("predicate operator must has one child");
     return RC::INTERNAL;
+  }
+
+  if (expression_->type() == ExprType::COMPARISON) {
+    auto comparison_expr = static_cast<ComparisonExpr *>(expression_.get());
+    auto left            = comparison_expr->left().get();
+    auto right           = comparison_expr->right().get();
+    if (left->type() == ExprType::SUB_QUERY) {
+      SubQueryExpr *               left_sub_query_expr = static_cast<SubQueryExpr *>(left);
+      left_sub_query_expr->phy_op()->open(trx);
+    }
+    if (right->type() == ExprType::SUB_QUERY) {
+      SubQueryExpr *               right_sub_query_expr = static_cast<SubQueryExpr *>(right);
+      right_sub_query_expr->phy_op()->open(trx);
+    }
   }
 
   return children_[0]->open(trx);

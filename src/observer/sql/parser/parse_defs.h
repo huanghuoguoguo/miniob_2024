@@ -52,10 +52,13 @@ enum CompOp
     LESS_THAN, ///< "<"
     GREAT_EQUAL, ///< ">="
     GREAT_THAN, ///< ">"
+    /// 在这之前的都走默认比较器。
     IS_NULL, ///< is null
     IS_NOT_NULL, ///< is not null
     LIKE_OP, ///< "like"
     NOT_LIKE_OP, ///< "not like"
+    IN_,
+    NOT_IN,
     NO_OP,
 };
 

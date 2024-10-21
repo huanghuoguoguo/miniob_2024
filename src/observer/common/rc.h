@@ -27,6 +27,8 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(SQL_SYNTAX)                  \
   DEFINE_RC(INTERNAL)                    \
   DEFINE_RC(NOMEM)                       \
+  DEFINE_RC(SUB_QUERY_ERROR)             \
+  DEFINE_RC(SUB_QUERY_NUILTI_COLUMN)             \
   DEFINE_RC(NOTFOUND)                    \
   DEFINE_RC(EMPTY)                       \
   DEFINE_RC(FULL)                        \

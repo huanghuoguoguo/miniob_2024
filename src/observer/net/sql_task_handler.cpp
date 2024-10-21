@@ -44,6 +44,11 @@ RC SqlTaskHandler::handle_event(Communicator *communicator)
 
   rc = communicator->write_result(event, need_disconnect);
   LOG_INFO("write result return %s", strrc(rc));
+  if (OB_FAIL(rc)) {
+    LOG_TRACE("failed to handle sql. rc=%s", strrc(rc));
+    event->sql_result()->set_return_code(rc);
+    event->sql_result()->close();
+  }
   event->session()->set_current_request(nullptr);
   Session::set_current_session(nullptr);
 

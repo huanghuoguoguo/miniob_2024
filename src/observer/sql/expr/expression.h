@@ -23,7 +23,10 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/aggregator.h"
 #include "storage/common/chunk.h"
 
+class ProjectPhysicalOperator;
+class ProjectLogicalOperator;
 class Tuple;
+class ListType;
 
 /**
  * @defgroup Expression
@@ -429,22 +432,7 @@ private:
   std::unique_ptr<Expression> child_;
 };
 
-class SubQueryExpr : public Expression
-{
-public:
-  SubQueryExpr(const char *aggregate_name, Expression *child);
-  virtual ~SubQueryExpr() = default;
 
-  ExprType type() const override { return ExprType::SUB_QUERY; }
-
-  std::unique_ptr<Expression> &child() { return child_; }
-
-  RC       get_value(const Tuple &tuple, Value &value) const override { return RC::INTERNAL; }
-
-
-private:
-  SelectStmt select_stmt_;
-};
 
 class AggregateExpr : public Expression
 {
@@ -488,4 +476,75 @@ public:
 private:
   Type                        aggregate_type_;
   std::unique_ptr<Expression> child_;
+};
+
+/**
+ * 子查询表达式，子查询的结果是一个tuple集合。参考group by valuelist。
+ */
+class SubQueryExpr : public Expression
+{
+public:
+  SubQueryExpr(SelectSqlNode* select_sql_node)
+  {
+    select_sql_node_ = select_sql_node;
+  };
+  virtual ~SubQueryExpr() = default;
+
+  ExprType type() const override { return ExprType::SUB_QUERY; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+  int      value_length() const override { return 0; }
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+
+private:
+  SelectSqlNode* select_sql_node_;
+  //需要将node变成stmt
+  SelectStmt* select_stmt_;
+  // stmt转换为逻辑计划
+  ProjectLogicalOperator* project_logical_op_;
+  ProjectPhysicalOperator* project_phy_op_;
+
+  mutable ListType* list_type_ = nullptr;
+
+public:
+  ProjectLogicalOperator* logical_op() const
+  {
+    return project_logical_op_;
+  }
+
+  void set_logical_op(ProjectLogicalOperator* project_logical_op)
+  {
+    project_logical_op_ = project_logical_op;
+  }
+
+  ProjectPhysicalOperator* phy_op() const
+  {
+    return project_phy_op_;
+  }
+
+  void set_phy_op(ProjectPhysicalOperator* project_phy_op)
+  {
+    project_phy_op_ = project_phy_op;
+  }
+
+
+
+  SelectStmt* select_stmt() const
+  {
+    return select_stmt_;
+  }
+
+  void set_select_stmt(SelectStmt* select_stmt)
+  {
+    select_stmt_ = select_stmt;
+  }
+
+  SelectSqlNode* select_sql_node() const
+  {
+    return select_sql_node_;
+  }
+
+  void set_select_sql_node(SelectSqlNode* select_sql_node)
+  {
+    select_sql_node_ = select_sql_node;
+  }
 };

@@ -33,6 +33,9 @@ RC FilterStmt::create(Db *db, Table *default_table, std::unordered_map<std::stri
     const ConditionSqlNode *conditions, int condition_num, FilterStmt *&stmt)
 {
   RC rc = RC::SUCCESS;
+  if (conditions == NULL || (conditions->left_expr == NULL && conditions->right_expr == NULL)) {
+    return rc;
+  }
   stmt  = nullptr;
 
   FilterStmt *tmp_stmt = new FilterStmt();

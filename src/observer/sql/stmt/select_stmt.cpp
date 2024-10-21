@@ -39,6 +39,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   BinderContext binder_context;
+  binder_context.db(db);
 
   // collect tables in `from` and `join` statement
   vector<Table *>                tables;
@@ -115,15 +116,17 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     return rc;
   }
 
-  rc         = FilterStmt::create(db,
+  if(select_sql.group_by_having.size() > 0) {
+    rc         = FilterStmt::create(db,
       default_table,
       &table_map,
       select_sql.group_by_having.data(),
       static_cast<int>(select_sql.group_by_having.size()),
       having_filter_stmt);
-  if (rc != RC::SUCCESS) {
-    LOG_WARN("cannot construct having filter stmt");
-    return rc;
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("cannot construct having filter stmt");
+      return rc;
+    }
   }
 
 

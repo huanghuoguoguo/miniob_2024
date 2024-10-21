@@ -96,6 +96,9 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
       ASSERT(false, "shouldn't be here");
     } break;
 
+    case ExprType::SUB_QUERY: {
+      return bind_sub_expression(expr, bound_expressions);
+    }
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
@@ -478,6 +481,9 @@ RC ExpressionBinder::bind_aggregate_expression(
 RC ExpressionBinder::bind_condition_expression(std::vector<ConditionSqlNode>& condition_sql_nodes)
 {
   RC rc = RC::SUCCESS;
+  if(condition_sql_nodes.empty()) {
+    return rc;
+  }
   // 将表达式绑定。
   vector<unique_ptr<Expression>> where_expressions;
   for (ConditionSqlNode &expression : condition_sql_nodes) {
@@ -503,11 +509,23 @@ RC ExpressionBinder::bind_condition_expression(std::vector<ConditionSqlNode>& co
     }else {
       expression.right_expr = right.release();
     }
+    where_expressions.clear();
 
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
     }
   }
+  return rc;
+}
+RC ExpressionBinder::bind_sub_expression(
+      std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions)
+{
+  RC rc = RC::SUCCESS;
+  Stmt *stmt = nullptr;
+  SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
+  rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
+  sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
+  bound_expressions.emplace_back(sub_query_expr);
   return rc;
 }

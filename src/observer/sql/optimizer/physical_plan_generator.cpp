@@ -216,6 +216,26 @@ RC PhysicalPlanGenerator::create_plan(PredicateLogicalOperator &pred_oper, uniqu
   ASSERT(expressions.size() == 1, "predicate logical operator's children should be 1");
 
   unique_ptr<Expression> expression = std::move(expressions.front());
+  // 检查condition中有没有子查询。
+  if (expression->type() == ExprType::COMPARISON) {
+    auto comparison_expr = static_cast<ComparisonExpr *>(expression.get());
+    auto left            = comparison_expr->left().get();
+    auto right           = comparison_expr->right().get();
+    if (left->type() == ExprType::SUB_QUERY) {
+      SubQueryExpr *               left_sub_query_expr = static_cast<SubQueryExpr *>(left);
+      unique_ptr<PhysicalOperator> child_phy_oper;
+      create_plan(*left_sub_query_expr->logical_op(), child_phy_oper);
+      left_sub_query_expr->set_phy_op(static_cast<ProjectPhysicalOperator *>(child_phy_oper.release()));
+    }
+    if (right->type() == ExprType::SUB_QUERY) {
+      SubQueryExpr *               right_sub_query_expr = static_cast<SubQueryExpr *>(right);
+      unique_ptr<PhysicalOperator> child_phy_oper;
+      create_plan(*right_sub_query_expr->logical_op(), child_phy_oper);
+      right_sub_query_expr->set_phy_op(static_cast<ProjectPhysicalOperator *>(child_phy_oper.release()));
+    }
+  }
+
+
   oper = unique_ptr<PhysicalOperator>(new PredicatePhysicalOperator(std::move(expression)));
   oper->add_child(std::move(child_phy_oper));
   return rc;
