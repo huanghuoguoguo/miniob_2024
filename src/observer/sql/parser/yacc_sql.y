@@ -172,6 +172,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <join_list>           join_list
 %type <join>                join
 %type <condition_list>      condition_list
+%type <condition_list>      having_condition
 %type <string>              storage_format
 %type <relation_list>       rel_list
 %type <expression>          expression
@@ -530,7 +531,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by
+    SELECT expression_list FROM rel_list join_list where group_by having_condition
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -555,6 +556,11 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($7 != nullptr) {
         $$->selection.group_by.swap(*$7);
         delete $7;
+      }
+
+      if ($8 != nullptr) {
+        $$->selection.group_by_having.swap(*$8);
+        delete $8;
       }
     }
     ;
@@ -779,6 +785,15 @@ group_by:
     }
     | GROUP BY expression_list {
       $$ = $3;
+    }
+    ;
+having_condition:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING condition_list {
+      $$ = $2;
     }
     ;
 load_data_stmt:
