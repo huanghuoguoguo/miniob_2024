@@ -570,7 +570,7 @@ select_stmt:        /*  select 语句的语法解析树*/
         delete $8;
       }
 
-      if ($8 != nullptr) {
+      if ($9 != nullptr) {
         $$->selection.order_unit_list.swap(*$9);
         delete $9;
       }
@@ -849,7 +849,7 @@ opt_order_by:
 	/* empty */ {
    $$ = nullptr;
   }
-	| ORDER BY order_by_list
+	| ORDER BY order_unit_list
 	{
       $$ = $3;
       std::reverse($$->begin(),$$->end());

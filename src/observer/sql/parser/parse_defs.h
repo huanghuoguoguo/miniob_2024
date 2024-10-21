@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/value.h"
 
 struct JoinSqlNode;
+struct OrderBySqlNode;
 class Expression;
 
 /**
@@ -111,7 +112,7 @@ struct SelectSqlNode
   std::vector<JoinSqlNode>                 join_list;   ///< join节点
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
   std::vector<ConditionSqlNode>            group_by_having;     ///< group by having clause
-  std::vector<OrderBySqlNode>              order_by_list;     ///< order_by_list
+  std::vector<OrderBySqlNode>              order_unit_list;     ///< order_unit_list
 };
 
 
