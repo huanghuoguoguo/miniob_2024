@@ -51,12 +51,9 @@ RC HashGroupByPhysicalOperator::open(Trx *trx)
     // 找到对应的group
     GroupType *found_group = nullptr;
     rc                     = find_group(*child_tuple, found_group);
-    if (rc != RC::SUCCESS && rc != RC::INTERNAL) {
+    if (OB_FAIL(rc)) {
       LOG_WARN("failed to find group. rc=%s", strrc(rc));
       return rc;
-    }
-    if (found_group == nullptr) {
-      continue;
     }
 
     // 计算需要做聚合的值
@@ -143,14 +140,7 @@ RC HashGroupByPhysicalOperator::find_group(const Tuple &child_tuple, GroupType *
     LOG_WARN("failed to get values from expression tuple. rc=%s", strrc(rc));
     return rc;
   }
-  // 检查，如果聚合的列的值有一个是null，则不参加此次聚合。
-  for (int i = 0; i < group_by_evaluated_tuple.cell_num(); ++i) {
-    Value cell;
-    group_by_evaluated_tuple.cell_at(i, cell);
-    if (cell.is_null()) {
-      return RC::INTERNAL;
-    }
-  }
+
   // 找到对应的group
   for (GroupType &group : groups_) {
     int compare_result = 0;
