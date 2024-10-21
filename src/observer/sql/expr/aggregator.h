@@ -24,9 +24,11 @@ public:
 
   virtual RC accumulate(const Value &value) = 0;
   virtual RC evaluate(Value &result)        = 0;
+  void setNullable(bool nullable) { this->nullable = nullable; };
 
 protected:
   Value value_;
+  bool nullable = false;
 };
 
 class SumAggregator : public Aggregator
@@ -34,4 +36,44 @@ class SumAggregator : public Aggregator
 public:
   RC accumulate(const Value &value) override;
   RC evaluate(Value &result) override;
+};
+
+class MaxAggregator : public Aggregator
+{
+public:
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+};
+
+class MinAggregator : public Aggregator
+{
+public:
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+};
+
+class CountAggregator : public Aggregator
+{
+public:
+  CountAggregator() : countNum(0) {}
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+private:
+  int countNum;
+};
+
+
+class AvgAggregator : public Aggregator
+{
+public:
+  AvgAggregator() : countNum(0)
+  {
+    sum_ = Value(0.0f);
+  }
+  RC accumulate(const Value &value) override;
+  RC evaluate(Value &result) override;
+
+private:
+  Value sum_;    // 存储总和
+  int countNum;  // 记录计数
 };

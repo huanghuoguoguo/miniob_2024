@@ -104,6 +104,7 @@ struct SelectSqlNode
   std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>                 join_list;   ///< join节点
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
+  std::vector<ConditionSqlNode>            group_by_having;     ///< group by having clause
 };
 
 

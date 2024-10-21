@@ -130,6 +130,8 @@ RIGHT                                   RETURN_TOKEN(RIGHT);
 NULL                                    RETURN_TOKEN(NULL_);
 NULLABLE                                RETURN_TOKEN(NULLABLE);
 IS                                      RETURN_TOKEN(IS);
+NOT                                     RETURN_TOKEN(NOT);
+HAVING                                  RETURN_TOKEN(HAVING);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);

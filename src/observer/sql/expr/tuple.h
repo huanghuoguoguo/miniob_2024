@@ -143,9 +143,15 @@ public:
         return rc;
       }
 
-      result = this_value.compare(other_value);
-      if (0 != result) {
-        return rc;
+      // 如果两个null，返回0
+      if (this_value.is_null() && other_value.is_null())
+      {
+        result = 0;
+      }else {
+        result = this_value.compare(other_value);
+        if (0 != result) {
+          return rc;
+        }
       }
     }
 
@@ -208,7 +214,7 @@ public:
     int null_index = index - table_->table_meta().sys_field_num();
     if (null_index >= 0 && null_list[null_index])
     {
-      cell.set_type(AttrType::NULL_);
+      cell.set_type(AttrType::UNDEFINED);
       return RC::SUCCESS;
     }
 

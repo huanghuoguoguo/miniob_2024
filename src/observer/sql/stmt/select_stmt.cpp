@@ -71,12 +71,18 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder expression_binder(binder_context);
 
+  // 绑定搜索列。
   for (unique_ptr<Expression> &expression : select_sql.expressions) {
     RC rc = expression_binder.bind_expression(expression, bound_expressions);
     if (OB_FAIL(rc)) {
       LOG_INFO("bind expression failed. rc=%s", strrc(rc));
       return rc;
     }
+  }
+
+  Table *default_table = nullptr;
+  if (tables.size() == 1) {
+    default_table = tables[0];
   }
 
   // conditions
@@ -96,10 +102,31 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
-  Table *default_table = nullptr;
-  if (tables.size() == 1) {
-    default_table = tables[0];
+  // having和group by只能一起出现，如果没有group by，则不能有having
+  if(!select_sql.group_by_having.empty() && group_by_expressions.empty()) {
+    return RC::UNSUPPORTED;
   }
+  std::vector<FilterStmt*> group_by_having;
+  FilterStmt *having_filter_stmt = nullptr;
+  // conditions
+  rc = expression_binder.bind_condition_expression(select_sql.group_by_having);
+  if (OB_FAIL(rc)) {
+    LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  rc         = FilterStmt::create(db,
+      default_table,
+      &table_map,
+      select_sql.group_by_having.data(),
+      static_cast<int>(select_sql.group_by_having.size()),
+      having_filter_stmt);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("cannot construct having filter stmt");
+    return rc;
+  }
+
+
 
   // create filter statement in `join` statement
   std::vector<pair<Table*,FilterStmt*>> join_filter_stmts;
@@ -146,6 +173,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->tables_.swap(tables);
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
+  select_stmt->group_by_having_ = having_filter_stmt;
   select_stmt->join_filter_stmts_.swap(join_filter_stmts);
   select_stmt->group_by_.swap(group_by_expressions);
   stmt                      = select_stmt;
