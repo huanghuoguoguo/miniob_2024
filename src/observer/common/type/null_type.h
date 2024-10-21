@@ -10,7 +10,7 @@
 class NullType : public DataType
 {
 public:
-  NullType() : DataType(AttrType::NULL_) {}
+  NullType() : DataType(AttrType::UNDEFINED) {}
   virtual ~NullType() = default;
 
   int compare(const Value &left, const Value &right) const override;

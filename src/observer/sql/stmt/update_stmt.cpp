@@ -77,6 +77,12 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
     return rc;
   }
 
+  auto table_meta = table->table_meta().field(field_name.c_str());
+  // 检查，不能为null的值不允许添加为null。
+  if (value.is_null() && !table_meta->nullable()) {
+    return RC::INVALID_ARGUMENT;
+  }
+
   if (rc == RC::SUCCESS) {
     // 如果绑定成功，bound_expressions 中将包含绑定后的比较表达式
     LOG_INFO("Successfully bound the comparison expression: %s = %s", field_name.c_str(), value.to_string().c_str());

@@ -125,6 +125,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LIKE
         NULL_
         NULLABLE
+        HAVING
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -166,9 +167,12 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <condition_list>      where
+%type <string>              aggre_type
+%type <expression_list>     aggre_list
 %type <join_list>           join_list
 %type <join>                join
 %type <condition_list>      condition_list
+%type <condition_list>      having_condition
 %type <string>              storage_format
 %type <relation_list>       rel_list
 %type <expression>          expression
@@ -360,7 +364,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type
@@ -369,7 +373,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type LBRACE number RBRACE NOT NULL_
@@ -381,6 +385,15 @@ attr_def:
       $$->nullable = false;
       free($1);
     }
+    | ID type LBRACE number RBRACE NULL_
+        {
+          $$ = new AttrInfoSqlNode;
+          $$->type = (AttrType)$2;
+          $$->name = $1;
+          $$->length = $4;
+          $$->nullable = true;
+          free($1);
+        }
     | ID type LBRACE number RBRACE NULLABLE
     {
       $$ = new AttrInfoSqlNode;
@@ -400,6 +413,15 @@ attr_def:
       free($1);
     }
     | ID type NULLABLE
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      $$->nullable = true;
+      free($1);
+    }
+    | ID type NULL_
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
@@ -509,7 +531,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by
+    SELECT expression_list FROM rel_list join_list where group_by having_condition
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -534,6 +556,11 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($7 != nullptr) {
         $$->selection.group_by.swap(*$7);
         delete $7;
+      }
+
+      if ($8 != nullptr) {
+        $$->selection.group_by_having.swap(*$8);
+        delete $8;
       }
     }
     ;
@@ -593,8 +620,31 @@ expression_list:
       $$->emplace($$->begin(), $1);
     }
     ;
+aggre_type:
+    ID { $$ = $1; }
+    ;
+aggre_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | expression_list {
+        $$ = $1;
+    }
 expression:
-    expression '+' expression {
+    aggre_type LBRACE aggre_list RBRACE {
+      $$ = nullptr;
+      if ($3 != nullptr) {
+        if($3->size() == 1){
+            $$ = create_aggregate_expression($1, $3->front().release(), sql_string, &@$);
+        } else {
+            $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+        }
+      }else{
+        $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+      }
+    }
+    | expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
     | expression '-' expression {
@@ -732,6 +782,18 @@ group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY expression_list {
+      $$ = $3;
+    }
+    ;
+having_condition:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING condition_list {
+      $$ = $2;
     }
     ;
 load_data_stmt:

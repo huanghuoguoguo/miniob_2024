@@ -165,6 +165,21 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &group_by_oper;
   }
 
+  // 添加可能存在的having。
+  unique_ptr<LogicalOperator> having_predicate_oper;
+  rc = create_plan(select_stmt->having_filter_stmt(), having_predicate_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+  if (having_predicate_oper) {
+    if (*last_oper) {
+      having_predicate_oper->add_child(std::move(*last_oper));
+    }
+
+    last_oper = &having_predicate_oper;
+  }
+
   auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()));
   if (*last_oper) {
     project_oper->add_child(std::move(*last_oper));
@@ -224,7 +239,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   for (FilterUnit *filter_unit : filter_units) {
     std::unique_ptr<Expression>             left       = std::move(filter_unit->left());
     std::unique_ptr<Expression>             right       = std::move(filter_unit->right());
-    if (left->value_type() != AttrType::NULL_ && right->value_type() != AttrType::NULL_) {
+    if (left->value_type() != AttrType::UNDEFINED && right->value_type() != AttrType::UNDEFINED) {
       if (left->value_type() != right->value_type()) {
         auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
         auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
@@ -404,6 +419,22 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   // collect all aggregate expressions
   for (unique_ptr<Expression> &expression : query_expressions) {
     collector(expression);
+  }
+
+  FilterStmt * having_filter_stmt = select_stmt->having_filter_stmt();
+  // 将having中的条件收集。
+  if (having_filter_stmt) {
+    auto &filter_units = having_filter_stmt->filter_units();
+    for (auto &filter_unit : filter_units) {
+      std::unique_ptr<Expression> &left = filter_unit->left();
+      bind_group_by_expr(left);
+      find_unbound_column(left);
+      collector(left);
+      std::unique_ptr<Expression> &right = filter_unit->right();
+      bind_group_by_expr(right);
+      find_unbound_column(right);
+      collector(right);
+    }
   }
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {
