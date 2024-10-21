@@ -143,9 +143,15 @@ public:
         return rc;
       }
 
-      result = this_value.compare(other_value);
-      if (0 != result) {
-        return rc;
+      // 如果两个null，返回0
+      if (this_value.is_null() && other_value.is_null())
+      {
+        result = 0;
+      }else {
+        result = this_value.compare(other_value);
+        if (0 != result) {
+          return rc;
+        }
       }
     }
 
