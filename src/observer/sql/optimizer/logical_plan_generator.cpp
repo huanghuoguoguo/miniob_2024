@@ -421,6 +421,22 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
     collector(expression);
   }
 
+  FilterStmt * having_filter_stmt = select_stmt->having_filter_stmt();
+  // 将having中的条件收集。
+  if (having_filter_stmt) {
+    auto &filter_units = having_filter_stmt->filter_units();
+    for (auto &filter_unit : filter_units) {
+      std::unique_ptr<Expression> &left = filter_unit->left();
+      bind_group_by_expr(left);
+      find_unbound_column(left);
+      collector(left);
+      std::unique_ptr<Expression> &right = filter_unit->right();
+      bind_group_by_expr(right);
+      find_unbound_column(right);
+      collector(right);
+    }
+  }
+
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {
     // 既没有group by也没有聚合函数，不需要group by
     return RC::SUCCESS;
