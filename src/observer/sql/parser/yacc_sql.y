@@ -76,6 +76,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         OUTER
         DROP
         GROUP
+        ORDER
         TABLE
         TABLES
         INDEX
@@ -143,6 +144,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   std::vector<ConditionSqlNode> *            condition_list;
   std::vector<JoinSqlNode> *                 join_list;
   JoinSqlNode *                              join;
+  OrderBySqlNode *                           order_unit;
+  std::vector<OrderBySqlNode> *              order_unit_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
   std::vector<std::string> *                 relation_list;
   char *                                     string;
@@ -179,6 +182,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
+%type <order_unit>          order_unit
+%type <order_unit_list>     order_unit_list
+%type <order_unit_list>     order_by
 %type <sql_node>            calc_stmt
 %type <sql_node>            select_stmt
 %type <sql_node>            insert_stmt
@@ -532,7 +538,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by having_condition
+    SELECT expression_list FROM rel_list join_list where group_by having_condition order_by
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -562,6 +568,11 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($8 != nullptr) {
         $$->selection.group_by_having.swap(*$8);
         delete $8;
+      }
+
+      if ($8 != nullptr) {
+        $$->selection.order_unit_list.swap(*$9);
+        delete $9;
       }
     }
     ;
@@ -793,6 +804,53 @@ having_condition:
       $$ = $2;
     }
     ;
+order_unit:
+    expression
+    {
+        $$ = new OrderBySqlNode(); // 默认是升序
+        $$->expr = $1;              // 提取表达式
+        $$->is_asc = true;          // 设置为升序
+    }
+    |
+    expression DESC
+    {
+        $$ = new OrderBySqlNode(); // 解析带有 DESC 的排序单元
+        $$->expr = $1;
+        $$->is_asc = false;         // 设置为降序
+    }
+    |
+    expression ASC
+    {
+        $$ = new OrderBySqlNode(); // 解析带有 ASC 的排序单元
+        $$->expr = $1;
+        $$->is_asc = true;          // 设置为升序
+    }
+    ;
+order_unit_list:
+	order_by
+	{
+    $$ = new std::vector<OrderBySqlNode>;
+    $$->emplace_back(*$1);
+    delete $1;
+	}
+  |
+	order_by COMMA order_unit_list
+	{
+    $3->emplace_back(*$1);
+    $$ = $3;
+    delete $1;
+	}
+	;
+order_by_list:
+	/* empty */ {
+   $$ = nullptr;
+  }
+	| ORDER BY order_by_list
+	{
+      $$ = $3;
+      std::reverse($$->begin(),$$->end());
+	}
+	;
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
     {
