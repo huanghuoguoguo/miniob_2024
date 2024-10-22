@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include <common/type/list_type.h>
 #include <sql/stmt/select_stmt.h>
 
+
 #include "common/value.h"
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
@@ -522,7 +523,7 @@ private:
 
   mutable ListType* list_type_ = nullptr;
   std::vector<std::unique_ptr<Expression>>* values_ = nullptr;
-
+  std::vector<Tuple*> tuples_;
 public:
   std::vector<std::unique_ptr<Expression>>* values() const
   {

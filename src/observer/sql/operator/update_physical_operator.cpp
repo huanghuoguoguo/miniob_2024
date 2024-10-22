@@ -95,7 +95,14 @@ RC UpdatePhysicalOperator::next() { return RC::RECORD_EOF; }
 
 RC UpdatePhysicalOperator::close()
 {
-  // return children()[0]->close();
+  for (auto& e : expressions_) {
+    auto expression = e->right().get();
+    if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
+      auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
+      RC rc = sub_query_expr->close();
+      if (rc != RC::SUCCESS) return rc;
+    }
+  }
   return RC::SUCCESS;
 }
 

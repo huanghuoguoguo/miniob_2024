@@ -707,7 +707,7 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 RC SubQueryExpr::open(Trx* trx)
 {
   RC rc = RC::SUCCESS;
-  if(project_phy_op_) {
+  if (project_phy_op_) {
     rc = project_phy_op_->open(trx);
     // 首次运行将子查询的结果获取。
     if (list_type_ == nullptr) {
@@ -723,19 +723,25 @@ RC SubQueryExpr::open(Trx* trx)
           LOG_WARN("failed to get current record: %s", strrc(rc));
           return rc;
         }
+        this->tuples_.emplace_back(tuple);
         Value *value = new Value();
         rc           = tuple->cell_at(0, *value);
-        list_type_->add(value);
+        if(OB_FAIL(rc)) {
+          return rc;
+        }
+        if(!list_type_->count(value)) {
+          list_type_->add(value);
+        }
       }
       if (this->list_type_->empty()) {
         // 如果没有，提供默认null值。
         this->list_type_->add(new Value());
       }
-    } else {
-      if (list_type_ == nullptr) {
-        this->list_type_ = new ListType();
-        list_type_->add(new Value());
-      }
+    }
+  } else {
+    if (list_type_ == nullptr) {
+      this->list_type_ = new ListType();
+      list_type_->add(new Value());
     }
   }
   return rc;
