@@ -285,16 +285,20 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
 
     // 如果是子查询。将其转换为逻辑计划。
     if(left->type()==ExprType::SUB_QUERY) {
-      unique_ptr<LogicalOperator> sub_oper(nullptr);
       auto                        sub_query_expr = static_cast<SubQueryExpr*>(left.get());
-      create_plan(sub_query_expr->select_stmt(), sub_oper);
-      sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
+      if(sub_query_expr->select_stmt() != nullptr) {
+        unique_ptr<LogicalOperator> sub_oper(nullptr);
+        create_plan(sub_query_expr->select_stmt(), sub_oper);
+        sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
+      }
     }
     if(right->type()==ExprType::SUB_QUERY) {
-      unique_ptr<LogicalOperator> sub_oper(nullptr);
       auto                        sub_query_expr = static_cast<SubQueryExpr*>(right.get());
-      create_plan(sub_query_expr->select_stmt(), sub_oper);
-      sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
+      if(sub_query_expr->select_stmt() != nullptr) {
+        unique_ptr<LogicalOperator> sub_oper(nullptr);
+        create_plan(sub_query_expr->select_stmt(), sub_oper);
+        sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
+      }
     }
 
     ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));

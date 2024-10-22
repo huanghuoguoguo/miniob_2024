@@ -37,12 +37,16 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     auto left            = comparison_expr->left().get();
     auto right           = comparison_expr->right().get();
     if (left->type() == ExprType::SUB_QUERY) {
-      SubQueryExpr *               left_sub_query_expr = static_cast<SubQueryExpr *>(left);
-      left_sub_query_expr->phy_op()->open(trx);
+      SubQueryExpr *left_sub_query_expr = static_cast<SubQueryExpr *>(left);
+      if (left_sub_query_expr->phy_op() != nullptr) {
+        left_sub_query_expr->phy_op()->open(trx);
+      }
     }
     if (right->type() == ExprType::SUB_QUERY) {
-      SubQueryExpr *               right_sub_query_expr = static_cast<SubQueryExpr *>(right);
-      right_sub_query_expr->phy_op()->open(trx);
+      SubQueryExpr *right_sub_query_expr = static_cast<SubQueryExpr *>(right);
+      if (right_sub_query_expr->phy_op() != nullptr) {
+        right_sub_query_expr->phy_op()->open(trx);
+      }
     }
   }
 
@@ -81,6 +85,23 @@ RC PredicatePhysicalOperator::next()
 RC PredicatePhysicalOperator::close()
 {
   children_[0]->close();
+  if (expression_->type() == ExprType::COMPARISON) {
+    auto comparison_expr = static_cast<ComparisonExpr *>(expression_.get());
+    auto left            = comparison_expr->left().get();
+    auto right           = comparison_expr->right().get();
+    if (left->type() == ExprType::SUB_QUERY) {
+      SubQueryExpr *left_sub_query_expr = static_cast<SubQueryExpr *>(left);
+      if (left_sub_query_expr->phy_op() != nullptr) {
+        left_sub_query_expr->phy_op()->close();
+      }
+    }
+    if (right->type() == ExprType::SUB_QUERY) {
+      SubQueryExpr *right_sub_query_expr = static_cast<SubQueryExpr *>(right);
+      if (right_sub_query_expr->phy_op() != nullptr) {
+        right_sub_query_expr->phy_op()->close();
+      }
+    }
+  }
   return RC::SUCCESS;
 }
 

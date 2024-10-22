@@ -524,8 +524,39 @@ RC ExpressionBinder::bind_sub_expression(
   RC rc = RC::SUCCESS;
   Stmt *stmt = nullptr;
   SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
-  rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
-  sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
+  if(sub_query_expr->select_stmt() != nullptr) {
+    rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
+    sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
+  }else {
+    std::vector<std::unique_ptr<Expression>> * expressions = sub_query_expr->values();
+    if(expressions != nullptr) {
+      // 值定义。
+      std::vector<std::unique_ptr<Expression>>* bound_values = new std::vector<std::unique_ptr<Expression>>();
+      for(size_t i = 1; i < expressions->size(); ++i) {
+        bind_expression(expressions->at(i), *bound_values);
+      }
+      // 检查是否存在不一样的。
+      if (!bound_values->empty()) {
+        for (size_t i = 1; i < bound_values->size(); ++i) {
+          if (bound_values->at(i)->type() != bound_values->at(i - 1)->type()) {
+            return RC::INVALID_ARGUMENT;
+          }
+        }
+      } else {
+        // 是否添加一个null。
+        bound_values->emplace_back(new ValueExpr(Value()));
+      }
+        // 直接加入list
+      for (size_t i = 0; i < bound_values->size(); ++i) {
+        Value *v  = new Value();
+        RC     rc = static_cast<ValueExpr *>(bound_values->at(i).get())->try_get_value(*v);
+        if (OB_FAIL(rc)) {
+          return rc;
+        }
+        sub_query_expr->add_value(v);
+      }
+    }
+  }
   bound_expressions.emplace_back(sub_query_expr);
   return rc;
 }

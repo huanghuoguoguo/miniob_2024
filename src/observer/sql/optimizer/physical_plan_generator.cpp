@@ -222,16 +222,20 @@ RC PhysicalPlanGenerator::create_plan(PredicateLogicalOperator &pred_oper, uniqu
     auto left            = comparison_expr->left().get();
     auto right           = comparison_expr->right().get();
     if (left->type() == ExprType::SUB_QUERY) {
-      SubQueryExpr *               left_sub_query_expr = static_cast<SubQueryExpr *>(left);
-      unique_ptr<PhysicalOperator> child_phy_oper;
-      create_plan(*left_sub_query_expr->logical_op(), child_phy_oper);
-      left_sub_query_expr->set_phy_op(static_cast<ProjectPhysicalOperator *>(child_phy_oper.release()));
+      SubQueryExpr *left_sub_query_expr = static_cast<SubQueryExpr *>(left);
+      if (left_sub_query_expr->logical_op() != nullptr) {
+        unique_ptr<PhysicalOperator> child_phy_oper;
+        create_plan(*left_sub_query_expr->logical_op(), child_phy_oper);
+        left_sub_query_expr->set_phy_op(static_cast<ProjectPhysicalOperator *>(child_phy_oper.release()));
+      }
     }
     if (right->type() == ExprType::SUB_QUERY) {
-      SubQueryExpr *               right_sub_query_expr = static_cast<SubQueryExpr *>(right);
-      unique_ptr<PhysicalOperator> child_phy_oper;
-      create_plan(*right_sub_query_expr->logical_op(), child_phy_oper);
-      right_sub_query_expr->set_phy_op(static_cast<ProjectPhysicalOperator *>(child_phy_oper.release()));
+      SubQueryExpr *right_sub_query_expr = static_cast<SubQueryExpr *>(right);
+      if (right_sub_query_expr->logical_op() != nullptr) {
+        unique_ptr<PhysicalOperator> child_phy_oper;
+        create_plan(*right_sub_query_expr->logical_op(), child_phy_oper);
+        right_sub_query_expr->set_phy_op(static_cast<ProjectPhysicalOperator *>(child_phy_oper.release()));
+      }
     }
   }
 

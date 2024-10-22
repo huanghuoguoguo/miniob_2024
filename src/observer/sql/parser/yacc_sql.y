@@ -681,6 +681,9 @@ expression:
     | select_stmt {
       $$ = new SubQueryExpr(&($1->selection));
     }
+    | LBRACE expression_list RBRACE {
+      $$ = new SubQueryExpr($2);
+    }
     ;
 
 rel_attr:

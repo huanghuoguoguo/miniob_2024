@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <memory>
 #include <string>
+#include <common/type/list_type.h>
 #include <sql/stmt/select_stmt.h>
 
 #include "common/value.h"
@@ -488,24 +489,47 @@ public:
   {
     select_sql_node_ = select_sql_node;
   };
+  SubQueryExpr(std::vector<std::unique_ptr<Expression>>* values)
+  {
+    this->values_ = values;
+  }
   virtual ~SubQueryExpr() = default;
 
   ExprType type() const override { return ExprType::SUB_QUERY; }
   AttrType value_type() const override { return AttrType::UNDEFINED; }
   int      value_length() const override { return 0; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
+  void     add_value(Value* v)
+  {
+    if (list_type_ == nullptr)
+    {
+      list_type_ = new ListType;
+    }
+    list_type_->add(v);
+  }
 
 private:
-  SelectSqlNode* select_sql_node_;
+  SelectSqlNode* select_sql_node_ = nullptr;
   //需要将node变成stmt
-  SelectStmt* select_stmt_;
+  SelectStmt* select_stmt_ = nullptr;
   // stmt转换为逻辑计划
-  ProjectLogicalOperator* project_logical_op_;
-  ProjectPhysicalOperator* project_phy_op_;
+  ProjectLogicalOperator* project_logical_op_ = nullptr;
+  ProjectPhysicalOperator* project_phy_op_ = nullptr;
 
   mutable ListType* list_type_ = nullptr;
+  std::vector<std::unique_ptr<Expression>>* values_ = nullptr;
 
 public:
+  std::vector<std::unique_ptr<Expression>>* values() const
+  {
+    return values_;
+  }
+
+  void values(std::vector<std::unique_ptr<Expression>>* values)
+  {
+    values_ = values;
+  }
+
   ProjectLogicalOperator* logical_op() const
   {
     return project_logical_op_;
