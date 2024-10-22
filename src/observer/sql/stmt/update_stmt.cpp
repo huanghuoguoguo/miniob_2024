@@ -59,6 +59,9 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
   rc = expression_binder.bind_condition_expression(update_sql.set_expression);
+  if(OB_FAIL(rc)) {
+    return rc;
+  }
 
   std::vector<ComparisonExpr*> set_exprs;
   // 检查，不能为null的值不允许添加为null，操作符必须为=

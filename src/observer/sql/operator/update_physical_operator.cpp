@@ -62,7 +62,6 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       values.push_back(cell);
     }
     // 修改对应index的value
-
     for (size_t i = 0; i < index.size(); i++) {
       int   field_index = index[i];
       Value value;
