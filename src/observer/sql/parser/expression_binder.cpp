@@ -524,7 +524,7 @@ RC ExpressionBinder::bind_sub_expression(
   RC rc = RC::SUCCESS;
   Stmt *stmt = nullptr;
   SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
-  if(sub_query_expr->select_stmt() != nullptr) {
+  if(sub_query_expr->select_sql_node() != nullptr) {
     rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
     sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
   }else {
