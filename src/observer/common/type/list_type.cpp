@@ -15,8 +15,8 @@ int ListType::compare(const Value &left, const Value &right) const
 }
 bool ListType::count(Value* value)
 {
-  for (auto it = values.begin(); it != values.end(); ++it) {
-    if ((*it)->compare(*value) == 0) {
+  for (const auto & it : values) {
+    if (it->compare(*value) == 0) {
       return true;
     }
   }
