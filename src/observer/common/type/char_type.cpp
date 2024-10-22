@@ -41,7 +41,7 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
   };
   auto str = extract_number(val.get_string());
   if (str == "error") {
-        return RC::INVALID_ARGUMENT;
+    str = "0";
   }
   switch (type) {
     case AttrType::INTS:
