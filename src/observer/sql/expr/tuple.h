@@ -305,8 +305,14 @@ public:
       return RC::INTERNAL;
     }
 
-    Expression *expr = expressions_[index].get();
-    return expr->get_value(*tuple_, cell);
+    Expression* expr = expressions_[index].get();
+    RC rc = expr->get_value(*tuple_, cell);
+    if (rc == RC::DIVIDE_ZERO)
+    {
+      cell.set_type(AttrType::UNDEFINED);
+      rc = RC::SUCCESS;
+    }
+    return rc;
   }
 
   RC spec_at(int index, TupleCellSpec &spec) const override
