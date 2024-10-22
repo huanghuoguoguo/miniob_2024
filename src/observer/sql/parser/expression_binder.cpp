@@ -532,7 +532,7 @@ RC ExpressionBinder::bind_sub_expression(
     if(expressions != nullptr) {
       // 值定义。
       std::vector<std::unique_ptr<Expression>>* bound_values = new std::vector<std::unique_ptr<Expression>>();
-      for(size_t i = 1; i < expressions->size(); ++i) {
+      for(size_t i = 0; i < expressions->size(); ++i) {
         bind_expression(expressions->at(i), *bound_values);
       }
       // 检查是否存在不一样的。
