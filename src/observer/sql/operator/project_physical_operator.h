@@ -40,6 +40,8 @@ public:
 
   RC tuple_schema(TupleSchema &schema) const override;
 
+  int select_size(){return static_cast<int>(expressions_.size());}
+
 private:
   std::vector<std::unique_ptr<Expression>>     expressions_;
   ExpressionTuple<std::unique_ptr<Expression>> tuple_;

@@ -700,31 +700,81 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
 
 RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  RC rc = RC::SUCCESS;
-  // 首次运行将子查询的结果获取。
-  if (list_type_ == nullptr) {
-    this->list_type_                        = new ListType();
-    ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
-    if (project_phy_op->cell_num() > 1) {
-      project_phy_op->close();
-      return RC::SUB_QUERY_ERROR;
-    }
-    while (OB_SUCC(rc = project_phy_op->next())) {
-      Tuple *tuple = project_phy_op->current_tuple();
-      if (nullptr == tuple) {
-        LOG_WARN("failed to get current record: %s", strrc(rc));
-        return rc;
-      }
-      Value *value = new Value();
-      rc           = tuple->cell_at(0, *value);
-      list_type_->add(value);
-    }
-    if (this->list_type_->empty()) {
-      // 如果没有，提供默认null值。
-      this->list_type_->add(new Value());
-    }
-    project_phy_op->close();
-  }
   list_type_->get_value(value);
+  return RC::SUCCESS;
+}
+
+RC SubQueryExpr::open(Trx* trx)
+{
+  RC rc = RC::SUCCESS;
+  if(project_phy_op_) {
+    rc = project_phy_op_->open(trx);
+    // 首次运行将子查询的结果获取。
+    if (list_type_ == nullptr) {
+      this->list_type_                        = new ListType();
+      ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
+      if (project_phy_op->cell_num() > 1) {
+        project_phy_op->close();
+        return RC::SUB_QUERY_ERROR;
+      }
+      while (OB_SUCC(rc = project_phy_op->next())) {
+        Tuple *tuple = project_phy_op->current_tuple();
+        if (nullptr == tuple) {
+          LOG_WARN("failed to get current record: %s", strrc(rc));
+          return rc;
+        }
+        Value *value = new Value();
+        rc           = tuple->cell_at(0, *value);
+        list_type_->add(value);
+      }
+      if (this->list_type_->empty()) {
+        // 如果没有，提供默认null值。
+        this->list_type_->add(new Value());
+      }
+    } else {
+      if (list_type_ == nullptr) {
+        this->list_type_ = new ListType();
+        list_type_->add(new Value());
+      }
+    }
+  }
+  return rc;
+}
+RC  SubQueryExpr::close()
+{
+  RC rc = RC::SUCCESS;
+  if(project_phy_op_) {
+    rc = project_phy_op_->close();
+  }
+  return rc;
+}
+
+RC SubQueryExpr::check(CompOp op)
+{
+  switch (op) {
+    case EQUAL_TO:    ///< "="
+    case LESS_EQUAL:  ///< "<="
+    case NOT_EQUAL:   ///< "<>"
+    case LESS_THAN:   ///< "<"
+    case GREAT_EQUAL: ///< ">="
+    case GREAT_THAN:  ///< ">"
+    {
+      if (list_type_ != nullptr && list_type_->size() != 1) {
+        return RC::SUB_QUERY_NUILTI_COLUMN;
+      }
+      if (project_phy_op_ != nullptr && project_phy_op_->select_size() != 1) {
+        return RC::SUB_QUERY_NUILTI_COLUMN;
+      }
+    }
+    break;
+    case IN_:
+    case NOT_IN: {
+      if (project_phy_op_ != nullptr && project_phy_op_->select_size() != 1) {
+        return RC::SUB_QUERY_NUILTI_COLUMN;
+      }
+    }
+    break;
+    default: return RC::SUCCESS;
+  }
   return RC::SUCCESS;
 }

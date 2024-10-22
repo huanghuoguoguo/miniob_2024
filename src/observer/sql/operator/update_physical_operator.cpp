@@ -3,30 +3,32 @@
 //
 
 #include "sql/operator/update_physical_operator.h"
+
+#include "project_physical_operator.h"
 #include "sql/stmt/update_stmt.h"
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
 
 using namespace std;
 
-UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table, unique_ptr<ComparisonExpr> expression)
+UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table, std::vector<ComparisonExpr *>& expressions)
 {
   this->table_      = table;
-  this->expression_ = std::move(expression);
+  this->expressions_.swap(expressions);
 }
 
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
-  auto leftExpr  = expression_->left().get();
-  auto rightExpr = expression_->right().get();
+  for (auto& e : expressions_) {
+    auto expression = e->right().get();
+    if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
+      auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
+      sub_query_expr->open(trx);
+      RC rc = sub_query_expr->check(e->comp());
+      if (rc != RC::SUCCESS) return rc;
+    }
+  }
 
-  FieldExpr *fieldExpression(static_cast<FieldExpr *>(leftExpr));
-
-  ValueExpr *valueExpression(static_cast<ValueExpr *>(rightExpr));
-
-  auto                               field_name = fieldExpression->field().field_name();
-  auto                               table      = fieldExpression->field().table();
-  auto                               value      = valueExpression->get_value();
   std::unique_ptr<PhysicalOperator> &child      = children_[0];
 
   RC rc = child->open(trx);
@@ -36,7 +38,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   }
 
   trx_      = trx;
-  int index = -1;
+
+  vector<int> index;
+  // 将需要修改的字段的序列保存。
+  getColumnIndex(index);
+
   while (OB_SUCC(rc = child->next())) {
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
@@ -46,28 +52,23 @@ RC UpdatePhysicalOperator::open(Trx *trx)
 
     RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
 
-    if (index == -1) {
-      // 找到index
-      TupleCellSpec tupleCellSpec;
-      int           cell_num = row_tuple->cell_num();
-      for (int i = table->table_meta().sys_field_num(); i < cell_num; i++) {
-        row_tuple->spec_at(i, tupleCellSpec);
-        if (strcmp(tupleCellSpec.field_name(), field_name) == 0) {
-          index = i - table->table_meta().sys_field_num();
-          break;
-        }
-      }
-    }
+
     // 找到所有的value
     int           cell_num = row_tuple->cell_num();
     vector<Value> values;
-    for (int i = table->table_meta().sys_field_num(); i < cell_num; ++i) {
+    for (int i = table_->table_meta().sys_field_num(); i < cell_num; ++i) {
       Value cell;
       row_tuple->cell_at(i, cell);
       values.push_back(cell);
     }
     // 修改对应index的value
-    values[index] = value;
+
+    for (size_t i = 0; i < index.size(); i++) {
+      int   field_index = index[i];
+      Value value;
+      expressions_.at(i)->right()->get_value(*row_tuple, value);
+      values[field_index] = value;
+    }
 
     Record new_record_test;
     new_record_test.set_rid(row_tuple->record().rid());
@@ -97,4 +98,20 @@ RC UpdatePhysicalOperator::close()
 {
   // return children()[0]->close();
   return RC::SUCCESS;
+}
+
+void UpdatePhysicalOperator::getColumnIndex(vector<int> &c)
+{
+  auto &table_meta  = table_->table_meta();
+  auto  field_metas = table_meta.field_metas();
+  for (auto &e : expressions_) {
+    auto field         = static_cast<FieldExpr *>(e->left().get());
+    int  sys_field_num = table_meta.sys_field_num();
+    for (int i = sys_field_num; i < static_cast<int>(field_metas->size()); ++i) {
+      if (strcmp(field_metas->at(i).name(), field->field_name()) == 0) {
+        c.push_back(i - sys_field_num);
+        break;
+      }
+    }
+  }
 }

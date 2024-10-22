@@ -13,20 +13,29 @@
 class UpdateLogicalOperator : public LogicalOperator
 {
 public:
-    UpdateLogicalOperator(Table* table, std::unique_ptr<ComparisonExpr>& expression)
+    UpdateLogicalOperator(Table* table, std::vector<ComparisonExpr *>& expression)
     {
         this->table_ = table;
-        this->expression = std::move(expression);
+        this->set_exprs_.swap(expression);
     }
 
     Table* table() const { return table_; }
     virtual ~ UpdateLogicalOperator() = default;
-    ComparisonExpr* get_expression() { return expression.release(); }
 
     LogicalOperatorType type() const override { return LogicalOperatorType::UPDATE; }
 
 private:
     Table* table_ = nullptr;
-    std::unique_ptr<ComparisonExpr> expression;
-    // 属性还有父类的expression 和childrens
+    std::vector<ComparisonExpr *> set_exprs_;
+
+public:
+    std::vector<ComparisonExpr*>& set_exprs()
+    {
+        return set_exprs_;
+    }
+
+    void set_exprs(const std::vector<ComparisonExpr*>& set_exprs)
+    {
+        set_exprs_ = set_exprs;
+    }
 };

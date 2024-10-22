@@ -15,7 +15,6 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/update_stmt.h"
 #include "sql/parser/expression_binder.h"
 #include "storage/db/db.h"
-#include "sql/parser/expression_binder.h"
 
 UpdateStmt::~UpdateStmt()
 {
@@ -27,6 +26,7 @@ UpdateStmt::~UpdateStmt()
 
 RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
 {
+  RC rc = RC::SUCCESS;
   // TODO
   if (nullptr == db) {
     LOG_WARN("invalid argument. db is null");
@@ -34,6 +34,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
   }
 
   BinderContext binder_context;
+  binder_context.db(db);
 
   // 找到需要更新的表
   const char *table_name = update_sql.relation_name.c_str();
@@ -50,43 +51,39 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
   }
 
   binder_context.add_table(table);
-  // 验证字段名
 
-  const std::string &field_name = update_sql.attribute_name; // 属性名
-  const Value &      value      = update_sql.value;
 
-  //创建字段表达式和值表达式
-  unique_ptr<Expression> unbound_field_expr = std::make_unique<UnboundFieldExpr>(table_name, field_name);
-  unique_ptr<Expression> value_expr         = std::make_unique<ValueExpr>(value);
 
-  // 2. 创建一个未绑定的比较表达式，用于表示 field_name = value
-  std::unique_ptr<Expression> unbound_comp_expr = std::make_unique<ComparisonExpr>(
-      EQUAL_TO,
-      std::move(unbound_field_expr),
-      // 使用std::move转移所有权
-      std::move(value_expr) // 使用std::move转移所有权
-      );
 
   // 创建表达式绑定器并执行绑定操作
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
+  rc = expression_binder.bind_condition_expression(update_sql.set_expression);
 
-  RC rc = expression_binder.bind_expression(unbound_comp_expr, bound_expressions);
-  if (OB_FAIL(rc)) {
-    LOG_INFO("bind expression failed. rc=%s", strrc(rc));
-    return rc;
+  std::vector<ComparisonExpr*> set_exprs;
+  // 检查，不能为null的值不允许添加为null，操作符必须为=
+  for (auto &node : update_sql.set_expression) {
+    if (node.comp != EQUAL_TO) {
+      return RC::INVALID_ARGUMENT;
+    }
+    if (node.left_expr->type() != ExprType::FIELD) {
+      return RC::INVALID_ARGUMENT;
+    }
+    if (node.right_expr->type() == ExprType::VALUE) {
+      // 如果是值，可以继续判断，如果是子查询，延后判断。
+      FieldExpr *field_expr = static_cast<FieldExpr *>(node.left_expr);
+      ValueExpr *value_expr = static_cast<ValueExpr *>(node.right_expr);
+      if (!field_expr->field().meta()->nullable() && value_expr->value_type() == AttrType::UNDEFINED) {
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+    // 构造ComparisonExpr
+    ComparisonExpr * set_e = new ComparisonExpr(EQUAL_TO,std::unique_ptr<Expression>(node.left_expr),std::unique_ptr<Expression>(node.right_expr));
+    set_exprs.push_back(set_e);
   }
 
-  auto table_meta = table->table_meta().field(field_name.c_str());
-  // 检查，不能为null的值不允许添加为null。
-  if (value.is_null() && !table_meta->nullable()) {
-    return RC::INVALID_ARGUMENT;
-  }
 
-  if (rc == RC::SUCCESS) {
-    // 如果绑定成功，bound_expressions 中将包含绑定后的比较表达式
-    LOG_INFO("Successfully bound the comparison expression: %s = %s", field_name.c_str(), value.to_string().c_str());
-  }
+
 
   // conditions
   rc = expression_binder.bind_condition_expression(update_sql.conditions);
@@ -112,12 +109,8 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
   UpdateStmt *update_stmt = new UpdateStmt();
 
   update_stmt->table_          = table;
-  update_stmt->attribute_name_ = update_sql.attribute_name; //不需要了，可以获得
-  update_stmt->value_          = update_sql.value;          //不需要了，可以获得
   update_stmt->filter_stmt_    = filter_stmt;
-  ComparisonExpr *expression   = static_cast<ComparisonExpr *>(bound_expressions[0].release());
-
-  update_stmt->comparisonExpr = std::unique_ptr<ComparisonExpr>(expression);
+  update_stmt->set_values_.swap(set_exprs);
   stmt                        = update_stmt;
   return RC::SUCCESS;
 }

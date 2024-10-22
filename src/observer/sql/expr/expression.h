@@ -499,7 +499,11 @@ public:
   AttrType value_type() const override { return AttrType::UNDEFINED; }
   int      value_length() const override { return 0; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
-  void     add_value(Value* v)
+  RC open(Trx* trx);
+  RC close();
+  RC check(CompOp op);
+
+  void add_value(Value* v) const
   {
     if (list_type_ == nullptr)
     {
