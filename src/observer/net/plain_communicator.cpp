@@ -245,7 +245,7 @@ RC PlainCommunicator::write_result_internal(SessionEvent *event, bool &need_disc
   }
 
   if (OB_FAIL(rc)) {
-    return rc;
+    return write_state(event, need_disconnect);
   }
 
   if (cell_num == 0) {
@@ -324,8 +324,8 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
 
   if (OB_FAIL(rc)) {
     LOG_ERROR("failed in server. err=%s", strerror(errno));
+    sql_result->set_return_code(rc);
     sql_result->close();
-    return rc;
   }
   return rc;
 }
