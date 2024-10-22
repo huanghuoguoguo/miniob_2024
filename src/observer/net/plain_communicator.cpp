@@ -321,6 +321,12 @@ RC PlainCommunicator::write_tuple_result(SqlResult *sql_result)
   if (rc == RC::RECORD_EOF) {
     rc = RC::SUCCESS;
   }
+
+  if (OB_FAIL(rc)) {
+    LOG_ERROR("failed in server. err=%s", strerror(errno));
+    sql_result->close();
+    return rc;
+  }
   return rc;
 }
 

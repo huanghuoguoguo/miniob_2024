@@ -127,7 +127,7 @@ private:
 private:
   AttrType attr_type_ = AttrType::UNDEFINED;
   int      length_    = 0;
-  vector<Value*> *values_;
+  vector<Value*> *values_ = nullptr;
 
   union Val
   {
