@@ -21,6 +21,7 @@ class CharType : public DataType
 {
 public:
   CharType() : DataType(AttrType::CHARS) {}
+  CharType(AttrType attr_Type) : DataType(attr_Type) {}
 
   virtual ~CharType() = default;
 

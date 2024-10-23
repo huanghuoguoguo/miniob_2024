@@ -92,6 +92,9 @@ public:
 
   RecordFileHandler *record_handler() const { return record_handler_; }
 
+  RC write_text(int64_t &offset, int64_t length, const char *data)const;
+  RC read_text(int64_t offset, int64_t length, char *data) const;
+
   /**
    * @brief 可以在页面锁保护的情况下访问记录
    * @details 当前是在事务中访问记录，为了提供一个“原子性”的访问模式
@@ -121,6 +124,7 @@ private:
 
 private:
   RC init_record_handler(const char *base_dir);
+  RC init_text_handler(const char *base_dir);
 
 public:
   Index* find_index(const char* index_name) const;
@@ -133,6 +137,7 @@ private:
   TableMeta          table_meta_;
   DiskBufferPool    *data_buffer_pool_ = nullptr;  /// 数据文件关联的buffer pool
   RecordFileHandler *record_handler_   = nullptr;  /// 记录操作
+  DiskBufferPool    *text_buffer_pool_ = nullptr;   /// text文件关联的buffer pool
   vector<Index *>    indexes_;
 
 

@@ -592,6 +592,45 @@ RC DiskBufferPool::recover_page(PageNum page_num)
   return RC::SUCCESS;
 }
 
+/**
+ * @brief 向文件末尾追加数据，写入的数据长度根据页面大小来更新页面计数。
+ */
+RC DiskBufferPool::append_data(int64_t &offset, int64_t length, const char *data)
+{
+  RC rc = RC::SUCCESS;
+
+  // 查看file_header中记录的文件末尾位置信息
+  offset = BP_PAGE_SIZE * file_header_->page_count;
+  if (lseek(file_desc_, offset, SEEK_SET) == -1) {
+    LOG_ERROR("Failed to lseek %s at offset %d :%s.", file_name_.c_str(), offset, strerror(errno));
+    return RC::IOERR_SEEK;
+  }
+
+  if (0 != writen(file_desc_, data, length)) {
+    LOG_ERROR("Failed to write text into file due to %s.", offset, file_desc_, strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+  file_header_->page_count += (length + BP_PAGE_SIZE - 1) / BP_PAGE_SIZE;
+
+  return rc;
+}
+
+RC DiskBufferPool::get_data(int64_t offset, int64_t length, char *data)
+{
+  if (lseek(file_desc_, offset, SEEK_SET) == -1) {
+    LOG_ERROR("Failed to lseek %s at offset %d :%s.", file_name_.c_str(), offset, strerror(errno));
+    return RC::IOERR_SEEK;
+  }
+
+  int ret = readn(file_desc_, data, length);
+  if (ret != 0) {
+    LOG_ERROR("Failed to load text from %s, file_desc:%d, due to failed to read data:%s, ret=%d, page count=%d",
+              file_name_.c_str(), file_desc_, strerror(errno), ret, file_header_->allocated_pages);
+    return RC::IOERR_READ;
+  }
+  return RC::SUCCESS;
+}
+
 RC DiskBufferPool::write_page(PageNum page_num, Page &page)
 {
   scoped_lock lock_guard(wr_lock_);
@@ -915,5 +954,19 @@ RC BufferPoolManager::get_buffer_pool(int32_t id, DiskBufferPool *&bp)
   
   bp = iter->second;
   return RC::SUCCESS;
+}
+
+static BufferPoolManager *default_bpm = nullptr;
+void BufferPoolManager::set_instance(BufferPoolManager *bpm)
+{
+  if (default_bpm != nullptr && bpm != nullptr) {
+    LOG_ERROR("default buffer pool manager has been setted");
+    abort();
+  }
+  default_bpm = bpm;
+}
+BufferPoolManager &BufferPoolManager::instance()
+{
+  return *default_bpm;
 }
 

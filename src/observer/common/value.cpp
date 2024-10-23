@@ -26,6 +26,8 @@ Value::Value(float val) { set_float(val); }
 
 Value::Value(bool val) { set_boolean(val); }
 
+Value::Value(int64_t val) { set_boolean(val); }
+
 Value::Value(const char *s, int len /*= 0*/) { set_string(s, len); }
 
 Value::Value(const Value &other)
@@ -129,6 +131,10 @@ void Value::set_data(char *data, int length)
       value_.int_value_ = *(int *)data;
       length_            = length;
     } break;
+    case AttrType::TEXTS: {
+      value_.long_value_ = *(int64_t *)data;
+      length_ = length;
+    } break;
     case AttrType::NULL_: {
 
     } break;
@@ -165,6 +171,13 @@ void Value::set_date(int val)
   attr_type_ = AttrType::DATES;
   value_.int_value_ = val;
   length_ = sizeof(val);
+}
+
+void Value::set_text(int64_t val)
+{
+  attr_type_ = AttrType::TEXTS;
+  value_.long_value_ = val;
+  length_ = sizeof(int64_t);
 }
 
 void Value::set_string(const char *s, int len /*= 0*/)
@@ -206,6 +219,9 @@ void Value::set_value(const Value &value)
     case AttrType::DATES: {
       set_date(value.get_int());
     } break;
+    case AttrType::TEXTS: {
+      set_text(value.get_text());
+    }
     default: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -308,6 +324,11 @@ float Value::get_float() const
     }
   }
   return 0;
+}
+
+int64_t Value::get_text() const
+{
+  return value_.long_value_;
 }
 
 string Value::get_string() const { return this->to_string(); }
