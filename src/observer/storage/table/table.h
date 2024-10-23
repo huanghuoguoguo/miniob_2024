@@ -126,6 +126,7 @@ private:
 public:
   Index* find_index(const char* index_name) const;
   Index* find_index_by_field(const char* field_name) const;
+  Index* find_index_by_field(const std::vector<string> field_names) const;
   RC drop_all_index();
 
 private:

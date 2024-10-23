@@ -162,7 +162,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
     const IndexMeta *index_meta = table_meta_.index(i);
-    std::vector<const FieldMeta *> field_list;
+    std::vector<const FieldMeta *>* field_list = new std::vector<const FieldMeta *>();
     for (std::string field_str : index_meta->field()) {
       const FieldMeta *field_meta = table_meta_.field(field_str.c_str());
       if (field_meta == nullptr) {
@@ -174,13 +174,13 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
         //  do all cleanup action in destructive Table function
         return RC::INTERNAL;
       }
-      field_list.push_back(field_meta);
+      field_list->emplace_back(field_meta);
     }
 
     BplusTreeIndex *index      = new BplusTreeIndex();
     string          index_file = table_index_file(base_dir, name(), index_meta->name());
 
-    rc = index->open(this, index_file.c_str(), *index_meta, field_list);
+    rc = index->open(this, index_file.c_str(), *index_meta, *field_list);
     if (rc != RC::SUCCESS) {
       delete index;
       LOG_ERROR("Failed to open index. table=%s, index=%s, file=%s, rc=%s",
@@ -391,13 +391,15 @@ RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressi
     bool                    is_unique)
 {
   // 收集需要创建的索引的列信息。
-  std::vector<const FieldMeta *> field_meta;
+  std::vector<const FieldMeta *> *field_meta = new vector<const FieldMeta*>();
   for (auto &field_meta_expression : column_expressions_) {
-    FieldExpr *field_expr = static_cast<FieldExpr *>(field_meta_expression.get());
-    field_meta.push_back(field_expr->field().meta());
+    FieldExpr *field_expr = static_cast<FieldExpr *>(field_meta_expression.release());
+    const FieldMeta *       meta       = field_expr->field().meta();
+    field_meta->emplace_back(new FieldMeta(*meta));
   }
+  column_expressions_.clear();
 
-  for (const FieldMeta *field : field_meta) {
+  for (const FieldMeta *field : *field_meta) {
     if (nullptr == field) {
       LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
       return RC::INVALID_ARGUMENT;
@@ -405,7 +407,7 @@ RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressi
   }
 
   IndexMeta new_index_meta;
-  RC        rc = new_index_meta.init(index_name, field_meta, is_unique);
+  RC        rc = new_index_meta.init(index_name, *field_meta, is_unique);
   if (rc != RC::SUCCESS) {
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s", name(), index_name);
     return rc;
@@ -413,7 +415,7 @@ RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressi
   // 创建索引相关数据
   BplusTreeIndex *index      = new BplusTreeIndex();
   std::string     index_file = table_index_file(base_dir_.c_str(), name(), index_name);
-  rc                         = index->create(this, index_file.c_str(), new_index_meta, field_meta);
+  rc                         = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
@@ -631,7 +633,15 @@ Index *Table::find_index_by_field(const char *field_name) const
   }
   return nullptr;
 }
-
+Index* Table::find_index_by_field(const std::vector<string> field_names) const
+{
+  const TableMeta &table_meta = this->table_meta();
+  const IndexMeta *index_meta = table_meta.find_index_by_field(field_names);
+  if (index_meta != nullptr) {
+    return this->find_index(index_meta->name());
+  }
+  return nullptr;
+}
 RC Table::sync()
 {
   RC rc = RC::SUCCESS;

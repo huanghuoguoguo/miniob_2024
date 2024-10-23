@@ -31,6 +31,7 @@ class FieldMeta
 public:
   FieldMeta();
   FieldMeta(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable);
+  FieldMeta(const FieldMeta &other);
   FieldMeta(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id);
   ~FieldMeta() = default;
 

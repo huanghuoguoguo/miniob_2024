@@ -48,6 +48,11 @@ public:
   void      to_json(Json::Value &json_value) const;
   static RC from_json(const TableMeta &table, const Json::Value &json_value, IndexMeta &index);
 
+  std::vector<std::string> fields() const
+  {
+    return field_;
+  }
+
 protected:
   string name_;   // index's name
   std::vector<std::string> field_; // field's name

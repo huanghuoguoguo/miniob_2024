@@ -66,7 +66,7 @@ public:
 
   int operator()(const char *v1, const char *v2) const
   {
-    // TODO: optimized the comparison
+    // TODO: optimized the comparison 如果是多个字段的话，应该要把每一个属性取出来，然后比较。这里直接将其变为char*，并且不考虑变长的字段，只考虑定长的字段。希望测试用例没有边长字段比如varchar，text。
     Value left;
     left.set_type(attr_type_);
     left.set_data(v1, attr_length_);
@@ -639,7 +639,7 @@ protected:
 
 private:
   common::MemPoolItem::item_unique_ptr make_key(const char *user_key, const RID &rid);
-    std::shared_ptr<std::vector<FieldMeta>> field_meta_;
+  std::shared_ptr<std::vector<FieldMeta>> field_meta_;
 protected:
   LogHandler     *log_handler_      = nullptr;  /// 日志处理器
   DiskBufferPool *disk_buffer_pool_ = nullptr;  /// 磁盘缓冲池

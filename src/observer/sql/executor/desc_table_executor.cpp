@@ -57,6 +57,19 @@ RC DescTableExecutor::execute(SQLStageEvent *sql_event)
       const FieldMeta *field_meta = table_meta.field(i);
       oper->append({field_meta->name(), attr_type_to_string(field_meta->type()), std::to_string(field_meta->len())});
     }
+    // 输出可能存在的index
+    if (table_meta.index_num() > 0) {
+      oper->append({"--------index---------"});
+      for (auto i = table_meta.index_num() - 1; i >= 0; i--) {
+        const IndexMeta *index_meta = table_meta.index(i);
+        oper->append({"index_name: ",index_meta->name()});
+        for (auto &field : index_meta->fields()) {
+          oper->append(field);
+        }
+        oper->append({"is_unique", std::to_string(index_meta->is_unique())});
+      }
+      oper->append({"---------------"});
+    }
 
     sql_result->set_operator(unique_ptr<PhysicalOperator>(oper));
   } else {

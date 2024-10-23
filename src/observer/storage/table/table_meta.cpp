@@ -193,12 +193,28 @@ const IndexMeta *TableMeta::index(const char *name) const
 
 const IndexMeta *TableMeta::find_index_by_field(const char *field) const
 {
-  // TODO 单字段封装多字段兼容
-  // for (const IndexMeta &index : indexes_) {
-  //   // if (0 == strcmp(index.field(), field)) {
-  //   //   return &index;
-  //   // }
-  // }
+  for (const IndexMeta &index : indexes_) {
+    auto fields = index.fields();
+    if (fields.size() == 1 && strcmp(fields[0].c_str(), field) == 0) {
+      return &index;
+    }
+  }
+  return nullptr;
+}
+
+const IndexMeta *TableMeta::find_index_by_field(const std::vector<string> field_names) const
+{
+  for (const IndexMeta &index : indexes_) {
+    auto fields = index.fields();
+    // 按次序相比，每个字段都匹配上才行。
+    if (fields.size() == field_names.size()) {
+      for (int i = 0; i < field_names.size(); ++i) {
+        if (field_names[i] == fields[i]) {
+          return &index;
+        }
+      }
+    }
+  }
   return nullptr;
 }
 

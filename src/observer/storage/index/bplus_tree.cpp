@@ -1666,6 +1666,7 @@ RC BplusTreeHandler::insert_entry(const char *user_key, const RID *rid)
 RC BplusTreeHandler::get_entry(const char *user_key, int key_len, list<RID> &rids)
 {
   BplusTreeScanner scanner(*this);
+  // 初始化扫描器，找到第一个相等的位置。如果没有找到，会把frame置为空，表示未找到。
   RC rc = scanner.open(user_key, key_len, true /*left_inclusive*/, user_key, key_len, true /*right_inclusive*/);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to open scanner. rc=%s", strrc(rc));

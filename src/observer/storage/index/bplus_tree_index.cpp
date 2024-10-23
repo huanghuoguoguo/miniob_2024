@@ -89,7 +89,42 @@ RC BplusTreeIndex::close()
 
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
-  return index_handler_.insert_entry(record, rid);
+  // 计算总长度
+  int total_len = 0;
+  for (auto& field_meta : field_meta_) {
+    total_len += field_meta->len();;
+  }
+  // 创建一个新的char数组来存储这些字段数据
+  char *entry_data  = new char[total_len];
+  int   current_pos = 0;
+  // get_entry
+
+  for (auto &field_meta : field_meta_) {
+    int offset = field_meta->offset();
+    int len    = field_meta->len();
+    // 将从record中提取的字段数据拷贝到entry_data
+    memcpy(entry_data + current_pos, record + offset, len);
+    current_pos += len;
+  }
+
+  // 如果不是唯一索引，不需要检查唯一性。
+  if (index_meta_.is_unique()) {
+    list<RID> rids;
+    index_handler_.get_entry(entry_data, total_len, rids);
+    // 释放分配的内存
+
+    if (!rids.empty()) {
+      delete[] entry_data;
+      return RC::ERR_UNIQUE_INDEX_VIOLATION;
+    }
+  }
+  RC rc = index_handler_.insert_entry(entry_data, rid);
+  if (OB_FAIL(rc)) {
+    delete[] entry_data;
+    LOG_WARN("Failed to insert entry, rc:%s", strrc(rc));
+    return rc;
+  }
+  return rc;
 }
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
