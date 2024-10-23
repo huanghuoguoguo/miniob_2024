@@ -79,7 +79,14 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
       if (!field_expr->field().meta()->nullable() && value_expr->value_type() == AttrType::UNDEFINED) {
         return RC::INVALID_ARGUMENT;
       }
+    }else {
+      // 如果是多列值，返回错误。
+      SubQueryExpr *sub_query_expr = static_cast<SubQueryExpr *>(node.right_expr);
+      if (sub_query_expr->select_stmt() != nullptr && sub_query_expr->select_stmt()->query_expressions().size() > 1) {
+        return RC::SUB_QUERY_NUILTI_COLUMN;
+      }
     }
+
     // 构造ComparisonExpr
     ComparisonExpr * set_e = new ComparisonExpr(EQUAL_TO,std::unique_ptr<Expression>(node.left_expr),std::unique_ptr<Expression>(node.right_expr));
     set_exprs.push_back(set_e);

@@ -26,6 +26,11 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       sub_query_expr->open(trx);
       RC rc = sub_query_expr->check(e->comp());
       if (rc != RC::SUCCESS) return rc;
+
+      // 检查值，设置值的时候只允许一个值，不允许多个值。如果有上面的代码，这里似乎永远不会到达。
+      if (!sub_query_expr->is_single_value()) {
+        return RC::SUB_QUERY_NUILTI_VALUE;
+      }
     }
   }
 

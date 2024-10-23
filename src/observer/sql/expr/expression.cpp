@@ -739,6 +739,7 @@ RC SubQueryExpr::open(Trx* trx)
       }
     }
   } else {
+    // 如果是值类型，在expression_binder中就绑定了。
     if (list_type_ == nullptr) {
       this->list_type_ = new ListType();
       list_type_->add(new Value());
@@ -766,7 +767,7 @@ RC SubQueryExpr::check(CompOp op)
     case GREAT_THAN:  ///< ">"
     {
       if (list_type_ != nullptr && list_type_->size() != 1) {
-        return RC::SUB_QUERY_NUILTI_COLUMN;
+        return RC::SUB_QUERY_NUILTI_VALUE;
       }
       if (project_phy_op_ != nullptr && project_phy_op_->select_size() != 1) {
         return RC::SUB_QUERY_NUILTI_COLUMN;
@@ -783,4 +784,12 @@ RC SubQueryExpr::check(CompOp op)
     default: return RC::SUCCESS;
   }
   return RC::SUCCESS;
+}
+
+bool SubQueryExpr::is_single_value() const
+{
+  if (list_type_->size() == 1) {
+    return true;
+  }
+  return false;
 }
