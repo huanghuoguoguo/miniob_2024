@@ -461,8 +461,13 @@ public:
    */
   RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, AttrType attr_type, int attr_length,
       int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int attr_length,
-      int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, AttrType attr_type, int attr_length,
+            int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler& log_handler, BufferPoolManager& bpm, const char* file_name,
+            std::vector<const FieldMeta*> field_meta, int internal_max_size = -1,
+            int leaf_max_size = -1);
+  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, std::vector<const FieldMeta *> field_meta,
+            int internal_max_size, int leaf_max_size);
 
   /**
    * @brief 打开一个B+树
@@ -513,7 +518,7 @@ public:
 
 public:
   const IndexFileHeader &file_header() const { return file_header_; }
-  DiskBufferPool        &buffer_pool() const { return *disk_buffer_pool_; }
+  DiskBufferPool        &buffer_pool()  { return *disk_buffer_pool_; }
   LogHandler            &log_handler() const { return *log_handler_; }
 
 public:
@@ -634,7 +639,7 @@ protected:
 
 private:
   common::MemPoolItem::item_unique_ptr make_key(const char *user_key, const RID &rid);
-
+    std::shared_ptr<std::vector<FieldMeta>> field_meta_;
 protected:
   LogHandler     *log_handler_      = nullptr;  /// 日志处理器
   DiskBufferPool *disk_buffer_pool_ = nullptr;  /// 磁盘缓冲池

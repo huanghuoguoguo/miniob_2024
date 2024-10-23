@@ -13,6 +13,9 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/create_index_stmt.h"
+
+#include <sql/parser/expression_binder.h>
+
 #include "common/lang/string.h"
 #include "common/log/log.h"
 #include "storage/db/db.h"
@@ -21,15 +24,14 @@ See the Mulan PSL v2 for more details. */
 using namespace std;
 using namespace common;
 
-RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt *&stmt)
+RC CreateIndexStmt::create(Db *db, CreateIndexSqlNode &create_index, Stmt *&stmt)
 {
   stmt = nullptr;
 
   const char *table_name = create_index.relation_name.c_str();
-  if (is_blank(table_name) || is_blank(create_index.index_name.c_str()) ||
-      is_blank(create_index.attribute_name.c_str())) {
-    LOG_WARN("invalid argument. db=%p, table_name=%p, index name=%s, attribute name=%s",
-        db, table_name, create_index.index_name.c_str(), create_index.attribute_name.c_str());
+  if (is_blank(table_name) || is_blank(create_index.index_name.c_str())) {
+    LOG_WARN("invalid argument. db=%p, table_name=%p, index name=%s",
+        db, table_name, create_index.index_name.c_str());
     return RC::INVALID_ARGUMENT;
   }
 
@@ -40,11 +42,22 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
-  const FieldMeta *field_meta = table->table_meta().field(create_index.attribute_name.c_str());
-  if (nullptr == field_meta) {
-    LOG_WARN("no such field in table. db=%s, table=%s, field name=%s", 
-             db->name(), table_name, create_index.attribute_name.c_str());
-    return RC::SCHEMA_FIELD_NOT_EXIST;
+  // 绑定列。
+  BinderContext binder_context;
+  binder_context.db(db);
+  binder_context.add_table(table);
+
+  // collect fields
+  vector<unique_ptr<Expression>> bound_expressions;
+  ExpressionBinder expression_binder(binder_context);
+
+  // 绑定列。
+  for (unique_ptr<Expression> &expression : create_index.columns) {
+    RC rc = expression_binder.bind_expression(expression, bound_expressions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
   }
 
   Index *index = table->find_index(create_index.index_name.c_str());
@@ -53,6 +66,12 @@ RC CreateIndexStmt::create(Db *db, const CreateIndexSqlNode &create_index, Stmt 
     return RC::SCHEMA_INDEX_NAME_REPEAT;
   }
 
-  stmt = new CreateIndexStmt(table, field_meta, create_index.index_name);
+  CreateIndexStmt * c = new CreateIndexStmt();
+  c->index_name_ = create_index.index_name;
+  c->table_ = table;
+  c->column_expressions_.swap(bound_expressions);
+  c->unique_ = create_index.unique;
+
+  stmt = c;
   return RC::SUCCESS;
 }

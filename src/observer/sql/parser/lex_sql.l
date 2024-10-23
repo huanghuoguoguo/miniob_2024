@@ -133,6 +133,7 @@ IS                                      RETURN_TOKEN(IS);
 NOT                                     RETURN_TOKEN(NOT);
 HAVING                                  RETURN_TOKEN(HAVING);
 IN                                      RETURN_TOKEN(IN);
+UNIQUE                                  RETURN_TOKEN(UNIQUE);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
