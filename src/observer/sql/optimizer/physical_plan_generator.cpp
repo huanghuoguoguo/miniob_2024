@@ -41,6 +41,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_scan_physical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
 #include "sql/operator/group_by_physical_operator.h"
+#include "sql/operator/order_by_logical_operator.h"
+#include "sql/operator/order_by_physical_operator.h"
 #include "sql/operator/hash_group_by_physical_operator.h"
 #include "sql/operator/scalar_group_by_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
@@ -93,6 +95,9 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::GROUP_BY: {
       return create_plan(static_cast<GroupByLogicalOperator &>(logical_operator), oper);
+    } break;
+    case LogicalOperatorType::ORDER_BY: {
+      return create_plan(static_cast<OrderByLogicalOperator &>(logical_operator), oper);
     } break;
 
     default: {
@@ -414,6 +419,37 @@ RC PhysicalPlanGenerator::create_plan(GroupByLogicalOperator &logical_oper, std:
   group_by_oper->add_child(std::move(child_physical_oper));
 
   oper = std::move(group_by_oper);
+  return rc;
+}
+RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper)
+{
+  RC rc = RC::SUCCESS;
+
+  // 获取 order by 相关的表达式和排序方向
+  std::vector<Expression *> &order_by_expressions = logical_oper.order_by_expressions();
+  std::vector<bool> &order_by_directions = logical_oper.order_by_directions();
+
+  // 创建 OrderByPhysicalOperator
+  unique_ptr<OrderByPhysicalOperator> order_by_oper = make_unique<OrderByPhysicalOperator>(
+      std::move(order_by_expressions), std::move(order_by_directions));
+
+  // 确保 OrderByLogicalOperator 只有一个子节点
+  ASSERT(logical_oper.children().size() == 1, "Order by operator should have 1 child");
+
+  // 创建子物理操作符
+  LogicalOperator &child_oper = *logical_oper.children().front();
+  unique_ptr<PhysicalOperator> child_physical_oper;
+  rc = create(child_oper, child_physical_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create child physical operator for order by operator. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // 将子物理操作符添加到 order by 操作符中
+  order_by_oper->add_child(std::move(child_physical_oper));
+
+  // 将生成的物理计划返回
+  oper = std::move(order_by_oper);
   return rc;
 }
 
