@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
+#include "sql/operator/order_by_logical_operator.h"
 
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
@@ -178,6 +179,21 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     }
 
     last_oper = &having_predicate_oper;
+  }
+  // 添加可能存在的 ORDER BY
+  unique_ptr<LogicalOperator> order_by_oper;
+  rc = create_order_by_plan(select_stmt, order_by_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create group by logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  if (order_by_oper) {
+    if (*last_oper) {
+      order_by_oper->add_child(std::move(*last_oper));
+    }
+
+    last_oper = &order_by_oper;
   }
 
   auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()));
@@ -473,5 +489,43 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   auto group_by_oper = make_unique<GroupByLogicalOperator>(std::move(group_by_expressions),
                                                            std::move(aggregate_expressions));
   logical_operator = std::move(group_by_oper);
+  return RC::SUCCESS;
+}
+RC LogicalPlanGenerator::create_order_by_plan(SelectStmt *select_stmt, std::unique_ptr<LogicalOperator> &logical_operator) {
+  // 获取SelectStmt中的order by节点
+  std::vector<std::unique_ptr<OrderBySqlNode>> &order_by_nodes = select_stmt->order_by();
+
+  // 保存用于orderby的表达式
+  std::vector<Expression *> order_by_expressions;
+  std::vector<bool> order_by_directions; // 保存每个表达式的排序方向，true为升序，false为降序
+
+  // 如果没有order by节点，直接返回
+  if (order_by_nodes.empty()) {
+    logical_operator = nullptr;
+    return RC::SUCCESS;
+  }
+
+  // 遍历order by节点
+  for (const auto &order_by_node : order_by_nodes) {
+    if (order_by_node->expr != nullptr) {
+      // 保存表达式和排序方向
+      order_by_expressions.push_back(order_by_node->expr);
+      order_by_directions.push_back(order_by_node->is_asc);
+    }
+  }
+
+  // 如果没有收集到任何order by表达式，直接返回
+  if (order_by_expressions.empty()) {
+    logical_operator = nullptr;
+    return RC::SUCCESS;
+  }
+
+  // 创建OrderByLogicalOperator
+  std::unique_ptr<LogicalOperator> orderby_oper(
+    new OrderByLogicalOperator(std::move(order_by_expressions), std::move(order_by_directions))
+  );
+
+  // 将orderby_oper返回
+  logical_operator = std::move(orderby_oper);
   return RC::SUCCESS;
 }
