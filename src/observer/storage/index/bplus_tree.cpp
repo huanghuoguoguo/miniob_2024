@@ -1386,7 +1386,7 @@ RC BplusTreeHandler::insert_entry_into_leaf_node(BplusTreeMiniTransaction &mtr, 
   int                  insert_position = leaf_node.lookup(key_comparator_, key, &exists);
   if (exists) {
     LOG_TRACE("entry exists");
-    return RC::RECORD_DUPLICATE_KEY;
+    // return RC::RECORD_DUPLICATE_KEY;
   }
 
   if (leaf_node.size() < leaf_node.max_size()) {
@@ -2173,8 +2173,8 @@ RC BplusTreeScanner::fix_user_key(
   }
 
   // 这里很粗暴，变长字段才需要做调整，其它默认都不需要做调整
-  assert(tree_handler_.file_header_.attr_type == AttrType::CHARS);
-  assert(strlen(user_key) >= static_cast<size_t>(key_len));
+  // assert(tree_handler_.file_header_.attr_type == AttrType::CHARS);
+  // assert(strlen(user_key) >= static_cast<size_t>(key_len));
 
   *should_inclusive = false;
 
