@@ -90,15 +90,34 @@ class KeyComparator
 {
 public:
   void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+    void init(std::vector<AttrType>& type, std::vector<int>& length)
+  {
+      for(int i = 0; i < static_cast<int>(length.size()); ++i) {
+          AttrComparator comparator;
+          comparator.init(type.at(i), length.at(i));
+          attr_comparators_.push_back(comparator);
+      }
+  }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
   int operator()(const char *v1, const char *v2) const
   {
-    int result = attr_comparator_(v1, v2);
-    if (result != 0) {
-      return result;
-    }
+      int cur = 0;
+      for (auto& comparator : attr_comparators_)
+      {
+          Value left;
+          Value right;
+          // 取对应位置进行
+          int result = attr_comparator_(v1 + cur, v2 + cur);
+          if (result != 0)
+          {
+              return result;
+          }
+          cur += comparator.attr_length();
+      }
+
+
 
     const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
     const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
@@ -106,7 +125,8 @@ public:
   }
 
 private:
-  AttrComparator attr_comparator_;
+  std::vector<AttrComparator> attr_comparators_;
+  AttrComparator attr_comparator_ = {};
 };
 
 /**
@@ -142,22 +162,33 @@ private:
 class KeyPrinter
 {
 public:
-  void init(AttrType type, int length) { attr_printer_.init(type, length); }
+    void init(AttrType type, int length) { attr_printer_.init(type, length); }
 
-  const AttrPrinter &attr_printer() const { return attr_printer_; }
+    void init(std::vector<AttrType>& type, std::vector<int>& length)
+    {
+        for (int i = 0; i < static_cast<int>(length.size()); ++i)
+        {
+            AttrPrinter attr_printer;
+            attr_printer.init(type.at(i), length.at(i));
+            attr_printers_.push_back(attr_printer);
+        }
+    }
 
-  string operator()(const char *v) const
-  {
-    stringstream ss;
-    ss << "{key:" << attr_printer_(v) << ",";
+    const AttrPrinter& attr_printer() const { return attr_printer_; }
 
-    const RID *rid = (const RID *)(v + attr_printer_.attr_length());
-    ss << "rid:{" << rid->to_string() << "}}";
-    return ss.str();
-  }
+    string operator()(const char* v) const
+    {
+        stringstream ss;
+        ss << "{key:" << attr_printer_(v) << ",";
+
+        const RID* rid = (const RID*)(v + attr_printer_.attr_length());
+        ss << "rid:{" << rid->to_string() << "}}";
+        return ss.str();
+    }
 
 private:
-  AttrPrinter attr_printer_;
+    std::vector<AttrPrinter> attr_printers_;
+    AttrPrinter attr_printer_;
 };
 
 /**

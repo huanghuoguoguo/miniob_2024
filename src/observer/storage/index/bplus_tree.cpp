@@ -831,8 +831,10 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
 {
   // 收集需要创建索引的字段长度。
   int attr_length = 0;
+  std::vector<int> attr_lengths;
   for(const FieldMeta * field_tmp: field_meta) {
     attr_length += field_tmp->len();
+    attr_lengths.push_back(attr_length);
   }
 
   if (internal_max_size < 0) {
@@ -874,6 +876,12 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
     // 存储指针。
     file_header->attr_type = AttrType::CHARS;
   }
+
+  vector<AttrType> attr_types;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_types.push_back(field_tmp->type());
+  }
+
   file_header->internal_max_size = internal_max_size;
   file_header->leaf_max_size     = leaf_max_size;
   file_header->root_page         = BP_INVALID_PAGE_NUM;
@@ -893,8 +901,8 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
     return RC::NOMEM;
   }
 
-  key_comparator_.init(file_header->attr_type, file_header->attr_length);
-  key_printer_.init(file_header->attr_type, file_header->attr_length);
+  key_comparator_.init(attr_types, attr_lengths);
+  key_printer_.init(attr_types, attr_lengths);
 
   /*
   虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。

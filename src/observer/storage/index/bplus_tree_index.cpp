@@ -98,7 +98,7 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
   char *entry_data  = new char[total_len];
   int   current_pos = 0;
   // get_entry
-
+  // 还需要判断，为null的列不能作为索引。
   for (auto &field_meta : field_meta_) {
     int offset = field_meta->offset();
     int len    = field_meta->len();
