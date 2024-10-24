@@ -122,8 +122,9 @@ public:
       for (size_t i = 1; i < attr_comparators_.size(); ++i)
       {
           auto& comparator = attr_comparators_[i];
-          if (left_null[i - 1] != right_null[i - 1])
+          if (left_null[i - 1] == 1 || right_null[i - 1] == 1)
           {
+              // 只要有一方是null，就认为不相同。
               return -1;
           }
           // 取对应位置进行
