@@ -30,6 +30,7 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(SUB_QUERY_ERROR)             \
   DEFINE_RC(SUB_QUERY_NUILTI_COLUMN)     \
   DEFINE_RC(SUB_QUERY_NUILTI_VALUE)      \
+  DEFINE_RC(SUB_QUERY_NUILTI_TUPLE)      \
   DEFINE_RC(ERR_UNIQUE_INDEX_VIOLATION)  \
   DEFINE_RC(NOTFOUND)                    \
   DEFINE_RC(EMPTY)                       \

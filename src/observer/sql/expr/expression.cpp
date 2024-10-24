@@ -150,10 +150,6 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   int cmp_result;
   if(comp_ < IS_NULL)
   {
-    // 子查询的比较右值必须为1个。
-    if(right.get_list() && right.get_list()->size() > 1) {
-      return RC::SUB_QUERY_NUILTI_COLUMN;
-    }
     cmp_result = left.compare(right);
   }
 
@@ -766,6 +762,9 @@ RC SubQueryExpr::check(CompOp op)
     case GREAT_EQUAL: ///< ">="
     case GREAT_THAN:  ///< ">"
     {
+      if(!is_single_tuple()) {
+        return RC::SUB_QUERY_NUILTI_TUPLE;
+      }
       if (list_type_ != nullptr && list_type_->size() != 1) {
         return RC::SUB_QUERY_NUILTI_VALUE;
       }
@@ -786,10 +785,10 @@ RC SubQueryExpr::check(CompOp op)
   return RC::SUCCESS;
 }
 
-bool SubQueryExpr::is_single_value() const
+bool SubQueryExpr::is_single_tuple() const
 {
-  if (list_type_->size() == 1) {
-    return true;
+  if (tuples_.size() > 1) {
+    return false;
   }
-  return false;
+  return true;
 }

@@ -12,6 +12,9 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/sstream.h"
 #include "common/log/log.h"
 #include "common/type/float_type.h"
+
+#include <cmath>
+
 #include "common/value.h"
 #include "common/lang/limits.h"
 #include "common/value.h"
@@ -82,7 +85,7 @@ RC FloatType::cast_to(const Value &val, AttrType type, Value &result) const
       result.set_string(std::to_string(val.get_int()).c_str());
     break;
     case AttrType::INTS:
-      result.set_int(static_cast<int>(val.get_float()));
+      result.set_int(static_cast<int>(std::round(val.get_float())));
     break;
     default: return RC::UNIMPLEMENTED;
   }

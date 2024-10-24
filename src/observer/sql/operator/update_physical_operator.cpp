@@ -19,20 +19,7 @@ UpdatePhysicalOperator::UpdatePhysicalOperator(Table *table, std::vector<Compari
 
 RC UpdatePhysicalOperator::open(Trx *trx)
 {
-  for (auto& e : expressions_) {
-    auto expression = e->right().get();
-    if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
-      auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
-      sub_query_expr->open(trx);
-      RC rc = sub_query_expr->check(e->comp());
-      if (rc != RC::SUCCESS) return rc;
 
-      // 检查值，设置值的时候只允许一个值，不允许多个值。如果有上面的代码，这里似乎永远不会到达。
-      if (!sub_query_expr->is_single_value()) {
-        return RC::SUB_QUERY_NUILTI_VALUE;
-      }
-    }
-  }
 
   std::unique_ptr<PhysicalOperator> &child      = children_[0];
 
@@ -48,7 +35,23 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   // 将需要修改的字段的序列保存。
   getColumnIndex(index);
 
+  bool is_open = false;
   while (OB_SUCC(rc = child->next())) {
+    // 如果返回多个tuple。返回错误。
+    if(!is_open) {
+      // 延迟到匹配到任何行时才进行检查。
+      for (auto& e : expressions_) {
+        auto expression = e->right().get();
+        if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
+          auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
+          sub_query_expr->open(trx);
+          // 如果返回多个tuple。返回错误。
+          if (!sub_query_expr->is_single_tuple()) {
+            return RC::SUB_QUERY_NUILTI_VALUE;
+          }
+        }
+      }
+    }
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {
       LOG_WARN("failed to get current record: %s", strrc(rc));
@@ -88,7 +91,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
   for (Record &record : records_) {
     rc = trx_->update_record(table_, record);;
     if (rc != RC::SUCCESS) {
-      LOG_WARN("failed to delete record: %s", strrc(rc));
+      LOG_WARN("failed to update record: %s", strrc(rc));
       return rc;
     }
   }

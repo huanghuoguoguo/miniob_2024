@@ -21,11 +21,15 @@ public:
     void add(Value* value) { values.emplace_back(value); }
     bool empty() { return this->values.empty(); }
     int size() { return this->values.size(); }
+
     void get_value(Value& value)
     {
-        if(values.size()>1) {
+        if (values.size() > 1)
+        {
             value.set_list(&values);
-        }else {
+        }
+        else
+        {
             value.set_value(*values.at(0));
         }
     }

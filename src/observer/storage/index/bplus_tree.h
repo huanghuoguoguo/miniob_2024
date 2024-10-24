@@ -90,11 +90,14 @@ class KeyComparator
 {
 public:
   void init(AttrType type, int length) { attr_comparator_.init(type, length); }
-    void init(std::vector<AttrType>& type, std::vector<int>& length)
+
+  void init(std::vector<AttrType>& type, std::vector<int>& length)
   {
-      for(int i = 0; i < static_cast<int>(length.size()); ++i) {
-          AttrComparator comparator;
+      for (int i = 0; i < static_cast<int>(length.size()); ++i)
+      {
+          AttrComparator comparator{};
           comparator.init(type.at(i), length.at(i));
+          attr_len += length.at(i);
           attr_comparators_.push_back(comparator);
       }
   }
@@ -122,8 +125,16 @@ public:
       for (size_t i = 1; i < attr_comparators_.size(); ++i)
       {
           auto& comparator = attr_comparators_[i];
-          if (left_null[i - 1] != right_null[i - 1])
+          if (left_null[i - 1] == 1 || right_null[i - 1] == 1)
           {
+              // 只要有一方是null，就认为不相同。还需要判断二者不是同一记录。
+              const RID *rid1 = (const RID *)(v1 + attr_len);
+              const RID *rid2 = (const RID *)(v2 + attr_len);
+              int compare = RID::compare(rid1, rid2);
+              if (compare == 0)
+              {
+                  return compare;
+              }
               return -1;
           }
           // 取对应位置进行
@@ -134,18 +145,16 @@ public:
           }
           cur += comparator.attr_length();
       }
-      return 0;
 
-      // 如果键值对都相等了，还需要判断是不是同一个记录吗？
-      // const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
-      // const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
-      // int compare = RID::compare(rid1, rid2);
-      // return compare;
+      const RID *rid1 = (const RID *)(v1 + attr_len);
+      const RID *rid2 = (const RID *)(v2 + attr_len);
+      return  RID::compare(rid1, rid2);
   }
 
 private:
   std::vector<AttrComparator> attr_comparators_;
   AttrComparator attr_comparator_ = {};
+    int attr_len = 0;
 };
 
 /**
@@ -207,7 +216,7 @@ public:
 
 private:
     std::vector<AttrPrinter> attr_printers_;
-    AttrPrinter attr_printer_;
+    AttrPrinter attr_printer_ = {};
 };
 
 /**
