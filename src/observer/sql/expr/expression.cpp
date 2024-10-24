@@ -793,3 +793,10 @@ bool SubQueryExpr::is_single_value() const
   }
   return false;
 }
+bool SubQueryExpr::is_single_tuple() const
+{
+  if (tuples_.size() > 1) {
+    return false;
+  }
+  return true;
+}
