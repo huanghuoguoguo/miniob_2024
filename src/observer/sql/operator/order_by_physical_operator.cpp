@@ -41,7 +41,7 @@ RC OrderByPhysicalOperator::fetch_and_sort() {
 
     std::vector<std::pair<std::vector<Value>, size_t>> pair_sort_table; // 要排序的内容
     std::vector<Value> row_values(order_by_expressions_.size()); // 缓存每一行
-    std::vector<std::unique_ptr<Tuple>> child_tuples; // 用于存储所有元组
+    std::vector<std::unique_ptr<ValueListTuple>> child_tuples; // 用于存储所有元组
 
     // 获取所有行的值
     while (RC::SUCCESS == (rc = children_[0]->next())) {
@@ -50,11 +50,12 @@ RC OrderByPhysicalOperator::fetch_and_sort() {
             LOG_WARN("Error retrieving child tuple");
             return RC::INTERNAL;
         }
-        RowTuple *row_tuple = static_cast<RowTuple *>(child_tuple);
-        Record   &record    = row_tuple->record();
-        RowTuple new_row_tuple;
-        new_row_tuple.set_record(&record);
-        child_tuples.emplace_back(&new_row_tuple);
+        auto                          *order_by_evaluated_tuple = new ValueListTuple();
+        rc = ValueListTuple::make(*child_tuple, *order_by_evaluated_tuple);
+        if(OB_FAIL(rc)) {
+            return rc;
+        }
+        child_tuples.emplace_back(order_by_evaluated_tuple);
 
 
         // 获取用于排序的值
