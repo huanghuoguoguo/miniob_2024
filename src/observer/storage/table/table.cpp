@@ -304,24 +304,27 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   // 复制所有字段的值
   int   record_size = table_meta_.record_size();
   char *record_data = (char *)malloc(record_size);
+
   std::bitset<32> null_list;
   memset(record_data, 0, record_size);
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
     const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
     const Value     &value = values[i];
+
     if (field->type() != value.attr_type() && !value.is_null()) {
       if (AttrType::TEXTS == field->type() && AttrType::CHARS == value.attr_type()) {
-        // do nothing
+        rc = set_value_to_record(record_data, value, field);
       } else {
         Value real_value;
         rc = Value::cast_to(value, field->type(), real_value);
         if (OB_FAIL(rc)) {
           LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name(), value.to_string().c_str());
+            table_meta_.name(),
+            field->name(),
+            value.to_string().c_str());
           return RC::SCHEMA_FIELD_TYPE_MISMATCH;
         }
-        rc = set_value_to_record(record_data, real_value, field);
       }
     } else if (value.is_null()) {
       // 将bitmap对应位置置为true。
@@ -354,10 +357,13 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     if (copy_len > data_len) {
       copy_len = data_len + 1;
     }
-    memcpy(record_data + field->offset(), value.data(), copy_len);
-  } else if (field->type() == AttrType::TEXTS) {
+    // memcpy(record_data + field->offset(), value.data(), copy_len);
+  }
+  if (field->type() == AttrType::TEXTS) {
     // 对于TEXTS类型字段，将字符串插入到文件中，并将offset和length写入record
+    // 目前是将TEXT的放入cell前 将其TYPE 设置为CHARS 所以这里 应该不会运行到
     int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    position[0] = field->offset();
     position[1] = value.length();
     // 假设 `text_buffer_pool_` 是一个用于存储大文本的缓冲池
     text_buffer_pool_->append_data(position[0], position[1], value.data());
