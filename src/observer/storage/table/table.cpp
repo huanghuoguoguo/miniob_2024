@@ -586,13 +586,15 @@ RC Table::update_record(const Record &record_)
   get_record(record_.rid(),origin_record);
   rc = insert_entry_of_indexes(record_.data(), record_.rid());
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+    rc = delete_entry_of_indexes(record_.data(), record_.rid(), false);
     return rc;
   }
   // 插入成功。删除旧索引。
   rc = delete_entry_of_indexes(origin_record.data(),origin_record.rid(),false);
   if (rc != RC::SUCCESS) {
     // 删除失败，删除之前插入的索引。
-    rc = delete_entry_of_indexes(record_.data(), record_.rid(), false);
+    rc = insert_entry_of_indexes(origin_record.data(), origin_record.rid());
+    rc = delete_entry_of_indexes(record_.data(),record_.rid(),false);
     return rc;
   }
   // 插入索引和删除之前的索引都没问题。可以更新值。

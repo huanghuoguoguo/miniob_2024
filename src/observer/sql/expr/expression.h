@@ -503,7 +503,7 @@ public:
   RC open(Trx* trx);
   RC close();
   RC check(CompOp op);
-  bool is_single_value() const;
+
   bool is_single_tuple() const;
 
   void add_value(Value* v) const

@@ -766,6 +766,9 @@ RC SubQueryExpr::check(CompOp op)
     case GREAT_EQUAL: ///< ">="
     case GREAT_THAN:  ///< ">"
     {
+      if(!is_single_tuple()) {
+        return RC::SUB_QUERY_NUILTI_TUPLE;
+      }
       if (list_type_ != nullptr && list_type_->size() != 1) {
         return RC::SUB_QUERY_NUILTI_VALUE;
       }
@@ -786,13 +789,6 @@ RC SubQueryExpr::check(CompOp op)
   return RC::SUCCESS;
 }
 
-bool SubQueryExpr::is_single_value() const
-{
-  if (list_type_->size() == 1) {
-    return true;
-  }
-  return false;
-}
 bool SubQueryExpr::is_single_tuple() const
 {
   if (tuples_.size() > 1) {
