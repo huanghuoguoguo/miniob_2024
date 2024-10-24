@@ -6,7 +6,7 @@
 #include "common/log/log.h"
 #include "sql/operator/order_by_physical_operator.h"
 #include "sql/expr/expression_tuple.h"
-#include "sql/expr/composite_tuple.h"
+#include "sql/expr/tuple.h"
 
 using namespace std;
 using namespace common;
@@ -18,37 +18,53 @@ OrderByPhysicalOperator::OrderByPhysicalOperator(std::vector<Expression *> &&ord
       order_by_directions_(std::move(order_by_directions)) {}
 
 RC OrderByPhysicalOperator::open(Trx *trx) {
-    RC rc = RC::SUCCESS;
-    if (children_.size() != 1) {
-        LOG_WARN("OrderByPhysicalOperator must have one child");
-        return RC::INTERNAL;
+    RC rc = children_[0]->open(trx);  // 打开子算子
+    if (OB_FAIL(rc)) {
+        LOG_WARN("failed to open child operator. rc=%s", strrc(rc));
+        return rc;
     }
-    if (RC::SUCCESS != (rc = children_[0]->open(trx))) {
-        LOG_WARN("Child operator open failed!");
-        return RC::INTERNAL;
+
+    // 获取所有元组并进行排序
+    rc = fetch_and_sort();
+    if (OB_FAIL(rc)) {
+        LOG_WARN("failed to fetch and sort tuples. rc=%s", strrc(rc));
+        return rc;
     }
-    rc = fetch_and_sort_tables();
+
+    current_index_ = 0;
     return rc;
 }
 
-RC OrderByPhysicalOperator::fetch_and_sort_tables() {
+RC OrderByPhysicalOperator::fetch_and_sort() {
     LOG_WARN("Begin sorting");
     RC rc = RC::SUCCESS;
 
     std::vector<std::pair<std::vector<Value>, size_t>> pair_sort_table; // 要排序的内容
     std::vector<Value> row_values(order_by_expressions_.size()); // 缓存每一行
+    std::vector<std::unique_ptr<Tuple>> child_tuples; // 用于存储所有元组
 
     // 获取所有行的值
     while (RC::SUCCESS == (rc = children_[0]->next())) {
+        Tuple *child_tuple = children_[0]->current_tuple();
+        if (child_tuple == nullptr) {
+            LOG_WARN("Error retrieving child tuple");
+            return RC::INTERNAL;
+        }
+        child_tuples.emplace_back(child_tuple);
+
+
+        // 获取用于排序的值
         for (size_t i = 0; i < order_by_expressions_.size(); ++i) {
             Value cell;
-            if (order_by_expressions_[i]->get_value(*children_[0]->current_tuple(), cell) != RC::SUCCESS) {
+            if (order_by_expressions_[i]->get_value(*child_tuple, cell) != RC::SUCCESS) {
                 LOG_WARN("Error retrieving value for sorting");
                 return RC::INTERNAL;
             }
             row_values[i] = cell;
         }
-        pair_sort_table.emplace_back(std::make_pair(row_values, pair_sort_table.size()));
+
+        // 将排序键和值的索引保存到排序表中
+        pair_sort_table.emplace_back(row_values, child_tuples.size() - 1); // 使用 child_tuples 的索引
     }
 
     if (RC::RECORD_EOF != rc) {
@@ -77,47 +93,45 @@ RC OrderByPhysicalOperator::fetch_and_sort_tables() {
         return false; // 完全相同
     };
 
+    // 排序
     std::sort(pair_sort_table.begin(), pair_sort_table.end(), cmp);
     LOG_INFO("Sort Table Success");
 
-    // 填充排序后的元组
+    // 根据排序后的顺序，填充 sorted_tuples_
+    sorted_tuples_.clear(); // 清除之前的内容
     for (const auto &pair : pair_sort_table) {
-        sorted_tuples_.emplace_back(new Tuple(pair.first)); // 假设有合适的构造函数
+        sorted_tuples_.emplace_back(std::move(child_tuples[pair.second]).get()); // 按排序后的顺序插入
     }
 
     current_index_ = 0;
-    return rc;
+    return RC::SUCCESS;
 }
 
 RC OrderByPhysicalOperator::next() {
     // 检查当前索引是否在有效范围内
-    if (current_index_ < sorted_tuples_.size()) {
-        // 获取当前元组
-        Tuple *current = sorted_tuples_[current_index_++];
-        // 将当前元组设置为返回的元组
-        // 如果需要返回的元组是通过某种方式输出，可以添加一个成员变量来存储
-        // 例如: returned_tuple_ = current;  // 假设有一个返回的元组指针成员
-
-        // 如果没有其他成员变量用于存储返回的元组，直接返回 RC::SUCCESS
-        return RC::SUCCESS;
+    if (current_index_ >= sorted_tuples_.size()) {
+        return RC::RECORD_EOF;
     }
-    return RC::RECORD_EOF; // 到达文件末尾
+
+    current_index_++;
+    return RC::SUCCESS;
 }
 
-RC OrderByPhysicalOperator::close() {
-    // 释放 sorted_tuples_ 中的每个 Tuple 的内存
-    for (Tuple *tuple : sorted_tuples_) {
-        delete tuple; // 假设需要手动释放内存
-    }
-    sorted_tuples_.clear(); // 清空容器
-    current_index_ = 0; // 重置当前索引（可选）
 
-    return RC::SUCCESS; // 返回成功状态
+RC OrderByPhysicalOperator::close() {
+    RC rc = children_[0]->close();
+    if (OB_FAIL(rc)) {
+        LOG_WARN("failed to close child operator.");
+        return rc;
+    }
+
+    sorted_tuples_.clear();
+    return RC::SUCCESS;
 }
 
 Tuple *OrderByPhysicalOperator::current_tuple() {
-    if (current_index_ < sorted_tuples_.size()) {
-        return sorted_tuples_[current_index_]; // 返回当前元组
+    if (current_index_ > 0 && current_index_ <= sorted_tuples_.size()) {
+        return sorted_tuples_[current_index_ - 1];
     }
-    return nullptr; // 索引无效时返回空指针
+    return nullptr;
 }

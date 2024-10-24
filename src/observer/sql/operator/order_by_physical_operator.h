@@ -1,6 +1,7 @@
 //
 // Created by admin on 24-10-23.
 //
+#include "sql/operator/physical_operator.h"
 
 class OrderByPhysicalOperator : public PhysicalOperator {
 public:
@@ -11,6 +12,9 @@ public:
     PhysicalOperatorType type() const override { return PhysicalOperatorType::ORDER_BY; }
 
     RC open(Trx *trx) override;
+
+    RC fetch_and_sort();
+
     RC next() override;
     RC close() override;
 
