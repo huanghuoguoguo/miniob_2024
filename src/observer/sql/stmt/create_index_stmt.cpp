@@ -51,7 +51,9 @@ RC CreateIndexStmt::create(Db *db, CreateIndexSqlNode &create_index, Stmt *&stmt
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder expression_binder(binder_context);
 
+  UnboundFieldExpr *null_list = new UnboundFieldExpr(table->name(), "null_list");
   // 绑定列。
+  create_index.columns.emplace(create_index.columns.begin(),null_list);
   for (unique_ptr<Expression> &expression : create_index.columns) {
     RC rc = expression_binder.bind_expression(expression, bound_expressions);
     if (OB_FAIL(rc)) {

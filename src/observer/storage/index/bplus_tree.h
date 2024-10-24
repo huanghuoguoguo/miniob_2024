@@ -108,11 +108,24 @@ public:
 
   int compare(const char* v1, const char* v2) const
   {
-      int cur = 0;
-      for (auto& comparator : attr_comparators_)
+      // 起始跳过null
+      int cur = 4;
+      // 读取前四个字节作为 null 标志
+      unsigned int nullInfo1, nullInfo2;
+      memcpy(&nullInfo1, v1, sizeof(nullInfo1));
+      memcpy(&nullInfo2, v2, sizeof(nullInfo2));
+
+      std::bitset<32> left_null(nullInfo1);
+      std::bitset<32> right_null(nullInfo2);
+
+      // 跳过null
+      for (size_t i = 1; i < attr_comparators_.size(); ++i)
       {
-          Value left;
-          Value right;
+          auto& comparator = attr_comparators_[i];
+          if (left_null[i - 1] != right_null[i - 1])
+          {
+              return -1;
+          }
           // 取对应位置进行
           int result = comparator(v1 + cur, v2 + cur);
           if (result != 0)
@@ -123,7 +136,7 @@ public:
       }
       return 0;
 
-
+      // 如果键值对都相等了，还需要判断是不是同一个记录吗？
       // const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
       // const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
       // int compare = RID::compare(rid1, rid2);
