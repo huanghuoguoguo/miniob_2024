@@ -100,7 +100,7 @@ RC OrderByPhysicalOperator::fetch_and_sort() {
     // 根据排序后的顺序，填充 sorted_tuples_
     sorted_tuples_.clear(); // 清除之前的内容
     for (const auto &pair : pair_sort_table) {
-        sorted_tuples_.emplace_back(std::move(child_tuples[pair.second]).get()); // 按排序后的顺序插入
+        sorted_tuples_.emplace_back(std::move(child_tuples[pair.second]).release()); // 按排序后的顺序插入
     }
 
     current_index_ = 0;
