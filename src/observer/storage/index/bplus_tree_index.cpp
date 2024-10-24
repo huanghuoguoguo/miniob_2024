@@ -101,7 +101,7 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
   memcpy(&nullInfo, record, sizeof(int)); // 从 record 中读取 null 信息
   nullBitset = std::bitset<32>(nullInfo); // 用读取的值初始化 bitset
   // 创建一个新的char数组来存储这些字段数据
-  char *entry_data  = new char[total_len];
+  char *entry_data  = new char[total_len + sizeof(RID)];
   int   current_pos = 0;
   // get_entry
   // 还需要判断，为null的列不能作为索引。
@@ -120,6 +120,7 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
   }
   unsigned int nullInfo2 = static_cast<unsigned int>(fieldNullBitset.to_ulong());
   memcpy(entry_data, &nullInfo2, sizeof(nullInfo2)); // 拷贝到 entry_data 的前四个字节
+  memcpy(entry_data + total_len, rid, sizeof(RID));  // 拷贝到 entry_data 的前四个字节
 
 
   // 如果不是唯一索引，不需要检查唯一性。

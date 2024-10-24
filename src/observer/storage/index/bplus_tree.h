@@ -90,11 +90,14 @@ class KeyComparator
 {
 public:
   void init(AttrType type, int length) { attr_comparator_.init(type, length); }
-    void init(std::vector<AttrType>& type, std::vector<int>& length)
+
+  void init(std::vector<AttrType>& type, std::vector<int>& length)
   {
-      for(int i = 0; i < static_cast<int>(length.size()); ++i) {
-          AttrComparator comparator;
+      for (int i = 0; i < static_cast<int>(length.size()); ++i)
+      {
+          AttrComparator comparator{};
           comparator.init(type.at(i), length.at(i));
+          attr_len += length.at(i);
           attr_comparators_.push_back(comparator);
       }
   }
@@ -125,8 +128,8 @@ public:
           if (left_null[i - 1] == 1 || right_null[i - 1] == 1)
           {
               // 只要有一方是null，就认为不相同。还需要判断二者不是同一记录。
-              const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
-              const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
+              const RID *rid1 = (const RID *)(v1 + attr_len);
+              const RID *rid2 = (const RID *)(v2 + attr_len);
               int compare = RID::compare(rid1, rid2);
               if (compare == 0)
               {
@@ -149,6 +152,7 @@ public:
 private:
   std::vector<AttrComparator> attr_comparators_;
   AttrComparator attr_comparator_ = {};
+    int attr_len = 0;
 };
 
 /**
