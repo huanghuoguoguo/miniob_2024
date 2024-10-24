@@ -38,15 +38,15 @@ RC PredicatePhysicalOperator::open(Trx *trx)
     auto right           = comparison_expr->right().get();
     if (left->type() == ExprType::SUB_QUERY) {
       SubQueryExpr *left_sub_query_expr = static_cast<SubQueryExpr *>(left);
-      if (left_sub_query_expr->phy_op() != nullptr) {
-        left_sub_query_expr->phy_op()->open(trx);
-      }
+      left_sub_query_expr->open(trx);
+      RC rc = left_sub_query_expr->check(comparison_expr->comp());
+      if (rc != RC::SUCCESS) return rc;
     }
     if (right->type() == ExprType::SUB_QUERY) {
       SubQueryExpr *right_sub_query_expr = static_cast<SubQueryExpr *>(right);
-      if (right_sub_query_expr->phy_op() != nullptr) {
-        right_sub_query_expr->phy_op()->open(trx);
-      }
+      right_sub_query_expr->open(trx);
+      RC rc = right_sub_query_expr->check(comparison_expr->comp());
+      if (rc != RC::SUCCESS) return rc;
     }
   }
 

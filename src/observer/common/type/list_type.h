@@ -2,8 +2,7 @@
 // Created by glwuy on 24-10-21.
 //
 
-#ifndef LIST_TYPE_H
-#define LIST_TYPE_H
+#pragma once
 #include <common/value.h>
 
 #include "data_type.h"
@@ -18,8 +17,10 @@ public:
 
     virtual ~ListType() = default;
     int compare(const Value& left, const Value& right) const override;
+    bool count(Value* value);
     void add(Value* value) { values.emplace_back(value); }
     bool empty() { return this->values.empty(); }
+    int size() { return this->values.size(); }
     void get_value(Value& value)
     {
         if(values.size()>1) {
@@ -28,9 +29,20 @@ public:
             value.set_value(*values.at(0));
         }
     }
+
+    std::vector<Value*>& values_vector()
+    {
+        return values;
+    }
+
+    void values_vector(const std::vector<Value*>& values)
+    {
+        this->values = values;
+    }
+
 private:
     std::vector<Value*> values;
 };
 
 
-#endif //LIST_TYPE_H
+

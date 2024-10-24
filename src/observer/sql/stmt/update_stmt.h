@@ -49,4 +49,16 @@ private:
     Value value_;
     FilterStmt* filter_stmt_ = nullptr;
     std::unique_ptr<ComparisonExpr> comparisonExpr = nullptr;
+    std::vector<ComparisonExpr*> set_values_;
+
+public:
+    std::vector<ComparisonExpr*> set_values() const
+    {
+        return set_values_;
+    }
+
+    void set_values(const std::vector<ComparisonExpr*>& set_values)
+    {
+        set_values_ = set_values;
+    }
 };

@@ -19,36 +19,42 @@ See the Mulan PSL v2 for more details. */
 
 BplusTreeIndex::~BplusTreeIndex() noexcept { close(); }
 
-RC BplusTreeIndex::create(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
+RC BplusTreeIndex::create(Table *         table, const char *file_name, const IndexMeta &index_meta,
+    const std::vector<const FieldMeta *> &field_meta)
 {
   if (inited_) {
-    LOG_WARN("Failed to create index due to the index has been created before. file_name:%s, index:%s, field:%s",
-        file_name, index_meta.name(), index_meta.field());
+    LOG_WARN("Failed to create index due to the index has been created before. file_name:%s, index:%s",
+        file_name,
+        index_meta.name());
     return RC::RECORD_OPENNED;
   }
 
   Index::init(index_meta, field_meta);
 
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
-  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_meta.type(), field_meta.len());
+  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_meta);
   if (RC::SUCCESS != rc) {
-    LOG_WARN("Failed to create index_handler, file_name:%s, index:%s, field:%s, rc:%s",
-        file_name, index_meta.name(), index_meta.field(), strrc(rc));
+    LOG_WARN("Failed to create index_handler, file_name:%s, index:%s, rc:%s",
+        file_name,
+        index_meta.name(),
+        strrc(rc));
     return rc;
   }
 
   inited_ = true;
-  table_  = table;
-  LOG_INFO("Successfully create index, file_name:%s, index:%s, field:%s",
-    file_name, index_meta.name(), index_meta.field());
+  LOG_INFO(
+      "Successfully create index, file_name:%s, index:%s",
+      file_name,
+      index_meta.name());
   return RC::SUCCESS;
 }
 
-RC BplusTreeIndex::open(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
+RC BplusTreeIndex::open(Table *table, const char *file_name, const IndexMeta &index_meta,const std::vector<const FieldMeta*>& field_meta)
 {
   if (inited_) {
-    LOG_WARN("Failed to open index due to the index has been initedd before. file_name:%s, index:%s, field:%s",
-        file_name, index_meta.name(), index_meta.field());
+    LOG_WARN("Failed to open index due to the index has been initedd before. file_name:%s, index:%s",
+        file_name,
+        index_meta.name());
     return RC::RECORD_OPENNED;
   }
 
@@ -57,15 +63,16 @@ RC BplusTreeIndex::open(Table *table, const char *file_name, const IndexMeta &in
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
   RC rc = index_handler_.open(table->db()->log_handler(), bpm, file_name);
   if (RC::SUCCESS != rc) {
-    LOG_WARN("Failed to open index_handler, file_name:%s, index:%s, field:%s, rc:%s",
-        file_name, index_meta.name(), index_meta.field(), strrc(rc));
+    LOG_WARN("Failed to open index_handler, file_name:%s, index:%s, rc:%s",
+        file_name,
+        index_meta.name(),
+        strrc(rc));
     return rc;
   }
 
   inited_ = true;
-  table_  = table;
-  LOG_INFO("Successfully open index, file_name:%s, index:%s, field:%s",
-    file_name, index_meta.name(), index_meta.field());
+  LOG_INFO(
+      "Successfully open index, file_name:%s, index:%s", file_name, index_meta.name());
   return RC::SUCCESS;
 }
 
@@ -82,12 +89,62 @@ RC BplusTreeIndex::close()
 
 RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 {
-  return index_handler_.insert_entry(record + field_meta_.offset(), rid);
+  // 计算总长度
+  int total_len = 0;
+  for (auto &field_meta : field_meta_) {
+    total_len += field_meta->len();;
+  }
+  std::bitset<32> nullBitset;
+  std::bitset<32> fieldNullBitset;
+  // 读取第一个字段作为 bitset
+  int nullInfo;
+  memcpy(&nullInfo, record, sizeof(int)); // 从 record 中读取 null 信息
+  nullBitset = std::bitset<32>(nullInfo); // 用读取的值初始化 bitset
+  // 创建一个新的char数组来存储这些字段数据
+  char *entry_data  = new char[total_len];
+  int   current_pos = 0;
+  // get_entry
+  // 还需要判断，为null的列不能作为索引。
+  for (size_t i = 0; i < field_meta_.size(); ++i) {
+    auto &field_meta = field_meta_[i];
+    int   offset     = field_meta->offset();
+    int   len        = field_meta->len();
+    // 将从record中提取的字段数据拷贝到entry_data
+    memcpy(entry_data + current_pos, record + offset, len);
+    current_pos += len;
+    // 检查是否为 null
+    if (nullBitset[i] == 1) {
+      // 如果第 i 位为 1，表示该字段为 null
+      fieldNullBitset.set(i); // 在第二个 bitset 中标记为 null
+    }
+  }
+  unsigned int nullInfo2 = static_cast<unsigned int>(fieldNullBitset.to_ulong());
+  memcpy(entry_data, &nullInfo2, sizeof(nullInfo2)); // 拷贝到 entry_data 的前四个字节
+
+
+  // 如果不是唯一索引，不需要检查唯一性。
+  if (index_meta_.is_unique()) {
+    list<RID> rids;
+    index_handler_.get_entry(entry_data, total_len, rids);
+    // 释放分配的内存
+
+    if (!rids.empty()) {
+      delete[] entry_data;
+      return RC::ERR_UNIQUE_INDEX_VIOLATION;
+    }
+  }
+  RC rc = index_handler_.insert_entry(entry_data, rid);
+  if (OB_FAIL(rc)) {
+    delete[] entry_data;
+    LOG_WARN("Failed to insert entry, rc:%s", strrc(rc));
+    return rc;
+  }
+  return rc;
 }
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
 {
-  return index_handler_.delete_entry(record + field_meta_.offset(), rid);
+  return index_handler_.delete_entry(record, rid);
 }
 
 IndexScanner *BplusTreeIndex::create_scanner(

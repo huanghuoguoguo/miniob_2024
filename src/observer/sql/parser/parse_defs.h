@@ -165,8 +165,7 @@ struct DeleteSqlNode
 struct UpdateSqlNode
 {
   std::string                   relation_name;   ///< Relation to update
-  std::string                   attribute_name;  ///< 更新的字段，仅支持一个字段
-  Value                         value;           ///< 更新的值，仅支持一个字段
+  std::vector<ConditionSqlNode> set_expression; ///< 要插入的值
   std::vector<ConditionSqlNode> conditions;
 };
 
@@ -212,9 +211,10 @@ struct DropTableSqlNode
  */
 struct CreateIndexSqlNode
 {
-  std::string index_name;      ///< Index name
-  std::string relation_name;   ///< Relation name
-  std::string attribute_name;  ///< Attribute name
+    std::string index_name; ///< Index name
+    std::string relation_name;   ///< Relation name
+    bool unique;
+    std::vector<std::unique_ptr<Expression>> columns;
 };
 
 /**

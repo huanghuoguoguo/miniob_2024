@@ -19,6 +19,7 @@ See the Mulan PSL v2 for more details. */
 #include <common/type/list_type.h>
 #include <sql/stmt/select_stmt.h>
 
+
 #include "common/value.h"
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
@@ -499,7 +500,12 @@ public:
   AttrType value_type() const override { return AttrType::UNDEFINED; }
   int      value_length() const override { return 0; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
-  void     add_value(Value* v)
+  RC open(Trx* trx);
+  RC close();
+  RC check(CompOp op);
+  bool is_single_value() const;
+
+  void add_value(Value* v) const
   {
     if (list_type_ == nullptr)
     {
@@ -518,7 +524,7 @@ private:
 
   mutable ListType* list_type_ = nullptr;
   std::vector<std::unique_ptr<Expression>>* values_ = nullptr;
-
+  std::vector<Tuple*> tuples_;
 public:
   std::vector<std::unique_ptr<Expression>>* values() const
   {

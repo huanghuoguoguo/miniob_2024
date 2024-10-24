@@ -66,7 +66,7 @@ public:
 
   int operator()(const char *v1, const char *v2) const
   {
-    // TODO: optimized the comparison
+    // TODO: optimized the comparison 如果是多个字段的话，应该要把每一个属性取出来，然后比较。这里直接将其变为char*，并且不考虑变长的字段，只考虑定长的字段。希望测试用例没有边长字段比如varchar，text。
     Value left;
     left.set_type(attr_type_);
     left.set_data(v1, attr_length_);
@@ -90,23 +90,62 @@ class KeyComparator
 {
 public:
   void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+    void init(std::vector<AttrType>& type, std::vector<int>& length)
+  {
+      for(int i = 0; i < static_cast<int>(length.size()); ++i) {
+          AttrComparator comparator;
+          comparator.init(type.at(i), length.at(i));
+          attr_comparators_.push_back(comparator);
+      }
+  }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
   int operator()(const char *v1, const char *v2) const
   {
-    int result = attr_comparator_(v1, v2);
-    if (result != 0) {
-      return result;
-    }
+      return compare(v1, v2);
+  }
 
-    const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
-    const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
-    return RID::compare(rid1, rid2);
+  int compare(const char* v1, const char* v2) const
+  {
+      // 起始跳过null
+      int cur = 4;
+      // 读取前四个字节作为 null 标志
+      unsigned int nullInfo1, nullInfo2;
+      memcpy(&nullInfo1, v1, sizeof(nullInfo1));
+      memcpy(&nullInfo2, v2, sizeof(nullInfo2));
+
+      std::bitset<32> left_null(nullInfo1);
+      std::bitset<32> right_null(nullInfo2);
+
+      // 跳过null
+      for (size_t i = 1; i < attr_comparators_.size(); ++i)
+      {
+          auto& comparator = attr_comparators_[i];
+          if (left_null[i - 1] != right_null[i - 1])
+          {
+              return -1;
+          }
+          // 取对应位置进行
+          int result = comparator(v1 + cur, v2 + cur);
+          if (result != 0)
+          {
+              return result;
+          }
+          cur += comparator.attr_length();
+      }
+      return 0;
+
+      // 如果键值对都相等了，还需要判断是不是同一个记录吗？
+      // const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
+      // const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
+      // int compare = RID::compare(rid1, rid2);
+      // return compare;
   }
 
 private:
-  AttrComparator attr_comparator_;
+  std::vector<AttrComparator> attr_comparators_;
+  AttrComparator attr_comparator_ = {};
 };
 
 /**
@@ -142,22 +181,33 @@ private:
 class KeyPrinter
 {
 public:
-  void init(AttrType type, int length) { attr_printer_.init(type, length); }
+    void init(AttrType type, int length) { attr_printer_.init(type, length); }
 
-  const AttrPrinter &attr_printer() const { return attr_printer_; }
+    void init(std::vector<AttrType>& type, std::vector<int>& length)
+    {
+        for (int i = 0; i < static_cast<int>(length.size()); ++i)
+        {
+            AttrPrinter attr_printer;
+            attr_printer.init(type.at(i), length.at(i));
+            attr_printers_.push_back(attr_printer);
+        }
+    }
 
-  string operator()(const char *v) const
-  {
-    stringstream ss;
-    ss << "{key:" << attr_printer_(v) << ",";
+    const AttrPrinter& attr_printer() const { return attr_printer_; }
 
-    const RID *rid = (const RID *)(v + attr_printer_.attr_length());
-    ss << "rid:{" << rid->to_string() << "}}";
-    return ss.str();
-  }
+    string operator()(const char* v) const
+    {
+        stringstream ss;
+        ss << "{key:" << attr_printer_(v) << ",";
+
+        const RID* rid = (const RID*)(v + attr_printer_.attr_length());
+        ss << "rid:{" << rid->to_string() << "}}";
+        return ss.str();
+    }
 
 private:
-  AttrPrinter attr_printer_;
+    std::vector<AttrPrinter> attr_printers_;
+    AttrPrinter attr_printer_;
 };
 
 /**
@@ -461,8 +511,13 @@ public:
    */
   RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, AttrType attr_type, int attr_length,
       int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler &log_handler, DiskBufferPool &buffer_pool, AttrType attr_type, int attr_length,
-      int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, AttrType attr_type, int attr_length,
+            int internal_max_size = -1, int leaf_max_size = -1);
+  RC create(LogHandler& log_handler, BufferPoolManager& bpm, const char* file_name,
+            std::vector<const FieldMeta*> field_meta, int internal_max_size = -1,
+            int leaf_max_size = -1);
+  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, std::vector<const FieldMeta *> field_meta,
+            int internal_max_size, int leaf_max_size);
 
   /**
    * @brief 打开一个B+树
@@ -513,7 +568,7 @@ public:
 
 public:
   const IndexFileHeader &file_header() const { return file_header_; }
-  DiskBufferPool        &buffer_pool() const { return *disk_buffer_pool_; }
+  DiskBufferPool        &buffer_pool()  { return *disk_buffer_pool_; }
   LogHandler            &log_handler() const { return *log_handler_; }
 
 public:
@@ -634,7 +689,7 @@ protected:
 
 private:
   common::MemPoolItem::item_unique_ptr make_key(const char *user_key, const RID &rid);
-
+  std::shared_ptr<std::vector<FieldMeta>> field_meta_;
 protected:
   LogHandler     *log_handler_      = nullptr;  /// 日志处理器
   DiskBufferPool *disk_buffer_pool_ = nullptr;  /// 磁盘缓冲池

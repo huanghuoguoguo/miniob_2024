@@ -13,3 +13,12 @@ int ListType::compare(const Value &left, const Value &right) const
     return 0;
   return INT32_MAX;
 }
+bool ListType::count(Value* value)
+{
+  for (const auto & it : values) {
+    if (it->compare(*value) == 0) {
+      return true;
+    }
+  }
+  return false;
+}

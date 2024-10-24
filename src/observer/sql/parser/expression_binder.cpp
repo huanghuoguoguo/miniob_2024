@@ -527,7 +527,7 @@ RC ExpressionBinder::bind_sub_expression(
   if(sub_query_expr->select_sql_node() != nullptr) {
     rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
     sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
-  }else {
+  } else {
     std::vector<std::unique_ptr<Expression>> * expressions = sub_query_expr->values();
     if(expressions != nullptr) {
       // 值定义。

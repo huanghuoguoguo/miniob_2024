@@ -220,6 +220,20 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     table_oper = std::move(table_get_oper);
   }
 
+  // 处理可能存在的子查询。
+  std::vector<ComparisonExpr *> set_exprs = update_stmt->set_values();
+  for (auto &set_expr : set_exprs) {
+    auto expression = set_expr->right().get();
+    if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
+      auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
+      if(sub_query_expr->select_stmt() != nullptr) {
+        unique_ptr<LogicalOperator> sub_oper(nullptr);
+        create_plan(sub_query_expr->select_stmt(), sub_oper);
+        sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
+      }
+    }
+  }
+
   unique_ptr<LogicalOperator> predicate_oper;
 
   RC rc = create_plan(update_stmt->filter_stmt(), predicate_oper);
@@ -235,9 +249,8 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     }
     last_oper = &predicate_oper;
   }
-  std::unique_ptr<ComparisonExpr>& expression = update_stmt->getComparisonExpr();
 
-  auto update_oper = make_unique<UpdateLogicalOperator>(table,expression);
+  auto update_oper = make_unique<UpdateLogicalOperator>(table, set_exprs);
   if (*last_oper) {
     update_oper->add_child(std::move(*last_oper));
   }

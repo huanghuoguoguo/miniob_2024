@@ -129,6 +129,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NULLABLE
         HAVING
         IN
+        UNIQUE
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -301,18 +302,30 @@ desc_table_stmt:
     }
     ;
 
+
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE INDEX ID ON ID LBRACE expression_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $3;
       create_index.relation_name = $5;
-      create_index.attribute_name = $7;
+      create_index.unique = false;
+      create_index.columns.swap(*$7);
       free($3);
       free($5);
-      free($7);
     }
+    | CREATE UNIQUE INDEX ID ON ID LBRACE expression_list RBRACE
+     {
+       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+       CreateIndexSqlNode &create_index = $$->create_index;
+       create_index.index_name = $4;
+       create_index.relation_name = $6;
+       create_index.unique = true;
+       create_index.columns.swap(*$8);
+       free($4);
+       free($6);
+     }
     ;
 
 drop_index_stmt:      /*drop index 语句的语法解析树*/
@@ -524,18 +537,16 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET condition_list where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      $$->update.set_expression.swap(*$4);
+      if ($5 != nullptr) {
+        $$->update.conditions.swap(*$5);
+        delete $5;
       }
       free($2);
-      free($4);
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
@@ -759,6 +770,11 @@ condition_list:
       $$ = $3;
       $$->emplace_back(*$1);
       delete $1;
+    }
+    | condition COMMA condition_list{
+        $$ = $3;
+        $$->emplace_back(*$1);
+        delete $1;
     }
     ;
 condition:
