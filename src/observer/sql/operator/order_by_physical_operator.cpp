@@ -97,26 +97,49 @@ RC OrderByPhysicalOperator::fetch_and_sort() {
     //     }
     //     return false; // 完全相同
     // };
+    // auto cmp = [this](const auto &a, const auto &b) {
+    //     for (size_t i = 0; i < order_by_expressions_.size(); ++i) {
+    //         const Value &cell_a = a.first[i];
+    //         const Value &cell_b = b.first[i];
+    //
+    //         // 如果 cell_a 是 null 而 cell_b 不是，cell_a 应该排在前面
+    //         if (cell_a.is_null() && !cell_b.is_null()) {
+    //             return true; // cell_a 是 null，cell_b 不是，cell_a 排在前面
+    //         }
+    //
+    //         // 如果 cell_b 是 null 而 cell_a 不是，cell_a 应该排在后面
+    //         if (!cell_a.is_null() && cell_b.is_null()) {
+    //             return false; // cell_b 是 null，cell_a 不是，cell_a 排在后面
+    //         }
+    //
+    //         // 使用 compare 函数进行比较
+    //         int comparison = cell_a.compare(cell_b);
+    //         if (comparison != 0) {
+    //             // 根据排序方向返回
+    //             return order_by_directions_[i] ? (comparison < 0) : (comparison > 0);
+    //         }
+    //     }
+    //     return false; // 完全相同
+    // };
     auto cmp = [this](const auto &a, const auto &b) {
         for (size_t i = 0; i < order_by_expressions_.size(); ++i) {
             const Value &cell_a = a.first[i];
             const Value &cell_b = b.first[i];
 
-            // 如果 cell_a 是 null 而 cell_b 不是，cell_a 应该排在前面
+            // 顺序排序时，null 在前；倒序排序时，null 在后
             if (cell_a.is_null() && !cell_b.is_null()) {
-                return true; // cell_a 是 null，cell_b 不是，cell_a 排在前面
+                return static_cast<bool>(order_by_directions_[i]); // 顺序时 true，null 在前；倒序时 false，null 在后
             }
 
-            // 如果 cell_b 是 null 而 cell_a 不是，cell_a 应该排在后面
             if (!cell_a.is_null() && cell_b.is_null()) {
-                return false; // cell_b 是 null，cell_a 不是，cell_a 排在后面
+                return !static_cast<bool>(order_by_directions_[i]); // 顺序时 false，null 在前；倒序时 true，null 在后
             }
 
             // 使用 compare 函数进行比较
             int comparison = cell_a.compare(cell_b);
             if (comparison != 0) {
                 // 根据排序方向返回
-                return order_by_directions_[i] ? (comparison < 0) : (comparison > 0);
+                return static_cast<bool>(order_by_directions_[i]) ? (comparison < 0) : (comparison > 0);
             }
         }
         return false; // 完全相同
