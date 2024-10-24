@@ -150,10 +150,6 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   int cmp_result;
   if(comp_ < IS_NULL)
   {
-    // 子查询的比较右值必须为1个。
-    if(right.get_list() && right.get_list()->size() > 1) {
-      return RC::SUB_QUERY_NUILTI_COLUMN;
-    }
     cmp_result = left.compare(right);
   }
 

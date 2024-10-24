@@ -87,10 +87,9 @@ RC BplusTreeIndex::close()
   return RC::SUCCESS;
 }
 
-RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
+void BplusTreeIndex::execute_real_data(const char *record, const RID *rid, int &total_len, char *&entry_data)
 {
-  // 计算总长度
-  int total_len = 0;
+  total_len = 0;
   for (auto &field_meta : field_meta_) {
     total_len += field_meta->len();;
   }
@@ -98,13 +97,11 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
   std::bitset<32> fieldNullBitset;
   // 读取第一个字段作为 bitset
   int nullInfo;
-  memcpy(&nullInfo, record, sizeof(int)); // 从 record 中读取 null 信息
-  nullBitset = std::bitset<32>(nullInfo); // 用读取的值初始化 bitset
-  // 创建一个新的char数组来存储这些字段数据
-  char *entry_data  = new char[total_len + sizeof(RID)];
+  memcpy(&nullInfo, record, sizeof(int));        // 从 record 中读取 null 信息
+  nullBitset        = std::bitset<32>(nullInfo); // 用读取的值初始化 bitset
+  entry_data        = new char[total_len + sizeof(RID)];
   int   current_pos = 0;
   // get_entry
-  // 还需要判断，为null的列不能作为索引。
   for (size_t i = 0; i < field_meta_.size(); ++i) {
     auto &field_meta = field_meta_[i];
     int   offset     = field_meta->offset();
@@ -121,7 +118,13 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
   unsigned int nullInfo2 = static_cast<unsigned int>(fieldNullBitset.to_ulong());
   memcpy(entry_data, &nullInfo2, sizeof(nullInfo2)); // 拷贝到 entry_data 的前四个字节
   memcpy(entry_data + total_len, rid, sizeof(RID));  // 拷贝到 entry_data 的前四个字节
+}
 
+RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
+{
+  int   total_len;
+  char *entry_data;
+  execute_real_data(record, rid, total_len, entry_data);
 
   // 如果不是唯一索引，不需要检查唯一性。
   if (index_meta_.is_unique()) {
@@ -145,7 +148,10 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
 
 RC BplusTreeIndex::delete_entry(const char *record, const RID *rid)
 {
-  return index_handler_.delete_entry(record, rid);
+  int   total_len;
+  char *entry_data;
+  execute_real_data(record, rid, total_len, entry_data);
+  return index_handler_.delete_entry(entry_data, rid);
 }
 
 IndexScanner *BplusTreeIndex::create_scanner(

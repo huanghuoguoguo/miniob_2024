@@ -584,19 +584,19 @@ RC Table::update_record(const Record &record_)
   RC rc = RC::SUCCESS;
   Record origin_record;
   get_record(record_.rid(),origin_record);
+
+  rc = delete_entry_of_indexes(origin_record.data(),origin_record.rid(),false);
+  if (rc != RC::SUCCESS) {
+    // 删除索引失败，重新插入所有索引。
+    insert_entry_of_indexes(origin_record.data(),origin_record.rid());
+    return rc;
+  }
   rc = insert_entry_of_indexes(record_.data(), record_.rid());
   if (rc != RC::SUCCESS) {  // 可能出现了键值重复
     rc = delete_entry_of_indexes(record_.data(), record_.rid(), false);
     return rc;
   }
   // 插入成功。删除旧索引。
-  rc = delete_entry_of_indexes(origin_record.data(),origin_record.rid(),false);
-  if (rc != RC::SUCCESS) {
-    // 删除失败，删除之前插入的索引。
-    rc = insert_entry_of_indexes(origin_record.data(), origin_record.rid());
-    rc = delete_entry_of_indexes(record_.data(),record_.rid(),false);
-    return rc;
-  }
   // 插入索引和删除之前的索引都没问题。可以更新值。
   rc    = record_handler_->visit_record(record_.rid(), [&record_](Record &record) {
               record.copy_data(record_.data(), record_.len());
@@ -623,6 +623,11 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
   for (Index *index : indexes_) {
     rc = index->delete_entry(record, &rid);
     if (rc != RC::SUCCESS) {
+      if (rc == RC::RECORD_NOT_EXIST) {
+        // 确保每个索引都删除。
+        rc = RC::SUCCESS;
+        continue;
+      }
       if (rc != RC::RECORD_INVALID_KEY || !error_on_not_exists) {
         break;
       }

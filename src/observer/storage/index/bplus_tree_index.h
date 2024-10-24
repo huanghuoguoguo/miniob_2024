@@ -31,6 +31,7 @@ public:
             const std::vector<const FieldMeta*>& field_meta) override;
   RC open(Table *table, const char *file_name, const IndexMeta &index_meta,const std::vector<const FieldMeta*>& field_meta) override;
   RC close();
+  void execute_real_data(const char* record, const RID* rid, int& total_len, char*& entry_data);
 
   RC insert_entry(const char *record, const RID *rid) override;
   RC delete_entry(const char *record, const RID *rid) override;
