@@ -124,7 +124,14 @@ public:
           auto& comparator = attr_comparators_[i];
           if (left_null[i - 1] == 1 || right_null[i - 1] == 1)
           {
-              // 只要有一方是null，就认为不相同。
+              // 只要有一方是null，就认为不相同。还需要判断二者不是同一记录。
+              const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
+              const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
+              int compare = RID::compare(rid1, rid2);
+              if (compare == 0)
+              {
+                  return compare;
+              }
               return -1;
           }
           // 取对应位置进行
@@ -135,13 +142,8 @@ public:
           }
           cur += comparator.attr_length();
       }
-      return 0;
 
-      // 如果键值对都相等了，还需要判断是不是同一个记录吗？
-      // const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
-      // const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
-      // int compare = RID::compare(rid1, rid2);
-      // return compare;
+      return 0;
   }
 
 private:
@@ -208,7 +210,7 @@ public:
 
 private:
     std::vector<AttrPrinter> attr_printers_;
-    AttrPrinter attr_printer_;
+    AttrPrinter attr_printer_ = {};
 };
 
 /**
