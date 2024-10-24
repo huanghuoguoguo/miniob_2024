@@ -146,7 +146,9 @@ public:
           cur += comparator.attr_length();
       }
 
-      return 0;
+      const RID *rid1 = (const RID *)(v1 + attr_len);
+      const RID *rid2 = (const RID *)(v2 + attr_len);
+      return  RID::compare(rid1, rid2);
   }
 
 private:
