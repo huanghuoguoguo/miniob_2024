@@ -834,7 +834,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   std::vector<int> attr_lengths;
   for(const FieldMeta * field_tmp: field_meta) {
     attr_length += field_tmp->len();
-    attr_lengths.push_back(attr_length);
+    attr_lengths.push_back(field_tmp->len());
   }
 
   if (internal_max_size < 0) {
@@ -870,8 +870,8 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   file_header->attr_length       = attr_length;
   file_header->key_length        = attr_length + sizeof(RID);
   // 原来是单类型，现在可能需要多类型？怎么做呢？
-  if(field_meta.size() == 1) {
-    file_header->attr_type = field_meta.front()->type();
+  if(field_meta.size() == 2) {
+    file_header->attr_type = field_meta.back()->type();
   }else {
     // 存储指针。
     file_header->attr_type = AttrType::CHARS;
