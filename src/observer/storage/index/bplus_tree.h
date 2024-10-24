@@ -103,25 +103,31 @@ public:
 
   int operator()(const char *v1, const char *v2) const
   {
+      return compare(v1, v2);
+  }
+
+  int compare(const char* v1, const char* v2) const
+  {
       int cur = 0;
       for (auto& comparator : attr_comparators_)
       {
           Value left;
           Value right;
           // 取对应位置进行
-          int result = attr_comparator_(v1 + cur, v2 + cur);
+          int result = comparator(v1 + cur, v2 + cur);
           if (result != 0)
           {
               return result;
           }
           cur += comparator.attr_length();
       }
+      return 0;
 
 
-
-    const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
-    const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
-    return RID::compare(rid1, rid2);
+      // const RID *rid1 = (const RID *)(v1 + attr_comparator_.attr_length());
+      // const RID *rid2 = (const RID *)(v2 + attr_comparator_.attr_length());
+      // int compare = RID::compare(rid1, rid2);
+      // return compare;
   }
 
 private:

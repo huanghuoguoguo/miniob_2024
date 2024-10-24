@@ -902,7 +902,9 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   }
 
   key_comparator_.init(attr_types, attr_lengths);
+  key_comparator_.init(file_header_.attr_type, file_header_.key_length);
   key_printer_.init(attr_types, attr_lengths);
+  key_printer_.init(file_header_.attr_type, file_header_.key_length);
 
   /*
   虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。
@@ -1971,8 +1973,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
 
   // 校验输入的键值是否是合法范围
   if (left_user_key && right_user_key) {
-    const auto &attr_comparator = tree_handler_.key_comparator_.attr_comparator();
-    const int   result          = attr_comparator(left_user_key, right_user_key);
+    const int   result          = tree_handler_.key_comparator_.compare(left_user_key, right_user_key);
     if (result > 0 ||  // left < right
                        // left == right but is (left,right)/[left,right) or (left,right]
         (result == 0 && (left_inclusive == false || right_inclusive == false))) {
