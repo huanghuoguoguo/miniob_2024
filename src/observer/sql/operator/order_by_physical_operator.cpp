@@ -50,7 +50,11 @@ RC OrderByPhysicalOperator::fetch_and_sort() {
             LOG_WARN("Error retrieving child tuple");
             return RC::INTERNAL;
         }
-        child_tuples.emplace_back(child_tuple);
+        RowTuple *row_tuple = static_cast<RowTuple *>(child_tuple);
+        Record   &record    = row_tuple->record();
+        RowTuple new_row_tuple;
+        new_row_tuple.set_record(&record);
+        child_tuples.emplace_back(&new_row_tuple);
 
 
         // 获取用于排序的值
