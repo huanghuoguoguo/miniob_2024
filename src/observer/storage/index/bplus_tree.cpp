@@ -793,32 +793,26 @@ RC BplusTreeHandler::sync()
   }
   return disk_buffer_pool_->flush_all_pages();
 }
-
-RC BplusTreeHandler::create(LogHandler &log_handler,
-                            BufferPoolManager &bpm,
-                            const char *file_name, 
-                            AttrType attr_type, 
-                            int attr_length, 
-                            int internal_max_size /* = -1*/,
-                            int leaf_max_size /* = -1 */)
+RC BplusTreeHandler::create(LogHandler &log_handler,BufferPoolManager &bpm,const char *file_name, std::vector<const FieldMeta *> field_meta,bool is_unique, int internal_max_size,
+    int leaf_max_size)
 {
+
+  // 创建文件。
   RC rc = bpm.create_file(file_name);
-  if (OB_FAIL(rc)) {
+  if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to create file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
     return rc;
   }
   LOG_INFO("Successfully create index file:%s", file_name);
 
   DiskBufferPool *bp = nullptr;
-
-  rc = bpm.open_file(log_handler, file_name, bp);
-  if (OB_FAIL(rc)) {
+  rc = bpm.open_file(log_handler,file_name, bp);
+  if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
     return rc;
   }
   LOG_INFO("Successfully open index file %s.", file_name);
-
-  rc = this->create(log_handler, *bp, attr_type, attr_length, internal_max_size, leaf_max_size);
+  rc = this->create(log_handler, *bp, field_meta, is_unique, internal_max_size, leaf_max_size);
   if (OB_FAIL(rc)) {
     bpm.close_file(file_name);
     return rc;
@@ -826,15 +820,24 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
 
   LOG_INFO("Successfully create index file %s.", file_name);
   return rc;
+
 }
 
 RC BplusTreeHandler::create(LogHandler &log_handler,
             DiskBufferPool &buffer_pool,
-            AttrType attr_type,
-            int attr_length,
+            std::vector<const FieldMeta *> field_meta,
+            bool is_unique,
             int internal_max_size /* = -1 */,
             int leaf_max_size /* = -1 */)
 {
+  // 收集需要创建索引的字段长度。
+  int attr_length = 0;
+  std::vector<int> attr_lengths;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_length += field_tmp->len();
+    attr_lengths.push_back(field_tmp->len());
+  }
+
   if (internal_max_size < 0) {
     internal_max_size = calc_internal_page_capacity(attr_length);
   }
@@ -867,7 +870,19 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   IndexFileHeader *file_header   = (IndexFileHeader *)pdata;
   file_header->attr_length       = attr_length;
   file_header->key_length        = attr_length + sizeof(RID);
-  file_header->attr_type         = attr_type;
+  // 原来是单类型，现在可能需要多类型？怎么做呢？
+  if(field_meta.size() == 2) {
+    file_header->attr_type = field_meta.back()->type();
+  }else {
+    // 存储指针。
+    file_header->attr_type = AttrType::CHARS;
+  }
+
+  vector<AttrType> attr_types;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_types.push_back(field_tmp->type());
+  }
+
   file_header->internal_max_size = internal_max_size;
   file_header->leaf_max_size     = leaf_max_size;
   file_header->root_page         = BP_INVALID_PAGE_NUM;
@@ -887,8 +902,10 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
     return RC::NOMEM;
   }
 
-  key_comparator_.init(file_header->attr_type, file_header->attr_length);
-  key_printer_.init(file_header->attr_type, file_header->attr_length);
+  key_comparator_.init(file_header_.attr_type, file_header_.key_length);
+  key_printer_.init(file_header_.attr_type, file_header_.key_length);
+  key_comparator_.init(attr_types, attr_lengths, is_unique);
+  key_printer_.init(attr_types, attr_lengths);
 
   /*
   虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。
@@ -904,6 +921,12 @@ RC BplusTreeHandler::create(LogHandler &log_handler,
   LOG_INFO("Successfully create index");
   return RC::SUCCESS;
 }
+
+
+
+
+
+
 
 RC BplusTreeHandler::open(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name)
 {
@@ -935,7 +958,13 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
   }
 
   RC rc = RC::SUCCESS;
-
+  // 收集需要创建索引的字段长度。
+  int attr_length = 0;
+  std::vector<int> attr_lengths;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_length += field_tmp->len();
+    attr_lengths.push_back(field_tmp->len());
+  }
   Frame *frame = nullptr;
   rc           = buffer_pool.get_this_page(FIRST_INDEX_PAGE, &frame);
   if (OB_FAIL(rc)) {
@@ -955,12 +984,17 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
     close();
     return RC::NOMEM;
   }
-
+  vector<AttrType> attr_types;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_types.push_back(field_tmp->type());
+  }
   // close old page_handle
   buffer_pool.unpin_page(frame);
 
   key_comparator_.init(file_header_.attr_type, file_header_.attr_length);
   key_printer_.init(file_header_.attr_type, file_header_.attr_length);
+  key_comparator_.init(attr_types, attr_lengths, is_unique_);
+  key_printer_.init(attr_types, attr_lengths);
   LOG_INFO("Successfully open index");
   return RC::SUCCESS;
 }
@@ -1266,6 +1300,8 @@ RC BplusTreeHandler::insert_entry_into_leaf_node(BplusTreeMiniTransaction &mtr, 
   bool                 exists          = false;  // 该数据是否已经存在指定的叶子节点中了
   int                  insert_position = leaf_node.lookup(key_comparator_, key, &exists);
   if (exists) {
+    // 和比较方式有关，如果比较方式是精确到rid，那么只有rid也相等才会返回真。
+    // 在唯一索引中需要找到一个方法，能够不比较rid，只找值比较。就返回存在。
     LOG_TRACE("entry exists");
     return RC::RECORD_DUPLICATE_KEY;
   }
@@ -1547,6 +1583,7 @@ RC BplusTreeHandler::insert_entry(const char *user_key, const RID *rid)
 RC BplusTreeHandler::get_entry(const char *user_key, int key_len, list<RID> &rids)
 {
   BplusTreeScanner scanner(*this);
+  // 初始化扫描器，找到第一个相等的位置。如果没有找到，会把frame置为空，表示未找到。
   RC rc = scanner.open(user_key, key_len, true /*left_inclusive*/, user_key, key_len, true /*right_inclusive*/);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to open scanner. rc=%s", strrc(rc));
@@ -1843,8 +1880,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
 
   // 校验输入的键值是否是合法范围
   if (left_user_key && right_user_key) {
-    const auto &attr_comparator = tree_handler_.key_comparator_.attr_comparator();
-    const int   result          = attr_comparator(left_user_key, right_user_key);
+    const int   result          = tree_handler_.key_comparator_.compare(left_user_key, right_user_key);
     if (result > 0 ||  // left < right
                        // left == right but is (left,right)/[left,right) or (left,right]
         (result == 0 && (left_inclusive == false || right_inclusive == false))) {
@@ -2053,8 +2089,8 @@ RC BplusTreeScanner::fix_user_key(
   }
 
   // 这里很粗暴，变长字段才需要做调整，其它默认都不需要做调整
-  assert(tree_handler_.file_header_.attr_type == AttrType::CHARS);
-  assert(strlen(user_key) >= static_cast<size_t>(key_len));
+  // assert(tree_handler_.file_header_.attr_type == AttrType::CHARS);
+  // assert(strlen(user_key) >= static_cast<size_t>(key_len));
 
   *should_inclusive = false;
 

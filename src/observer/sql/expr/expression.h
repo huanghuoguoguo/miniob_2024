@@ -511,6 +511,8 @@ public:
   RC close();
   RC check(CompOp op);
 
+  bool is_single_tuple() const;
+
   void add_value(Value* v) const
   {
     if (list_type_ == nullptr)
@@ -529,6 +531,7 @@ private:
   ProjectPhysicalOperator* project_phy_op_ = nullptr;
 
   mutable ListType* list_type_ = nullptr;
+  // 这个values是保存如in{}一个集合的情况，如果存在的话会将valueExpr的值获取，然后存入list_type中。
   std::vector<std::unique_ptr<Expression>>* values_ = nullptr;
   std::vector<Tuple*> tuples_;
 public:

@@ -150,10 +150,6 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   int cmp_result;
   if(comp_ < IS_NULL)
   {
-    // 子查询的比较右值必须为1个。
-    if(right.get_list() && right.get_list()->size() > 1) {
-      return RC::SUB_QUERY_NUILTI_COLUMN;
-    }
     cmp_result = left.compare(right);
   }
 
@@ -739,6 +735,7 @@ RC SubQueryExpr::open(Trx* trx)
       }
     }
   } else {
+    // 如果是值类型，在expression_binder中就绑定了。
     if (list_type_ == nullptr) {
       this->list_type_ = new ListType();
       list_type_->add(new Value());
@@ -765,8 +762,11 @@ RC SubQueryExpr::check(CompOp op)
     case GREAT_EQUAL: ///< ">="
     case GREAT_THAN:  ///< ">"
     {
+      if(!is_single_tuple()) {
+        return RC::SUB_QUERY_NUILTI_TUPLE;
+      }
       if (list_type_ != nullptr && list_type_->size() != 1) {
-        return RC::SUB_QUERY_NUILTI_COLUMN;
+        return RC::SUB_QUERY_NUILTI_VALUE;
       }
       if (project_phy_op_ != nullptr && project_phy_op_->select_size() != 1) {
         return RC::SUB_QUERY_NUILTI_COLUMN;
@@ -783,4 +783,12 @@ RC SubQueryExpr::check(CompOp op)
     default: return RC::SUCCESS;
   }
   return RC::SUCCESS;
+}
+
+bool SubQueryExpr::is_single_tuple() const
+{
+  if (tuples_.size() > 1) {
+    return false;
+  }
+  return true;
 }
