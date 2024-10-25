@@ -89,18 +89,23 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+    void init(AttrType type, int length)
+    {
+        attr_comparator_.init(type, length);
+        this->is_unique = false;
+    }
 
-  void init(std::vector<AttrType>& type, std::vector<int>& length)
-  {
-      for (int i = 0; i < static_cast<int>(length.size()); ++i)
-      {
-          AttrComparator comparator{};
-          comparator.init(type.at(i), length.at(i));
-          attr_len += length.at(i);
-          attr_comparators_.push_back(comparator);
-      }
-  }
+    void init(std::vector<AttrType>& type, std::vector<int>& length, bool is_unique)
+    {
+        for (int i = 0; i < static_cast<int>(length.size()); ++i)
+        {
+            AttrComparator comparator{};
+            comparator.init(type.at(i), length.at(i));
+            attr_len += length.at(i);
+            attr_comparators_.push_back(comparator);
+        }
+        this->is_unique = is_unique;
+    }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
@@ -108,7 +113,7 @@ public:
   {
       return compare(v1, v2);
   }
-
+    // 这里如果两个记录字段一致，并且rid一致，应该返回相同。但是如果不一致但是字段相同，
   int compare(const char* v1, const char* v2) const
   {
       // 起始跳过null
@@ -146,6 +151,11 @@ public:
           cur += comparator.attr_length();
       }
 
+      if (is_unique)
+      {
+          return 0;
+      }
+
       const RID *rid1 = (const RID *)(v1 + attr_len);
       const RID *rid2 = (const RID *)(v2 + attr_len);
       return  RID::compare(rid1, rid2);
@@ -155,6 +165,7 @@ private:
   std::vector<AttrComparator> attr_comparators_;
   AttrComparator attr_comparator_ = {};
     int attr_len = 0;
+    bool is_unique;
 };
 
 /**
@@ -518,14 +529,11 @@ public:
    * @param internal_max_size 内部节点最大大小
    * @param leaf_max_size 叶子节点最大大小
    */
-  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, AttrType attr_type, int attr_length,
-      int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, AttrType attr_type, int attr_length,
-            int internal_max_size = -1, int leaf_max_size = -1);
   RC create(LogHandler& log_handler, BufferPoolManager& bpm, const char* file_name,
-            std::vector<const FieldMeta*> field_meta, int internal_max_size = -1,
+            std::vector<const FieldMeta*> field_meta, bool is_unique = false, int internal_max_size = -1,
             int leaf_max_size = -1);
-  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, std::vector<const FieldMeta *> field_meta,
+  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, std::vector<const FieldMeta*> field_meta,
+            bool is_unique,
             int internal_max_size, int leaf_max_size);
 
   /**

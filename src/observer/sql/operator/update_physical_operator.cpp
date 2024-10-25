@@ -51,6 +51,7 @@ RC UpdatePhysicalOperator::open(Trx *trx)
           }
         }
       }
+      is_open = true;
     }
     Tuple *tuple = child->current_tuple();
     if (nullptr == tuple) {

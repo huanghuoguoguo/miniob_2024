@@ -32,7 +32,7 @@ RC BplusTreeIndex::create(Table *         table, const char *file_name, const In
   Index::init(index_meta, field_meta);
 
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
-  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_meta);
+  RC rc = index_handler_.create(table->db()->log_handler(), bpm, file_name, field_meta, index_meta.is_unique());
   if (RC::SUCCESS != rc) {
     LOG_WARN("Failed to create index_handler, file_name:%s, index:%s, rc:%s",
         file_name,
@@ -129,6 +129,7 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
   // 如果不是唯一索引，不需要检查唯一性。
   if (index_meta_.is_unique()) {
     list<RID> rids;
+    // get_entry,感觉加入rid的比较还是很有必要的，能够确定是否是同一记录，但是现在还需要实现的是，根据键值找到值。
     index_handler_.get_entry(entry_data, total_len, rids);
     // 释放分配的内存
 

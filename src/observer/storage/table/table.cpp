@@ -204,13 +204,30 @@ RC Table::insert_record(Record &record)
     return rc;
   }
 
-  rc = insert_entry_of_indexes(record.data(), record.rid());
-  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    RC rc2 = delete_entry_of_indexes(record.data(), record.rid(), false /*error_on_not_exists*/);
-    if (rc2 != RC::SUCCESS) {
-      LOG_ERROR("Failed to rollback index data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+  std::vector<Index *> temp_indexes;
+  RC rc2 = RC::SUCCESS;
+  for (Index *index : indexes_) {
+    rc = index->insert_entry(record.data(), &record.rid());
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("插入索引失败。");
+      break;
     }
+    temp_indexes.push_back(index);
+  }
+
+  if (rc != RC::SUCCESS) {
+    // 插入索引失败，删除原来插入的索引
+    for(Index *index : temp_indexes) {
+      rc2 = index->delete_entry(record.data(), &record.rid());
+      if (rc2 != RC::SUCCESS) {
+        if (rc2 != RC::RECORD_INVALID_KEY) {
+          LOG_WARN("插入索引失败，删除之前插入的索引失败。");
+          break;
+        }
+      }
+    }
+  }
+  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
     rc2 = record_handler_->delete_record(&record.rid());
     if (rc2 != RC::SUCCESS) {
       LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
@@ -583,20 +600,63 @@ RC Table::update_record(const Record &record_)
 {
   RC rc = RC::SUCCESS;
   Record origin_record;
+  bool error_on_not_exists = true;
   get_record(record_.rid(),origin_record);
 
-  rc = delete_entry_of_indexes(origin_record.data(),origin_record.rid(),false);
+  // 存储使用的索引。
+  std::vector<Index *> temp_indexes;
+  RC rc2 = RC::SUCCESS;
+  // 先删除原来的索引。唯一索引和普通索引都会删除。
+  for (Index *index : indexes_) {
+    rc = index->delete_entry(origin_record.data(), &origin_record.rid());
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("删除索引失败。");
+      break;
+    }
+    temp_indexes.push_back(index);
+  }
+
   if (rc != RC::SUCCESS) {
-    // 删除索引失败，重新插入所有索引。
-    insert_entry_of_indexes(origin_record.data(),origin_record.rid());
+    // 删除原有索引失败，重新插入原来的索引。
+    for (Index *index : temp_indexes) {
+      rc = index->insert_entry(origin_record.data(), &origin_record.rid());
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("删除原来索引失败，插入原来索引失败。");
+        break;
+      }
+    }
     return rc;
   }
-  rc = insert_entry_of_indexes(record_.data(), record_.rid());
-  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    rc = delete_entry_of_indexes(record_.data(), record_.rid(), false);
+  // 到这里删除原有索引都成功了。尝试插入新索引。如果插入失败，需要重新插入之前的旧索引。
+  temp_indexes.clear();
+  for (Index *index : indexes_) {
+    rc = index->insert_entry(record_.data(), &record_.rid());
+    if (rc != RC::SUCCESS) {
+      if (rc != RC::RECORD_INVALID_KEY || !error_on_not_exists) {
+        LOG_WARN("删除旧索引成功，但是插入新索引失败。");
+        break;
+      }
+    }
+    temp_indexes.push_back(index);
+  }
+  if (rc != RC::SUCCESS) {  // 可能出现了键值重复，导致插入的索引需要被删除。
+    // 插入索引失败，删除新插入的索引，还原旧索引。
+
+    for (Index *index : temp_indexes) {
+      rc2 = index->delete_entry(record_.data(), &record_.rid());
+      if (rc2 != RC::SUCCESS) {
+        LOG_WARN("删除新索引失败。。");
+        break;
+      }
+    }
+    // 还需要将新元素的索引全部删除
+    RC rc3 = insert_entry_of_indexes(origin_record.data(),origin_record.rid());
+    if(rc3 != RC::SUCCESS) {
+      LOG_WARN("插入失败，删除新索引，回滚旧索引失败。");
+    }
     return rc;
   }
-  // 插入成功。删除旧索引。
+
   // 插入索引和删除之前的索引都没问题。可以更新值。
   rc    = record_handler_->visit_record(record_.rid(), [&record_](Record &record) {
               record.copy_data(record_.data(), record_.len());
@@ -623,11 +683,6 @@ RC Table::delete_entry_of_indexes(const char *record, const RID &rid, bool error
   for (Index *index : indexes_) {
     rc = index->delete_entry(record, &rid);
     if (rc != RC::SUCCESS) {
-      if (rc == RC::RECORD_NOT_EXIST) {
-        // 确保每个索引都删除。
-        rc = RC::SUCCESS;
-        continue;
-      }
       if (rc != RC::RECORD_INVALID_KEY || !error_on_not_exists) {
         break;
       }
