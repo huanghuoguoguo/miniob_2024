@@ -116,6 +116,14 @@ public:
     // 这里如果两个记录字段一致，并且rid一致，应该返回相同。但是如果不一致但是字段相同，
   int compare(const char* v1, const char* v2) const
   {
+      // 直接判断二者是不是同一记录，是的或直接返回。
+      const RID* rid1 = (const RID*)(v1 + attr_len);
+      const RID* rid2 = (const RID*)(v2 + attr_len);
+      int compare = RID::compare(rid1, rid2);
+      if (compare == 0)
+      {
+          return 0;
+      }
       // 起始跳过null
       int cur = 4;
       // 读取前四个字节作为 null 标志
@@ -125,22 +133,14 @@ public:
 
       std::bitset<32> left_null(nullInfo1);
       std::bitset<32> right_null(nullInfo2);
-        bool has_null = false;
+
       // 跳过null
       for (size_t i = 1; i < attr_comparators_.size(); ++i)
       {
           auto& comparator = attr_comparators_[i];
           if (right_null[i] == 1 && left_null[i] == 1)
           {
-              has_null = true;
-              // 两者都为null，判断是不是同一记录，不是的话继续判断下一字段。
-              const RID* rid1 = (const RID*)(v1 + attr_len);
-              const RID* rid2 = (const RID*)(v2 + attr_len);
-              int compare = RID::compare(rid1, rid2);
-              if (compare == 0)
-              {
-                  return 0;
-              }
+
               // 如果比到最后都是null，并且二者还不是同一条记录，返回1。
               if (i == attr_comparators_.size() - 1)
               {
@@ -168,23 +168,12 @@ public:
           cur += comparator.attr_length();
       }
 
-      // 如果比到这一步，证明之前的key值都一样，并且同为null的键也比过了，不是同一记录。判断是否出现过null，如果出现过null，那么不能判断相等。
-      if (has_null)
-      {
-          // 如果有null，并且判断过不是同一记录了，可以直接返回1.不管是不是唯一索引。
-          const RID* rid1 = (const RID*)(v1 + attr_len);
-          const RID* rid2 = (const RID*)(v2 + attr_len);
-          return -RID::compare(rid1, rid2);
-      }
       if (is_unique)
       {
           // 如果没有null，并且是唯一索引，那么可以判断是不是同一个值。
           return 0;
       }
-
-      const RID* rid1 = (const RID*)(v1 + attr_len);
-      const RID* rid2 = (const RID*)(v2 + attr_len);
-      return RID::compare(rid1, rid2);
+      return compare;
   }
 
 private:

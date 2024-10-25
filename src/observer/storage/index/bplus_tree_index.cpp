@@ -102,7 +102,7 @@ void BplusTreeIndex::execute_real_data(const char *record, const RID *rid, int &
   memcpy(&nullInfo, record, sizeof(int));        // 从 record 中读取 null 信息
   nullBitset        = std::bitset<32>(nullInfo); // 用读取的值初始化 bitset
   entry_data        = new char[total_len + sizeof(RID)];
-  int   current_pos = 0;
+  int   current_pos = 4;
   // get_entry
   for (size_t i = 1; i < field_meta_.size(); ++i) {
     auto &field_meta = field_meta_[i];
