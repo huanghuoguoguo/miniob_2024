@@ -186,6 +186,9 @@ RC Db::drop_table(const char *table_name) {
   //表的实际数据文件路径
   auto table_data_name = table_data_file(path_.c_str(), table_name);
 
+  //TEXTS类型存放数据路径
+  auto table_text_name = table_text_file(path_.c_str(), table_name);
+
   if(unlink(table_data_name.c_str()) == -1){
     // 删除实际文件数据
     LOG_ERROR("failed to delete table (%s) data file %s.",table_name,table_data_name.c_str());
@@ -194,6 +197,11 @@ RC Db::drop_table(const char *table_name) {
   if(unlink(table_meta_name.c_str()) == -1){
     // 删除元文件数据
     LOG_ERROR("failed to delete table (%s) meta file %s.",table_name,table_meta_name.c_str());
+    return RC::IOERR_UNLINK;
+  }
+  if(unlink(table_text_name.c_str()) == -1){
+    // 删除元文件数据
+    LOG_ERROR("failed to delete table (%s) text file %s.",table_name,table_text_name.c_str());
     return RC::IOERR_UNLINK;
   }
 
