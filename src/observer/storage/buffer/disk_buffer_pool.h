@@ -348,7 +348,6 @@ public:
    * @param bp buffer pool 对象
    */
   RC get_buffer_pool(int32_t id, DiskBufferPool *&bp);
- static void set_instance(BufferPoolManager*bpm);
  static BufferPoolManager&instance();
 
 private:

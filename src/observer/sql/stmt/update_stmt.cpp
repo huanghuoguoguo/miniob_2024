@@ -52,14 +52,11 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
 
   binder_context.add_table(table);
 
-
-
-
   // 创建表达式绑定器并执行绑定操作
   vector<unique_ptr<Expression>> bound_expressions;
   ExpressionBinder               expression_binder(binder_context);
   rc = expression_binder.bind_condition_expression(update_sql.set_expression);
-  if(OB_FAIL(rc)) {
+  if (OB_FAIL(rc)) {
     return rc;
   }
 
@@ -95,10 +92,11 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
     }
 
     // 构造ComparisonExpr
-    ComparisonExpr *set_e = new ComparisonExpr(
-        EQUAL_TO, std::unique_ptr<Expression>(node.left_expr),std::unique_ptr<Expression>(node.right_expr));
+    ComparisonExpr * set_e = new ComparisonExpr(EQUAL_TO,std::unique_ptr<Expression>(node.left_expr),std::unique_ptr<Expression>(node.right_expr));
     set_exprs.push_back(set_e);
   }
+
+
 
 
   // conditions
