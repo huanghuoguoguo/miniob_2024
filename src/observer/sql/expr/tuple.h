@@ -143,9 +143,15 @@ public:
         return rc;
       }
 
-      result = this_value.compare(other_value);
-      if (0 != result) {
-        return rc;
+      // 如果两个null，返回0
+      if (this_value.is_null() && other_value.is_null())
+      {
+        result = 0;
+      }else {
+        result = this_value.compare(other_value);
+        if (0 != result) {
+          return rc;
+        }
       }
     }
 
@@ -200,15 +206,15 @@ public:
 
   RC cell_at(int index, Value &cell) const override
   {
-    RC rc = RC::SUCCESS;
     if (index < 0 || index >= static_cast<int>(speces_.size())) {
       LOG_WARN("invalid argument. index=%d", index);
       return RC::INVALID_ARGUMENT;
     }
 
     int null_index = index - table_->table_meta().sys_field_num();
-    if (null_index >= 0 && null_list[null_index]) {
-      cell.set_type(AttrType::NULL_);
+    if (null_index >= 0 && null_list[null_index])
+    {
+      cell.set_type(AttrType::UNDEFINED);
       return RC::SUCCESS;
     }
 
@@ -314,8 +320,14 @@ public:
       return RC::INTERNAL;
     }
 
-    Expression *expr = expressions_[index].get();
-    return expr->get_value(*tuple_, cell);
+    Expression* expr = expressions_[index].get();
+    RC rc = expr->get_value(*tuple_, cell);
+    if (rc == RC::DIVIDE_ZERO)
+    {
+      cell.set_type(AttrType::UNDEFINED);
+      rc = RC::SUCCESS;
+    }
+    return rc;
   }
 
   RC spec_at(int index, TupleCellSpec &spec) const override

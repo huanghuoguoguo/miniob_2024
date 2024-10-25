@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <vector>
+#include <storage/db/db.h>
 
 #include "sql/expr/expression.h"
 
@@ -32,6 +33,18 @@ public:
 
 private:
   std::vector<Table *> query_tables_;
+  Db* db_;
+
+public:
+  Db* db() const
+  {
+      return db_;
+  }
+
+  void db(Db* db)
+  {
+      db_ = db;
+  }
 };
 
 /**
@@ -65,7 +78,8 @@ private:
       std::unique_ptr<Expression> &arithmetic_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
   RC bind_aggregate_expression(
       std::unique_ptr<Expression> &aggregate_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
-
+    RC bind_sub_expression(
+          std::unique_ptr<Expression> &sub_query_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
 
 private:
   BinderContext &context_;

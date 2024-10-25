@@ -82,6 +82,11 @@ private:
     } else {
       rc = expression->try_get_value(value);
     }
+    if (rc == RC::DIVIDE_ZERO)
+    {
+      value.set_type(AttrType::UNDEFINED);
+      rc = RC::SUCCESS;
+    }
     return rc;
   }
 

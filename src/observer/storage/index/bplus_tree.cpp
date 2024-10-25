@@ -793,6 +793,135 @@ RC BplusTreeHandler::sync()
   }
   return disk_buffer_pool_->flush_all_pages();
 }
+RC BplusTreeHandler::create(LogHandler &log_handler,BufferPoolManager &bpm,const char *file_name, std::vector<const FieldMeta *> field_meta, int internal_max_size,
+    int leaf_max_size)
+{
+
+  // 创建文件。
+  RC rc = bpm.create_file(file_name);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to create file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  LOG_INFO("Successfully create index file:%s", file_name);
+
+  DiskBufferPool *bp = nullptr;
+  rc = bpm.open_file(log_handler,file_name, bp);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
+    return rc;
+  }
+  LOG_INFO("Successfully open index file %s.", file_name);
+  rc = this->create(log_handler, *bp, field_meta, internal_max_size, leaf_max_size);
+  if (OB_FAIL(rc)) {
+    bpm.close_file(file_name);
+    return rc;
+  }
+
+  LOG_INFO("Successfully create index file %s.", file_name);
+  return rc;
+
+}
+
+RC BplusTreeHandler::create(LogHandler &log_handler,
+            DiskBufferPool &buffer_pool,
+            std::vector<const FieldMeta *> field_meta,
+            int internal_max_size /* = -1 */,
+            int leaf_max_size /* = -1 */)
+{
+  // 收集需要创建索引的字段长度。
+  int attr_length = 0;
+  std::vector<int> attr_lengths;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_length += field_tmp->len();
+    attr_lengths.push_back(field_tmp->len());
+  }
+
+  if (internal_max_size < 0) {
+    internal_max_size = calc_internal_page_capacity(attr_length);
+  }
+  if (leaf_max_size < 0) {
+    leaf_max_size = calc_leaf_page_capacity(attr_length);
+  }
+
+  log_handler_      = &log_handler;
+  disk_buffer_pool_ = &buffer_pool;
+
+  RC rc = RC::SUCCESS;
+
+  BplusTreeMiniTransaction mtr(*this, &rc);
+
+  Frame *header_frame = nullptr;
+
+  rc = mtr.latch_memo().allocate_page(header_frame);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to allocate header page for bplus tree. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  if (header_frame->page_num() != FIRST_INDEX_PAGE) {
+    LOG_WARN("header page num should be %d but got %d. is it a new file",
+             FIRST_INDEX_PAGE, header_frame->page_num());
+    return RC::INTERNAL;
+  }
+
+  char            *pdata         = header_frame->data();
+  IndexFileHeader *file_header   = (IndexFileHeader *)pdata;
+  file_header->attr_length       = attr_length;
+  file_header->key_length        = attr_length + sizeof(RID);
+  // 原来是单类型，现在可能需要多类型？怎么做呢？
+  if(field_meta.size() == 2) {
+    file_header->attr_type = field_meta.back()->type();
+  }else {
+    // 存储指针。
+    file_header->attr_type = AttrType::CHARS;
+  }
+
+  vector<AttrType> attr_types;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_types.push_back(field_tmp->type());
+  }
+
+  file_header->internal_max_size = internal_max_size;
+  file_header->leaf_max_size     = leaf_max_size;
+  file_header->root_page         = BP_INVALID_PAGE_NUM;
+
+  // 取消记录日志的原因请参考下面的sync调用的地方。
+  // mtr.logger().init_header_page(header_frame, *file_header);
+
+  header_frame->mark_dirty();
+
+  memcpy(&file_header_, pdata, sizeof(file_header_));
+  header_dirty_ = false;
+
+  mem_pool_item_ = make_unique<common::MemPoolItem>("b+tree");
+  if (mem_pool_item_->init(file_header->key_length) < 0) {
+    LOG_WARN("Failed to init memory pool for index");
+    close();
+    return RC::NOMEM;
+  }
+
+  key_comparator_.init(attr_types, attr_lengths);
+  key_comparator_.init(file_header_.attr_type, file_header_.key_length);
+  key_printer_.init(attr_types, attr_lengths);
+  key_printer_.init(file_header_.attr_type, file_header_.key_length);
+
+  /*
+  虽然我们针对B+树记录了WAL，但是我们记录的都是逻辑日志，并没有记录某个页面如何修改的物理日志。
+  在做恢复时，必须先创建出来一个tree handler对象。但是如果元数据页面不正确的话，我们无法创建一个正确的tree handler对象。
+  因此这里取消第一次元数据页面修改的WAL记录，而改用更简单的方式，直接将元数据页面刷到磁盘。
+  */
+  rc = this->sync();
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to sync index header. rc=%d:%s", rc, strrc(rc));
+    return rc;
+  }
+
+  LOG_INFO("Successfully create index");
+  return RC::SUCCESS;
+}
+
+
 
 RC BplusTreeHandler::create(LogHandler &log_handler,
                             BufferPoolManager &bpm,
@@ -1267,7 +1396,7 @@ RC BplusTreeHandler::insert_entry_into_leaf_node(BplusTreeMiniTransaction &mtr, 
   int                  insert_position = leaf_node.lookup(key_comparator_, key, &exists);
   if (exists) {
     LOG_TRACE("entry exists");
-    return RC::RECORD_DUPLICATE_KEY;
+    // return RC::RECORD_DUPLICATE_KEY;
   }
 
   if (leaf_node.size() < leaf_node.max_size()) {
@@ -1547,6 +1676,7 @@ RC BplusTreeHandler::insert_entry(const char *user_key, const RID *rid)
 RC BplusTreeHandler::get_entry(const char *user_key, int key_len, list<RID> &rids)
 {
   BplusTreeScanner scanner(*this);
+  // 初始化扫描器，找到第一个相等的位置。如果没有找到，会把frame置为空，表示未找到。
   RC rc = scanner.open(user_key, key_len, true /*left_inclusive*/, user_key, key_len, true /*right_inclusive*/);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to open scanner. rc=%s", strrc(rc));
@@ -1843,8 +1973,7 @@ RC BplusTreeScanner::open(const char *left_user_key, int left_len, bool left_inc
 
   // 校验输入的键值是否是合法范围
   if (left_user_key && right_user_key) {
-    const auto &attr_comparator = tree_handler_.key_comparator_.attr_comparator();
-    const int   result          = attr_comparator(left_user_key, right_user_key);
+    const int   result          = tree_handler_.key_comparator_.compare(left_user_key, right_user_key);
     if (result > 0 ||  // left < right
                        // left == right but is (left,right)/[left,right) or (left,right]
         (result == 0 && (left_inclusive == false || right_inclusive == false))) {
@@ -2053,8 +2182,8 @@ RC BplusTreeScanner::fix_user_key(
   }
 
   // 这里很粗暴，变长字段才需要做调整，其它默认都不需要做调整
-  assert(tree_handler_.file_header_.attr_type == AttrType::CHARS);
-  assert(strlen(user_key) >= static_cast<size_t>(key_len));
+  // assert(tree_handler_.file_header_.attr_type == AttrType::CHARS);
+  // assert(strlen(user_key) >= static_cast<size_t>(key_len));
 
   *should_inclusive = false;
 

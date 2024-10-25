@@ -15,6 +15,10 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
+#include <regex>
+#include <string>
+#include <common/type/list_type.h>
+#include <sql/operator/project_physical_operator.h>
 
 using namespace std;
 
@@ -112,6 +116,27 @@ RC CastExpr::try_get_value(Value &result) const
 
 ////////////////////////////////////////////////////////////////////////////////
 
+static void replace_all(std::string &str, const std::string &from, const std::string &to)
+{
+  if (from.empty()) {
+    return;
+  }
+  size_t pos = 0;
+  while (std::string::npos != (pos = str.find(from, pos))) {
+    str.replace(pos, from.length(), to);
+    pos += to.length();  // in case 'to' contains 'from'
+  }
+}
+static bool str_like(const Value &left, const Value &right)
+{
+  std::string raw_reg(right.data());
+  replace_all(raw_reg, "_", "[^']");
+  replace_all(raw_reg, "%", "[^']*");
+  std::regex reg(raw_reg.c_str(), std::regex_constants::ECMAScript | std::regex_constants::icase);
+  bool res = std::regex_match(left.data(), reg);
+  return res;
+}
+
 ComparisonExpr::ComparisonExpr(CompOp comp, unique_ptr<Expression> left, unique_ptr<Expression> right)
     : comp_(comp), left_(std::move(left)), right_(std::move(right))
 {}
@@ -121,10 +146,22 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   RC  rc         = RC::SUCCESS;
-  int cmp_result = left.compare(right);
+  // int cmp_result = left.compare(right);
+  int cmp_result;
+  if(comp_ < IS_NULL)
+  {
+    // 子查询的比较右值必须为1个。
+    if(right.get_list() && right.get_list()->size() > 1) {
+      return RC::SUB_QUERY_NUILTI_COLUMN;
+    }
+    cmp_result = left.compare(right);
+  }
+
   result         = false;
-  if (cmp_result == INT32_MAX)
+
+  if (cmp_result == INT32_MAX) {
     return rc;
+  }
   switch (comp_) {
     case EQUAL_TO: {
       result = (0 == cmp_result);
@@ -144,18 +181,57 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     case GREAT_THAN: {
       result = (cmp_result > 0);
     } break;
+    case LIKE_OP :{
+      result = str_like(left,right);
+    } break;
+    case NOT_LIKE_OP:{
+      result = !str_like(left,right);
+    }break;
     case IS_NULL: {
-      if (left.attr_type() == AttrType::NULL_)
+      if (left.attr_type() == AttrType::UNDEFINED)
         result = true;
       else
         result = false;
     }
     break;
     case IS_NOT_NULL: {
-      if (left.attr_type() != AttrType::NULL_)
+      if (left.attr_type() != AttrType::UNDEFINED)
         result = true;
       else
         result = false;
+    }
+    break;
+    case IN_: {
+      if (right.attr_type() == AttrType::UNDEFINED && right.get_list()) {
+        std::vector<Value *> *values = right.get_list();
+        for (auto &v : *values) {
+          if (0 == left.compare(*v)) {
+            result = true;
+            return rc;
+          }
+        }
+        // 比较值
+      } else {
+        // right是值，直接比较值是否相等。
+        result = (0 == left.compare(right));
+      }
+    }
+    break;
+    case NOT_IN: {
+      if (right.attr_type() == AttrType::UNDEFINED && right.get_list()) {
+        std::vector<Value *> *values = right.get_list();
+        for (auto &v : *values) {
+          if (0 == left.compare(*v)) {
+            result = false;
+            return rc;
+          }
+        }
+        result = true;
+        // 比较值
+      } else {
+        // right是值，直接比较值是否相等。
+        result = (0 != left.compare(right));
+      }
     }
     break;
     default: {
@@ -573,6 +649,23 @@ unique_ptr<Aggregator> AggregateExpr::create_aggregator() const
       aggregator = make_unique<SumAggregator>();
       break;
     }
+    case Type::MAX: {
+      aggregator = make_unique<MaxAggregator>();
+      break;
+    }case Type::MIN: {
+      aggregator = make_unique<MinAggregator>();
+      break;
+    }case Type::COUNT: {
+      aggregator = make_unique<CountAggregator>();
+      if (this->child()->type() == ExprType::VALUE) {
+        aggregator->setNullable(true);
+      }
+      break;
+    }case Type::AVG: {
+      aggregator = make_unique<AvgAggregator>();
+      break;
+    }
+
     default: {
       ASSERT(false, "unsupported aggregate type");
       break;
@@ -603,4 +696,107 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
     rc = RC::INVALID_ARGUMENT;
   }
   return rc;
+}
+
+RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  list_type_->get_value(value);
+  return RC::SUCCESS;
+}
+
+RC SubQueryExpr::open(Trx* trx)
+{
+  RC rc = RC::SUCCESS;
+  if (project_phy_op_) {
+    rc = project_phy_op_->open(trx);
+    // 首次运行将子查询的结果获取。
+    if (list_type_ == nullptr) {
+      this->list_type_                        = new ListType();
+      ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
+      if (project_phy_op->cell_num() > 1) {
+        project_phy_op->close();
+        return RC::SUB_QUERY_ERROR;
+      }
+      while (OB_SUCC(rc = project_phy_op->next())) {
+        Tuple *tuple = project_phy_op->current_tuple();
+        if (nullptr == tuple) {
+          LOG_WARN("failed to get current record: %s", strrc(rc));
+          return rc;
+        }
+        this->tuples_.emplace_back(tuple);
+        Value *value = new Value();
+        rc           = tuple->cell_at(0, *value);
+        if(OB_FAIL(rc)) {
+          return rc;
+        }
+        if(!list_type_->count(value)) {
+          list_type_->add(value);
+        }
+      }
+      if (this->list_type_->empty()) {
+        // 如果没有，提供默认null值。
+        this->list_type_->add(new Value());
+      }
+    }
+  } else {
+    // 如果是值类型，在expression_binder中就绑定了。
+    if (list_type_ == nullptr) {
+      this->list_type_ = new ListType();
+      list_type_->add(new Value());
+    }
+  }
+  return rc;
+}
+RC  SubQueryExpr::close()
+{
+  RC rc = RC::SUCCESS;
+  if(project_phy_op_) {
+    rc = project_phy_op_->close();
+  }
+  return rc;
+}
+
+RC SubQueryExpr::check(CompOp op)
+{
+  switch (op) {
+    case EQUAL_TO:    ///< "="
+    case LESS_EQUAL:  ///< "<="
+    case NOT_EQUAL:   ///< "<>"
+    case LESS_THAN:   ///< "<"
+    case GREAT_EQUAL: ///< ">="
+    case GREAT_THAN:  ///< ">"
+    {
+      if (list_type_ != nullptr && list_type_->size() != 1) {
+        return RC::SUB_QUERY_NUILTI_VALUE;
+      }
+      if (project_phy_op_ != nullptr && project_phy_op_->select_size() != 1) {
+        return RC::SUB_QUERY_NUILTI_COLUMN;
+      }
+    }
+    break;
+    case IN_:
+    case NOT_IN: {
+      if (project_phy_op_ != nullptr && project_phy_op_->select_size() != 1) {
+        return RC::SUB_QUERY_NUILTI_COLUMN;
+      }
+    }
+    break;
+    default: return RC::SUCCESS;
+  }
+  return RC::SUCCESS;
+}
+
+bool SubQueryExpr::is_single_value() const
+{
+  if (list_type_->size() == 1) {
+    return true;
+  }
+  return false;
+}
+bool SubQueryExpr::is_single_tuple() const
+{
+  if (tuples_.size() > 1) {
+    return false;
+  }
+  return true;
 }

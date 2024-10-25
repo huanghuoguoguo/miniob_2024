@@ -12,13 +12,16 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/sstream.h"
 #include "common/log/log.h"
 #include "common/type/float_type.h"
+
+#include <cmath>
+
 #include "common/value.h"
 #include "common/lang/limits.h"
 #include "common/value.h"
 
 int FloatType::compare(const Value &left, const Value &right) const
 {
-  if (right.is_null())
+  if (right.is_null() || left.get_float() == numeric_limits<float>::max() || right.get_float() == numeric_limits<float>::max())
     return INT32_MAX;
   ASSERT(left.attr_type() == AttrType::FLOATS, "left type is not integer");
   ASSERT(right.attr_type() == AttrType::INTS || right.attr_type() == AttrType::FLOATS, "right type is not numeric");
@@ -82,7 +85,7 @@ RC FloatType::cast_to(const Value &val, AttrType type, Value &result) const
       result.set_string(std::to_string(val.get_int()).c_str());
     break;
     case AttrType::INTS:
-      result.set_int(static_cast<int>(val.get_float()));
+      result.set_int(static_cast<int>(std::round(val.get_float())));
     break;
     default: return RC::UNIMPLEMENTED;
   }

@@ -52,8 +52,13 @@ enum CompOp
     LESS_THAN, ///< "<"
     GREAT_EQUAL, ///< ">="
     GREAT_THAN, ///< ">"
+    /// 在这之前的都走默认比较器。
     IS_NULL, ///< is null
     IS_NOT_NULL, ///< is not null
+    LIKE_OP, ///< "like"
+    NOT_LIKE_OP, ///< "not like"
+    IN_,
+    NOT_IN,
     NO_OP,
 };
 
@@ -102,6 +107,7 @@ struct SelectSqlNode
   std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>                 join_list;   ///< join节点
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
+  std::vector<ConditionSqlNode>            group_by_having;     ///< group by having clause
 };
 
 
@@ -151,8 +157,7 @@ struct DeleteSqlNode
 struct UpdateSqlNode
 {
   std::string                   relation_name;   ///< Relation to update
-  std::string                   attribute_name;  ///< 更新的字段，仅支持一个字段
-  Value                         value;           ///< 更新的值，仅支持一个字段
+  std::vector<ConditionSqlNode> set_expression; ///< 要插入的值
   std::vector<ConditionSqlNode> conditions;
 };
 
@@ -198,9 +203,10 @@ struct DropTableSqlNode
  */
 struct CreateIndexSqlNode
 {
-  std::string index_name;      ///< Index name
-  std::string relation_name;   ///< Relation name
-  std::string attribute_name;  ///< Attribute name
+    std::string index_name; ///< Index name
+    std::string relation_name;   ///< Relation name
+    bool unique;
+    std::vector<std::unique_ptr<Expression>> columns;
 };
 
 /**

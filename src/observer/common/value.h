@@ -19,7 +19,6 @@ See the Mulan PSL v2 for more details. */
 #include "common/type/attr_type.h"
 #include "common/type/data_type.h"
 
-
 /**
  * @brief 属性的值
  * @ingroup DataType
@@ -38,10 +37,11 @@ public:
   friend class DateType;
   friend class TextType;
   friend class VectorType;
+  friend class ListType;
 
   Value()
   {
-    this->attr_type_ = AttrType::NULL_;
+    this->attr_type_ = AttrType::UNDEFINED;
   };
 
   ~Value() { reset(); }
@@ -99,6 +99,7 @@ public:
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
+  void set_list(vector<Value*>* list) { this->values_ = list; }
 
   string to_string() const;
 
@@ -121,6 +122,7 @@ public:
   bool   is_null() const;
   int64_t get_text() const;
 
+  vector<Value*> *get_list() const;
 
 private:
   void set_int(int val);
@@ -131,6 +133,7 @@ private:
 private:
   AttrType attr_type_ = AttrType::UNDEFINED;
   int      length_    = 0;
+  vector<Value*> *values_ = nullptr;
 
   union Val
   {

@@ -135,8 +135,8 @@ void Value::set_data(char *data, int length)
       value_.long_value_ = *(int64_t *)data;
       length_ = length;
     } break;
-    case AttrType::NULL_: {
-
+    case AttrType::UNDEFINED: {
+      set_type(AttrType::UNDEFINED);
     } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
@@ -222,6 +222,11 @@ void Value::set_value(const Value &value)
     case AttrType::TEXTS: {
       set_text(value.get_text());
     }
+    case AttrType::UNDEFINED: {
+      // null
+      set_type(AttrType::UNDEFINED);
+    }
+    break;
     default: {
       ASSERT(false, "got an invalid value type");
     } break;
@@ -244,7 +249,7 @@ const char *Value::data() const
     case AttrType::CHARS: {
       return value_.pointer_value_;
     } break;
-    case AttrType::NULL_: {
+    case AttrType::UNDEFINED: {
       return nullptr;
     } break;
     default: {
@@ -333,6 +338,13 @@ int64_t Value::get_text() const
 
 string Value::get_string() const { return this->to_string(); }
 bool Value::is_null() const { return this->attr_type_ == AttrType::NULL_; }
+string           Value::get_string() const { return this->to_string(); }
+bool             Value::is_null() const { return this->attr_type_ == AttrType::UNDEFINED; }
+vector<Value *> *Value::get_list() const
+{
+  return this->values_;
+}
+
 
 bool Value::get_boolean() const
 {

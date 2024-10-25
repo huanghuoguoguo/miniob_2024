@@ -119,6 +119,8 @@ INFILE                                  RETURN_TOKEN(INFILE);
 EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
 GROUP                                   RETURN_TOKEN(GROUP);
 BY                                      RETURN_TOKEN(BY);
+NOT                                     RETURN_TOKEN(NOT);
+LIKE                                    RETURN_TOKEN(LIKE);
 STORAGE                                 RETURN_TOKEN(STORAGE);
 FORMAT                                  RETURN_TOKEN(FORMAT);
 JOIN                                    RETURN_TOKEN(JOIN);
@@ -130,6 +132,9 @@ NULL                                    RETURN_TOKEN(NULL_);
 NULLABLE                                RETURN_TOKEN(NULLABLE);
 IS                                      RETURN_TOKEN(IS);
 NOT                                     RETURN_TOKEN(NOT);
+HAVING                                  RETURN_TOKEN(HAVING);
+IN                                      RETURN_TOKEN(IN);
+UNIQUE                                  RETURN_TOKEN(UNIQUE);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);

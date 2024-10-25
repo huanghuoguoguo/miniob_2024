@@ -123,8 +123,12 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         IS
         NOT
+        LIKE
         NULL_
         NULLABLE
+        HAVING
+        IN
+        UNIQUE
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -166,9 +170,12 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
 %type <condition_list>      where
+%type <string>              aggre_type
+%type <expression_list>     aggre_list
 %type <join_list>           join_list
 %type <join>                join
 %type <condition_list>      condition_list
+%type <condition_list>      having_condition
 %type <string>              storage_format
 %type <relation_list>       rel_list
 %type <expression>          expression
@@ -289,18 +296,30 @@ desc_table_stmt:
     }
     ;
 
+
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE INDEX ID ON ID LBRACE expression_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $3;
       create_index.relation_name = $5;
-      create_index.attribute_name = $7;
+      create_index.unique = false;
+      create_index.columns.swap(*$7);
       free($3);
       free($5);
-      free($7);
     }
+    | CREATE UNIQUE INDEX ID ON ID LBRACE expression_list RBRACE
+     {
+       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+       CreateIndexSqlNode &create_index = $$->create_index;
+       create_index.index_name = $4;
+       create_index.relation_name = $6;
+       create_index.unique = true;
+       create_index.columns.swap(*$8);
+       free($4);
+       free($6);
+     }
     ;
 
 drop_index_stmt:      /*drop index 语句的语法解析树*/
@@ -360,7 +379,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = $4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type
@@ -369,7 +388,7 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
-      $$->nullable = true;
+      $$->nullable = false;
       free($1);
     }
     | ID type LBRACE number RBRACE NOT NULL_
@@ -381,6 +400,15 @@ attr_def:
       $$->nullable = false;
       free($1);
     }
+    | ID type LBRACE number RBRACE NULL_
+        {
+          $$ = new AttrInfoSqlNode;
+          $$->type = (AttrType)$2;
+          $$->name = $1;
+          $$->length = $4;
+          $$->nullable = true;
+          free($1);
+        }
     | ID type LBRACE number RBRACE NULLABLE
     {
       $$ = new AttrInfoSqlNode;
@@ -400,6 +428,15 @@ attr_def:
       free($1);
     }
     | ID type NULLABLE
+    {
+      $$ = new AttrInfoSqlNode;
+      $$->type = (AttrType)$2;
+      $$->name = $1;
+      $$->length = 4;
+      $$->nullable = true;
+      free($1);
+    }
+    | ID type NULL_
     {
       $$ = new AttrInfoSqlNode;
       $$->type = (AttrType)$2;
@@ -495,22 +532,20 @@ delete_stmt:    /*  delete 语句的语法解析树*/
     }
     ;
 update_stmt:      /*  update 语句的语法解析树*/
-    UPDATE ID SET ID EQ value where 
+    UPDATE ID SET condition_list where
     {
       $$ = new ParsedSqlNode(SCF_UPDATE);
       $$->update.relation_name = $2;
-      $$->update.attribute_name = $4;
-      $$->update.value = *$6;
-      if ($7 != nullptr) {
-        $$->update.conditions.swap(*$7);
-        delete $7;
+      $$->update.set_expression.swap(*$4);
+      if ($5 != nullptr) {
+        $$->update.conditions.swap(*$5);
+        delete $5;
       }
       free($2);
-      free($4);
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by
+    SELECT expression_list FROM rel_list join_list where group_by having_condition
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -535,6 +570,11 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($7 != nullptr) {
         $$->selection.group_by.swap(*$7);
         delete $7;
+      }
+
+      if ($8 != nullptr) {
+        $$->selection.group_by_having.swap(*$8);
+        delete $8;
       }
     }
     ;
@@ -594,8 +634,31 @@ expression_list:
       $$->emplace($$->begin(), $1);
     }
     ;
+aggre_type:
+    ID { $$ = $1; }
+    ;
+aggre_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | expression_list {
+        $$ = $1;
+    }
 expression:
-    expression '+' expression {
+    aggre_type LBRACE aggre_list RBRACE {
+      $$ = nullptr;
+      if ($3 != nullptr) {
+        if($3->size() == 1){
+            $$ = create_aggregate_expression($1, $3->front().release(), sql_string, &@$);
+        } else {
+            $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+        }
+      }else{
+        $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+      }
+    }
+    | expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
     | expression '-' expression {
@@ -627,6 +690,12 @@ expression:
     }
     | '*' {
       $$ = new StarExpr();
+    }
+    | select_stmt {
+      $$ = new SubQueryExpr(&($1->selection));
+    }
+    | LBRACE expression_list RBRACE {
+      $$ = new SubQueryExpr($2);
     }
     ;
 
@@ -692,6 +761,11 @@ condition_list:
       $$->emplace_back(*$1);
       delete $1;
     }
+    | condition COMMA condition_list{
+        $$ = $3;
+        $$->emplace_back(*$1);
+        delete $1;
+    }
     ;
 condition:
     expression comp_op expression
@@ -701,20 +775,6 @@ condition:
       $$->right_expr = $3;
       $$->comp = $2;
     }
-    | expression IS expression
-    {
-       $$ = new ConditionSqlNode;
-       $$->left_expr = $1;
-       $$->right_expr = $3;
-       $$->comp = IS_NULL;
-    }
-     | expression IS NOT expression
-    {
-        $$ = new ConditionSqlNode;
-        $$->left_expr = $1;
-        $$->right_expr = $4;
-        $$->comp = IS_NOT_NULL;
-     }
     ;
 
 comp_op:
@@ -724,6 +784,12 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | LIKE {$$ = LIKE_OP; }
+    | NOT LIKE {$$ = NOT_LIKE_OP; }
+    | IS {  $$ = IS_NULL;}
+    | IS NOT {  $$ = IS_NOT_NULL;}
+    | IN {  $$ = IN_;}
+    | NOT IN {  $$ = NOT_IN;}
     ;
 
 // your code here
@@ -731,6 +797,18 @@ group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY expression_list {
+      $$ = $3;
+    }
+    ;
+having_condition:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING condition_list {
+      $$ = $2;
     }
     ;
 load_data_stmt:

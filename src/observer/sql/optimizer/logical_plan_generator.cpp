@@ -165,6 +165,21 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
     last_oper = &group_by_oper;
   }
 
+  // 添加可能存在的having。
+  unique_ptr<LogicalOperator> having_predicate_oper;
+  rc = create_plan(select_stmt->having_filter_stmt(), having_predicate_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create predicate logical plan. rc=%s", strrc(rc));
+    return rc;
+  }
+  if (having_predicate_oper) {
+    if (*last_oper) {
+      having_predicate_oper->add_child(std::move(*last_oper));
+    }
+
+    last_oper = &having_predicate_oper;
+  }
+
   auto project_oper = make_unique<ProjectLogicalOperator>(std::move(select_stmt->query_expressions()));
   if (*last_oper) {
     project_oper->add_child(std::move(*last_oper));
@@ -189,6 +204,20 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     table_oper = std::move(table_get_oper);
   }
 
+  // 处理可能存在的子查询。
+  std::vector<ComparisonExpr *> set_exprs = update_stmt->set_values();
+  for (auto &set_expr : set_exprs) {
+    auto expression = set_expr->right().get();
+    if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
+      auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
+      if(sub_query_expr->select_stmt() != nullptr) {
+        unique_ptr<LogicalOperator> sub_oper(nullptr);
+        create_plan(sub_query_expr->select_stmt(), sub_oper);
+        sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
+      }
+    }
+  }
+
   unique_ptr<LogicalOperator> predicate_oper;
 
   RC rc = create_plan(update_stmt->filter_stmt(), predicate_oper);
@@ -204,9 +233,8 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     }
     last_oper = &predicate_oper;
   }
-  std::unique_ptr<ComparisonExpr>& expression = update_stmt->getComparisonExpr();
 
-  auto update_oper = make_unique<UpdateLogicalOperator>(table,expression);
+  auto update_oper = make_unique<UpdateLogicalOperator>(table, set_exprs);
   if (*last_oper) {
     update_oper->add_child(std::move(*last_oper));
   }
@@ -219,12 +247,15 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
 RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<LogicalOperator> &logical_operator)
 {
   RC                                  rc = RC::SUCCESS;
+  if (filter_stmt == nullptr) {
+    return rc;
+  }
   std::vector<unique_ptr<Expression>> cmp_exprs;
   const std::vector<FilterUnit *>    &filter_units = filter_stmt->filter_units();
   for (FilterUnit *filter_unit : filter_units) {
     std::unique_ptr<Expression>             left       = std::move(filter_unit->left());
     std::unique_ptr<Expression>             right       = std::move(filter_unit->right());
-    if (left->value_type() != AttrType::NULL_ && right->value_type() != AttrType::NULL_) {
+    if (left->value_type() != AttrType::UNDEFINED && right->value_type() != AttrType::UNDEFINED) {
       if (left->value_type() != right->value_type()) {
         auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
         auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
@@ -262,6 +293,24 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
           LOG_WARN("unsupported cast from %s to %s", attr_type_to_string(left->value_type()), attr_type_to_string(right->value_type()));
           return rc;
         }
+      }
+    }
+
+    // 如果是子查询。将其转换为逻辑计划。
+    if(left->type()==ExprType::SUB_QUERY) {
+      auto                        sub_query_expr = static_cast<SubQueryExpr*>(left.get());
+      if(sub_query_expr->select_stmt() != nullptr) {
+        unique_ptr<LogicalOperator> sub_oper(nullptr);
+        create_plan(sub_query_expr->select_stmt(), sub_oper);
+        sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
+      }
+    }
+    if(right->type()==ExprType::SUB_QUERY) {
+      auto                        sub_query_expr = static_cast<SubQueryExpr*>(right.get());
+      if(sub_query_expr->select_stmt() != nullptr) {
+        unique_ptr<LogicalOperator> sub_oper(nullptr);
+        create_plan(sub_query_expr->select_stmt(), sub_oper);
+        sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
       }
     }
 
@@ -404,6 +453,22 @@ RC LogicalPlanGenerator::create_group_by_plan(SelectStmt *select_stmt, unique_pt
   // collect all aggregate expressions
   for (unique_ptr<Expression> &expression : query_expressions) {
     collector(expression);
+  }
+
+  FilterStmt * having_filter_stmt = select_stmt->having_filter_stmt();
+  // 将having中的条件收集。
+  if (having_filter_stmt) {
+    auto &filter_units = having_filter_stmt->filter_units();
+    for (auto &filter_unit : filter_units) {
+      std::unique_ptr<Expression> &left = filter_unit->left();
+      bind_group_by_expr(left);
+      find_unbound_column(left);
+      collector(left);
+      std::unique_ptr<Expression> &right = filter_unit->right();
+      bind_group_by_expr(right);
+      find_unbound_column(right);
+      collector(right);
+    }
   }
 
   if (group_by_expressions.empty() && aggregate_expressions.empty()) {

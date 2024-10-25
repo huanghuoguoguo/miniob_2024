@@ -48,7 +48,11 @@ FieldMeta::FieldMeta(const char *name, AttrType attr_type, int attr_offset, int 
   [[maybe_unused]] RC rc = this->init(name, attr_type, attr_offset, attr_len, visible, field_id, true);
   ASSERT(rc == RC::SUCCESS, "failed to init field meta. rc=%s", strrc(rc));
 }
-
+FieldMeta::FieldMeta(const FieldMeta &other)
+{
+  [[maybe_unused]] RC rc = this->init(other.name_.c_str(), other.attr_type_, other.attr_offset_, other.attr_len_, other.visible_, other.field_id_, other.nullable_);
+  ASSERT(rc == RC::SUCCESS, "failed to init field meta. rc=%s", strrc(rc));
+}
 RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id)
 {
   return this->init(name, attr_type, attr_offset, attr_len, visible, field_id, true);

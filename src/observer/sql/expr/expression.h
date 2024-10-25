@@ -16,13 +16,19 @@ See the Mulan PSL v2 for more details. */
 
 #include <memory>
 #include <string>
+#include <common/type/list_type.h>
+#include <sql/stmt/select_stmt.h>
+
 
 #include "common/value.h"
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
 #include "storage/common/chunk.h"
 
+class ProjectPhysicalOperator;
+class ProjectLogicalOperator;
 class Tuple;
+class ListType;
 
 /**
  * @defgroup Expression
@@ -39,7 +45,7 @@ enum class ExprType
   STAR,                 ///< 星号，表示所有字段
   UNBOUND_FIELD,        ///< 未绑定的字段，需要在resolver阶段解析为FieldExpr
   UNBOUND_AGGREGATION,  ///< 未绑定的聚合函数，需要在resolver阶段解析为AggregateExpr
-
+  SUB_QUERY,    ///< 子查询表达式
   FIELD,        ///< 字段。在实际执行时，根据行数据内容提取对应字段的值
   VALUE,        ///< 常量值
   CAST,         ///< 需要做类型转换的表达式
@@ -428,6 +434,8 @@ private:
   std::unique_ptr<Expression> child_;
 };
 
+
+
 class AggregateExpr : public Expression
 {
 public:
@@ -470,4 +478,104 @@ public:
 private:
   Type                        aggregate_type_;
   std::unique_ptr<Expression> child_;
+};
+
+/**
+ * 子查询表达式，子查询的结果是一个tuple集合。参考group by valuelist。
+ */
+class SubQueryExpr : public Expression
+{
+public:
+  SubQueryExpr(SelectSqlNode* select_sql_node)
+  {
+    select_sql_node_ = select_sql_node;
+  };
+  SubQueryExpr(std::vector<std::unique_ptr<Expression>>* values)
+  {
+    this->values_ = values;
+  }
+  virtual ~SubQueryExpr() = default;
+
+  ExprType type() const override { return ExprType::SUB_QUERY; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+  int      value_length() const override { return 0; }
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  RC open(Trx* trx);
+  RC close();
+  RC check(CompOp op);
+  bool is_single_value() const;
+  bool is_single_tuple() const;
+
+  void add_value(Value* v) const
+  {
+    if (list_type_ == nullptr)
+    {
+      list_type_ = new ListType;
+    }
+    list_type_->add(v);
+  }
+
+private:
+  SelectSqlNode* select_sql_node_ = nullptr;
+  //需要将node变成stmt
+  SelectStmt* select_stmt_ = nullptr;
+  // stmt转换为逻辑计划
+  ProjectLogicalOperator* project_logical_op_ = nullptr;
+  ProjectPhysicalOperator* project_phy_op_ = nullptr;
+
+  mutable ListType* list_type_ = nullptr;
+  std::vector<std::unique_ptr<Expression>>* values_ = nullptr;
+  std::vector<Tuple*> tuples_;
+public:
+  std::vector<std::unique_ptr<Expression>>* values() const
+  {
+    return values_;
+  }
+
+  void values(std::vector<std::unique_ptr<Expression>>* values)
+  {
+    values_ = values;
+  }
+
+  ProjectLogicalOperator* logical_op() const
+  {
+    return project_logical_op_;
+  }
+
+  void set_logical_op(ProjectLogicalOperator* project_logical_op)
+  {
+    project_logical_op_ = project_logical_op;
+  }
+
+  ProjectPhysicalOperator* phy_op() const
+  {
+    return project_phy_op_;
+  }
+
+  void set_phy_op(ProjectPhysicalOperator* project_phy_op)
+  {
+    project_phy_op_ = project_phy_op;
+  }
+
+
+
+  SelectStmt* select_stmt() const
+  {
+    return select_stmt_;
+  }
+
+  void set_select_stmt(SelectStmt* select_stmt)
+  {
+    select_stmt_ = select_stmt;
+  }
+
+  SelectSqlNode* select_sql_node() const
+  {
+    return select_sql_node_;
+  }
+
+  void set_select_sql_node(SelectSqlNode* select_sql_node)
+  {
+    select_sql_node_ = select_sql_node;
+  }
 };

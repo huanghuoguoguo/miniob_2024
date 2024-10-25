@@ -26,7 +26,6 @@ enum class AttrType
   TEXTS,    ///< 文本类型,最大65535字节
   VECTORS,   ///< 向量类型
   BOOLEANS,  ///< boolean类型，当前不是由parser解析出来的，是程序内部使用的
-  NULL_,     ///< null类型。
   MAXTYPE,   ///< 请在 UNDEFINED 与 MAXTYPE 之间增加新类型
 };
 

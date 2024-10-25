@@ -22,11 +22,15 @@ See the Mulan PSL v2 for more details. */
 #define DEFINE_RCS                       \
   DEFINE_RC(SUCCESS)                     \
   DEFINE_RC(INVALID_ARGUMENT)            \
-  DEFINE_RC(DIVIDE_ZERO)            \
+  DEFINE_RC(DIVIDE_ZERO)                 \
   DEFINE_RC(UNIMPLEMENTED)               \
   DEFINE_RC(SQL_SYNTAX)                  \
   DEFINE_RC(INTERNAL)                    \
   DEFINE_RC(NOMEM)                       \
+  DEFINE_RC(SUB_QUERY_ERROR)             \
+  DEFINE_RC(SUB_QUERY_NUILTI_COLUMN)     \
+  DEFINE_RC(SUB_QUERY_NUILTI_VALUE)      \
+  DEFINE_RC(ERR_UNIQUE_INDEX_VIOLATION)  \
   DEFINE_RC(NOTFOUND)                    \
   DEFINE_RC(EMPTY)                       \
   DEFINE_RC(FULL)                        \
