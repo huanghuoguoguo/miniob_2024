@@ -61,6 +61,8 @@ RC BplusTreeIndex::open(Table *table, const char *file_name, const IndexMeta &in
   Index::init(index_meta, field_meta);
 
   BufferPoolManager &bpm = table->db()->buffer_pool_manager();
+  index_handler_.set_field_meta(field_meta);
+  index_handler_.is_unique(index_meta.is_unique());
   RC rc = index_handler_.open(table->db()->log_handler(), bpm, file_name);
   if (RC::SUCCESS != rc) {
     LOG_WARN("Failed to open index_handler, file_name:%s, index:%s, rc:%s",
@@ -102,7 +104,7 @@ void BplusTreeIndex::execute_real_data(const char *record, const RID *rid, int &
   entry_data        = new char[total_len + sizeof(RID)];
   int   current_pos = 0;
   // get_entry
-  for (size_t i = 0; i < field_meta_.size(); ++i) {
+  for (size_t i = 1; i < field_meta_.size(); ++i) {
     auto &field_meta = field_meta_[i];
     int   offset     = field_meta->offset();
     int   len        = field_meta->len();
@@ -110,7 +112,7 @@ void BplusTreeIndex::execute_real_data(const char *record, const RID *rid, int &
     memcpy(entry_data + current_pos, record + offset, len);
     current_pos += len;
     // 检查是否为 null
-    if (nullBitset[i] == 1) {
+    if (nullBitset[field_meta->field_id()] == true) {
       // 如果第 i 位为 1，表示该字段为 null
       fieldNullBitset.set(i); // 在第二个 bitset 中标记为 null
     }

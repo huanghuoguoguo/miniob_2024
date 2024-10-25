@@ -958,7 +958,13 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
   }
 
   RC rc = RC::SUCCESS;
-
+  // 收集需要创建索引的字段长度。
+  int attr_length = 0;
+  std::vector<int> attr_lengths;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_length += field_tmp->len();
+    attr_lengths.push_back(field_tmp->len());
+  }
   Frame *frame = nullptr;
   rc           = buffer_pool.get_this_page(FIRST_INDEX_PAGE, &frame);
   if (OB_FAIL(rc)) {
@@ -978,12 +984,17 @@ RC BplusTreeHandler::open(LogHandler &log_handler, DiskBufferPool &buffer_pool)
     close();
     return RC::NOMEM;
   }
-
+  vector<AttrType> attr_types;
+  for(const FieldMeta * field_tmp: field_meta) {
+    attr_types.push_back(field_tmp->type());
+  }
   // close old page_handle
   buffer_pool.unpin_page(frame);
 
   key_comparator_.init(file_header_.attr_type, file_header_.attr_length);
   key_printer_.init(file_header_.attr_type, file_header_.attr_length);
+  key_comparator_.init(attr_types, attr_lengths, is_unique_);
+  key_printer_.init(attr_types, attr_lengths);
   LOG_INFO("Successfully open index");
   return RC::SUCCESS;
 }

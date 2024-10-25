@@ -325,7 +325,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
       rc = set_value_to_record(record_data, real_value, field);
     } else if(value.is_null()) {
       // 将bitmap对应位置置为true。
-      null_list.set(i);
+      null_list.set(field->field_id());
     } else {
       rc = set_value_to_record(record_data, value, field);
     }
@@ -610,7 +610,7 @@ RC Table::update_record(const Record &record_)
   for (Index *index : indexes_) {
     rc = index->delete_entry(origin_record.data(), &origin_record.rid());
     if (rc != RC::SUCCESS) {
-      LOG_WARN("删除索引失败。");
+      LOG_WARN("删除原来的索引失败。");
       break;
     }
     temp_indexes.push_back(index);
