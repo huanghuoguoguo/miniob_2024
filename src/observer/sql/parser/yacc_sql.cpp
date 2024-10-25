@@ -1973,7 +1973,7 @@ yyreduce:
       (yyval.attr_info)->type = (AttrType)(yyvsp[-3].number);
       (yyval.attr_info)->name = (yyvsp[-4].string);
       (yyval.attr_info)->length = (yyvsp[-1].number);
-      (yyval.attr_info)->nullable = false;
+      (yyval.attr_info)->nullable = true;
       free((yyvsp[-4].string));
     }
 #line 1980 "yacc_sql.cpp"
@@ -1986,7 +1986,7 @@ yyreduce:
       (yyval.attr_info)->type = (AttrType)(yyvsp[0].number);
       (yyval.attr_info)->name = (yyvsp[-1].string);
       (yyval.attr_info)->length = 4;
-      (yyval.attr_info)->nullable = false;
+      (yyval.attr_info)->nullable = true;
       free((yyvsp[-1].string));
     }
 #line 1993 "yacc_sql.cpp"
