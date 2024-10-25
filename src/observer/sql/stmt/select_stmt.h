@@ -48,6 +48,7 @@ public:
 
   std::vector<std::unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   std::vector<std::unique_ptr<Expression>> &group_by() { return group_by_; }
+  std::vector<std::unique_ptr<OrderBySqlNode>> &order_by() { return order_by_; }
   std::vector<std::pair<Table *, FilterStmt *>> join_filter_stmts() const {
     return join_filter_stmts_;
   }
@@ -58,5 +59,6 @@ private:
   FilterStmt                              *filter_stmt_ = nullptr;
   std::vector<std::pair<Table*,FilterStmt*>>   join_filter_stmts_;  // 小数据量，用vector即可。
   std::vector<std::unique_ptr<Expression>> group_by_;
+  std::vector<std::unique_ptr<OrderBySqlNode>> order_by_;
   FilterStmt*                              group_by_having_;
 };

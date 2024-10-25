@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/value.h"
 
 struct JoinSqlNode;
+struct OrderBySqlNode;
 class Expression;
 
 /**
@@ -89,6 +90,12 @@ struct ConditionSqlNode
     Expression* right_expr;
 };
 
+struct OrderBySqlNode
+{
+  Expression * expr = nullptr;
+  bool is_asc;// true 为升序
+};
+
 /**
  * @brief 描述一个select语句
  * @ingroup SQLParser
@@ -108,6 +115,7 @@ struct SelectSqlNode
   std::vector<JoinSqlNode>                 join_list;   ///< join节点
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
   std::vector<ConditionSqlNode>            group_by_having;     ///< group by having clause
+  std::vector<OrderBySqlNode>              order_unit_list;     ///< order_unit_list
 };
 
 
