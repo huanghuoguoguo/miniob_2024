@@ -80,10 +80,32 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   const int        value_num  = static_cast<int>(values_data->size());
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
+  const int sys_field_num = table_meta.sys_field_num();
 
   if (field_num != value_num) {
     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
     return RC::SCHEMA_FIELD_MISSING;
+  }
+
+  // check field type
+  for (int i = 0; i < value_num; i++) {
+    const FieldMeta *field_meta = table_meta.field(i+sys_field_num);
+    const AttrType field_type = field_meta->type();
+    const AttrType value_type = values[i].attr_type();
+
+    // 解决TEXT太长的问题
+    if(field_type != value_type) {
+      if (AttrType::TEXTS == field_type && AttrType::CHARS == value_type) {
+        if(MAX_TEXT_LENGTH < values[i].length()) {
+          LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535",values[i].length());
+          return RC::INVALID_ARGUMENT;
+        }
+      }else {
+        LOG_WARN("field type mismatch. table=%s, field=%s, field type=%d, value_type=%d",
+          table_name, field_meta->name(), field_type, value_type);
+        return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+      }
+    }
   }
 
   // 不能为null的值为null insert into t1 values(null)

@@ -63,7 +63,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
     return rc;
   }
 
-  std::vector<ComparisonExpr*> set_exprs;
+  std::vector<ComparisonExpr *> set_exprs;
   // 检查，不能为null的值不允许添加为null，操作符必须为=
   for (auto &node : update_sql.set_expression) {
     if (node.comp != EQUAL_TO) {
@@ -73,13 +73,20 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
       return RC::INVALID_ARGUMENT;
     }
     if (node.right_expr->type() == ExprType::VALUE) {
+      // 在这里对TEXT过长进行处理
       // 如果是值，可以继续判断，如果是子查询，延后判断。
       FieldExpr *field_expr = static_cast<FieldExpr *>(node.left_expr);
       ValueExpr *value_expr = static_cast<ValueExpr *>(node.right_expr);
       if (!field_expr->field().meta()->nullable() && value_expr->value_type() == AttrType::UNDEFINED) {
         return RC::INVALID_ARGUMENT;
       }
-    }else {
+      if (AttrType::TEXTS == field_expr->field().meta()->type() && AttrType::CHARS == value_expr->value_type()) {
+        if (MAX_TEXT_LENGTH < value_expr->value_length()) {
+          LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535",value_expr->value_length());
+          return RC::INVALID_ARGUMENT;
+        }
+      }
+    } else {
       // 如果是多列值，返回错误。
       SubQueryExpr *sub_query_expr = static_cast<SubQueryExpr *>(node.right_expr);
       if (sub_query_expr->select_stmt() != nullptr && sub_query_expr->select_stmt()->query_expressions().size() > 1) {
@@ -88,11 +95,10 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
     }
 
     // 构造ComparisonExpr
-    ComparisonExpr * set_e = new ComparisonExpr(EQUAL_TO,std::unique_ptr<Expression>(node.left_expr),std::unique_ptr<Expression>(node.right_expr));
+    ComparisonExpr *set_e = new ComparisonExpr(
+        EQUAL_TO, std::unique_ptr<Expression>(node.left_expr),std::unique_ptr<Expression>(node.right_expr));
     set_exprs.push_back(set_e);
   }
-
-
 
 
   // conditions
