@@ -169,6 +169,30 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_WARN("cannot construct filter stmt");
     return rc;
   }
+  // order
+  std::vector<std::unique_ptr<OrderBySqlNode>> order_by_expressions;
+  std::vector<std::unique_ptr<Expression>> order_by_bound_expressions; // 存储绑定后的表达式
+
+  // 遍历 `select_sql.order_unit_list` 中的每个 `OrderBySqlNode`
+  for ( auto &[expr, is_asc] : select_sql.order_unit_list) {
+    // 将原始指针转换为 unique_ptr
+    std::unique_ptr<Expression> expr_ptr(expr);
+
+    // 绑定 expression
+    RC rc = expression_binder.bind_expression(expr_ptr, order_by_bound_expressions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind order by expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    // 创建新的 OrderBySqlNode，并保留 is_asc 属性
+    auto order_by_sql_node = std::make_unique<OrderBySqlNode>();
+    order_by_sql_node->expr = order_by_bound_expressions.back().release(); // 获取绑定后的表达式并转移所有权
+    order_by_sql_node->is_asc = is_asc; // 保留 is_asc 属性
+
+    // 将新的 OrderBySqlNode 添加到 order_by_expressions 中
+    order_by_expressions.push_back(std::move(order_by_sql_node));
+  }
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
@@ -179,6 +203,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->group_by_having_ = having_filter_stmt;
   select_stmt->join_filter_stmts_.swap(join_filter_stmts);
   select_stmt->group_by_.swap(group_by_expressions);
+  select_stmt->order_by_.swap(order_by_expressions);
   stmt                      = select_stmt;
   return RC::SUCCESS;
 }

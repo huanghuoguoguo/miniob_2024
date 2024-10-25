@@ -209,7 +209,7 @@ const IndexMeta *TableMeta::find_index_by_field(const std::vector<string> field_
     auto fields = index.fields();
     // 按次序相比，每个字段都匹配上才行。
     if (fields.size() == field_names.size()) {
-      for (int i = 0; i < field_names.size(); ++i) {
+      for (int i = 0; i < static_cast<int>(field_names.size()); ++i) {
         if (field_names[i] == fields[i]) {
           return &index;
         }

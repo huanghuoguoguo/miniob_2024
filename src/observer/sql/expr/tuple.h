@@ -211,8 +211,8 @@ public:
       return RC::INVALID_ARGUMENT;
     }
 
-    int null_index = index - table_->table_meta().sys_field_num();
-    if (null_index >= 0 && null_list[null_index])
+
+    if (null_list[index])
     {
       cell.set_type(AttrType::UNDEFINED);
       return RC::SUCCESS;

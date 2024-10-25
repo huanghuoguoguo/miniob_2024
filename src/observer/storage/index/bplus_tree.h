@@ -89,18 +89,23 @@ private:
 class KeyComparator
 {
 public:
-  void init(AttrType type, int length) { attr_comparator_.init(type, length); }
+    void init(AttrType type, int length)
+    {
+        attr_comparator_.init(type, length);
+        this->is_unique = false;
+    }
 
-  void init(std::vector<AttrType>& type, std::vector<int>& length)
-  {
-      for (int i = 0; i < static_cast<int>(length.size()); ++i)
-      {
-          AttrComparator comparator{};
-          comparator.init(type.at(i), length.at(i));
-          attr_len += length.at(i);
-          attr_comparators_.push_back(comparator);
-      }
-  }
+    void init(std::vector<AttrType>& type, std::vector<int>& length, bool is_unique)
+    {
+        for (int i = 0; i < static_cast<int>(length.size()); ++i)
+        {
+            AttrComparator comparator{};
+            comparator.init(type.at(i), length.at(i));
+            attr_len += length.at(i);
+            attr_comparators_.push_back(comparator);
+        }
+        this->is_unique = is_unique;
+    }
 
   const AttrComparator &attr_comparator() const { return attr_comparator_; }
 
@@ -108,9 +113,17 @@ public:
   {
       return compare(v1, v2);
   }
-
+    // 这里如果两个记录字段一致，并且rid一致，应该返回相同。但是如果不一致但是字段相同，
   int compare(const char* v1, const char* v2) const
   {
+      // 直接判断二者是不是同一记录，是的或直接返回。
+      const RID* rid1 = (const RID*)(v1 + attr_len);
+      const RID* rid2 = (const RID*)(v2 + attr_len);
+      int compare = RID::compare(rid1, rid2);
+      if (compare == 0)
+      {
+          return 0;
+      }
       // 起始跳过null
       int cur = 4;
       // 读取前四个字节作为 null 标志
@@ -125,16 +138,25 @@ public:
       for (size_t i = 1; i < attr_comparators_.size(); ++i)
       {
           auto& comparator = attr_comparators_[i];
-          if (left_null[i - 1] == 1 || right_null[i - 1] == 1)
+          if (right_null[i] == 1 && left_null[i] == 1)
           {
-              // 只要有一方是null，就认为不相同。还需要判断二者不是同一记录。
-              const RID *rid1 = (const RID *)(v1 + attr_len);
-              const RID *rid2 = (const RID *)(v2 + attr_len);
-              int compare = RID::compare(rid1, rid2);
-              if (compare == 0)
+
+              // 如果比到最后都是null，并且二者还不是同一条记录，返回1。
+              if (i == attr_comparators_.size() - 1)
               {
-                  return compare;
+                  return 1;
               }
+              else
+              {
+                  continue;
+              }
+          }
+          if (left_null[i] == 1)
+          {
+              return 1;
+          }
+          if (right_null[i] == 1)
+          {
               return -1;
           }
           // 取对应位置进行
@@ -146,15 +168,19 @@ public:
           cur += comparator.attr_length();
       }
 
-      const RID *rid1 = (const RID *)(v1 + attr_len);
-      const RID *rid2 = (const RID *)(v2 + attr_len);
-      return  RID::compare(rid1, rid2);
+      if (is_unique)
+      {
+          // 如果没有null，并且是唯一索引，那么可以判断是不是同一个值。
+          return 0;
+      }
+      return compare;
   }
 
 private:
   std::vector<AttrComparator> attr_comparators_;
   AttrComparator attr_comparator_ = {};
     int attr_len = 0;
+    bool is_unique;
 };
 
 /**
@@ -518,14 +544,11 @@ public:
    * @param internal_max_size 内部节点最大大小
    * @param leaf_max_size 叶子节点最大大小
    */
-  RC create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name, AttrType attr_type, int attr_length,
-      int internal_max_size = -1, int leaf_max_size = -1);
-  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, AttrType attr_type, int attr_length,
-            int internal_max_size = -1, int leaf_max_size = -1);
   RC create(LogHandler& log_handler, BufferPoolManager& bpm, const char* file_name,
-            std::vector<const FieldMeta*> field_meta, int internal_max_size = -1,
+            std::vector<const FieldMeta*> field_meta, bool is_unique = false, int internal_max_size = -1,
             int leaf_max_size = -1);
-  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, std::vector<const FieldMeta *> field_meta,
+  RC create(LogHandler& log_handler, DiskBufferPool& buffer_pool, std::vector<const FieldMeta*> field_meta,
+            bool is_unique,
             int internal_max_size, int leaf_max_size);
 
   /**
@@ -704,7 +727,30 @@ protected:
   DiskBufferPool *disk_buffer_pool_ = nullptr;  /// 磁盘缓冲池
   bool            header_dirty_     = false;    /// 是否需要更新头页面
   IndexFileHeader file_header_;
+  std::vector<const FieldMeta*> field_meta;
+  bool is_unique_ = false;
 
+public:
+  std::vector<const FieldMeta*>& get_field_meta()
+  {
+      return field_meta;
+  }
+
+    void  set_field_meta(const std::vector<const FieldMeta*> &field_meta)
+  {
+      this->field_meta = field_meta;
+  }
+  bool is_unique() const
+  {
+      return is_unique_;
+  }
+
+  void is_unique(bool is_unique)
+  {
+      is_unique_ = is_unique;
+  }
+
+protected:
   // 在调整根节点时，需要加上这个锁。
   // 这个锁可以使用递归读写锁，但是这里偷懒先不改
   common::SharedMutex root_lock_;
