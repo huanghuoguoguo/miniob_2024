@@ -336,8 +336,6 @@ int64_t Value::get_text() const
   return value_.long_value_;
 }
 
-string Value::get_string() const { return this->to_string(); }
-bool Value::is_null() const { return this->attr_type_ == AttrType::NULL_; }
 string           Value::get_string() const { return this->to_string(); }
 bool             Value::is_null() const { return this->attr_type_ == AttrType::UNDEFINED; }
 vector<Value *> *Value::get_list() const

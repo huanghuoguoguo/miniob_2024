@@ -222,10 +222,10 @@ public:
     const FieldMeta *field_meta = field_expr->field().meta();
     if (AttrType::TEXTS == field_meta->type()) {
       cell.set_type(AttrType::CHARS);
-      int64_t offset = *(int64_t *)(record_->data() + field_meta->offset());
+      int64_t offset   = *(int64_t *)(record_->data() + field_meta->offset());
       int64_t length = *(int64_t *)(record_->data() + field_meta->offset() + sizeof(int64_t));
       char   *text   = (char *)malloc(length+2);
-      rc             = table_->read_text(offset, length, text);
+      RC rc = table_->read_text(offset, length, text);
       text[length + 1] = '\0';
       if (RC::SUCCESS != rc) {
         LOG_WARN("Failed to read text from table, rc=%s", strrc(rc));
