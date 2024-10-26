@@ -272,6 +272,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     std::unique_ptr<Expression>             left       = std::move(filter_unit->left());
     std::unique_ptr<Expression>             right       = std::move(filter_unit->right());
     if (left->value_type() != AttrType::UNDEFINED && right->value_type() != AttrType::UNDEFINED) {
+      if(AttrType::TEXTS==left->value_type()&&AttrType::CHARS==right->value_type()) {continue;}
       if (left->value_type() != right->value_type()) {
         auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
         auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());

@@ -107,7 +107,8 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       // 手动加入到trx数组中。
       trx_fields_.push_back(fields_[i]);
     }
-    field_offset += attr_info.length;
+    // field_offset += attr_info.length;
+    field_offset += fields_[i + trx_field_num].len(); // 修改计算偏移量field_offset的方法
   }
 
   record_size_ = field_offset;
@@ -230,7 +231,7 @@ int TableMeta::serialize(std::ostream &ss) const
   table_value[FIELD_TABLE_ID]   = table_id_;
   table_value[FIELD_TABLE_NAME] = name_;
   table_value[FIELD_STORAGE_FORMAT] = static_cast<int>(storage_format_);
-
+  Json::StreamWriterBuilder writer_;
   Json::Value fields_value;
   for (const FieldMeta &field : fields_) {
     Json::Value field_value;
