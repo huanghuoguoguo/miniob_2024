@@ -818,9 +818,11 @@ RC SubQueryExpr::open(Trx* trx)
           if(OB_FAIL(rc)) {
             return rc;
           }
-          if(!list_type_->count(value)) {
-            list_type_->add(value);
-          }
+          // if(!list_type_->count(value)) {
+          //   list_type_->add(value);
+          // }
+          // 不需要，如果是需要值的，只要返回两个value就认为错误。
+          list_type_->add(value);
         }
         if(rc == RC::RECORD_EOF) {
           rc = RC::SUCCESS;
