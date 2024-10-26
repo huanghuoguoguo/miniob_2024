@@ -32,6 +32,24 @@ Table *BinderContext::find_table(const char *table_name) const
   return *iter;
 }
 
+Table *BinderContext::find_table_by_field(const char *field_name) const
+{
+  // 先查询cur的。
+  for(auto& table : cur_tables_) {
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    if (nullptr != field_meta) {
+      return table;
+    }
+  }
+  for(auto& table : query_tables_) {
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    if (nullptr != field_meta) {
+      return table;
+    }
+  }
+  return nullptr;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions,bool is_muti)
 {
@@ -159,21 +177,14 @@ RC ExpressionBinder::bind_unbound_field_expression(
     // }
     // 循环table。应该只能找到当前table，暂时先找全部的table。
 
-    for (auto &q_table : context_.query_tables()) {
-      const std::vector<FieldMeta> * field_metas = q_table->table_meta().field_metas();
-      for (const auto &q_field : *field_metas) {
-        if (strcmp(q_field.name(), field_name) == 0) {
-          // 继续查找，如果有别的表也有该字段，返回错误。
-          if (table != nullptr) {
-            LOG_INFO("cannot determine table for field: %s", field_name);
-            return RC::SCHEMA_TABLE_NOT_EXIST;
-          }
-          table = q_table;
-        }
-      }
+    Table *find_table_by_field = context_.find_table_by_field(field_name);
+    if (find_table_by_field != nullptr) {
+      table = find_table_by_field;
+    } else {
+      table = context_.query_tables()[0];
     }
 
-    table = context_.query_tables()[0];
+
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
