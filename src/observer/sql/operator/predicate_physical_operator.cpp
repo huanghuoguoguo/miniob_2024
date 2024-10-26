@@ -141,7 +141,7 @@ RC PredicatePhysicalOperator::close()
   }
   for (auto &child : children_expr) {
     if (child->type() == ExprType::COMPARISON) {
-      auto comparison_expr = static_cast<ComparisonExpr *>(expression_.get());
+      auto comparison_expr = static_cast<ComparisonExpr *>(child);
       auto left            = comparison_expr->left().get();
       auto right           = comparison_expr->right().get();
       if (left->type() == ExprType::SUB_QUERY) {

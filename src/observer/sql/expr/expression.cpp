@@ -724,18 +724,24 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     }
     vector<PredicatePhysicalOperator *> predicates;
 
-    OperatorIterator::iterate_child_oper(project_phy_op_,
+    rc = OperatorIterator::iterate_child_oper(project_phy_op_,
         [&](PhysicalOperator *child) {
           if (child->type() == PhysicalOperatorType::PREDICATE) {
             predicates.push_back(static_cast<PredicatePhysicalOperator *>(child));
           }
           return RC::SUCCESS;
         });
+    if(rc != RC::SUCCESS) {
+      return rc;
+    }
     for(auto& p : predicates) {
       p->add_value_tuple(*const_value_tuple);
     }
 
-    project_phy_op->open(this->trx_);
+    rc = project_phy_op->open(this->trx_);
+    if(rc != RC::SUCCESS) {
+      return rc;
+    }
     while (OB_SUCC(rc = project_phy_op->next())) {
       Tuple *tuple = project_phy_op->current_tuple();
       if (nullptr == tuple) {
@@ -788,6 +794,9 @@ RC SubQueryExpr::open(Trx* trx)
     if (check_single()) {
       // 首次运行将子查询的结果获取。
       rc = project_phy_op_->open(trx);
+      if (rc != RC::SUCCESS) {
+        return rc;
+      }
       if (list_type_ == nullptr) {
         this->list_type_                        = new ListType();
         ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
@@ -815,6 +824,9 @@ RC SubQueryExpr::open(Trx* trx)
         }
         if(rc == RC::RECORD_EOF) {
           rc = RC::SUCCESS;
+        }
+        if(rc != RC::SUCCESS) {
+          return rc;
         }
         if (this->list_type_->empty()) {
           // 如果没有，提供默认null值。
