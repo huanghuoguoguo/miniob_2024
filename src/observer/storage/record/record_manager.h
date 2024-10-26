@@ -299,7 +299,6 @@ public:
   virtual RC get_record(const RID &rid, Record &record) override;
 };
 
-
 /**
  * @brief 负责处理 PAX 存储格式的页面中各种操作
  * @ingroup RecordManager
@@ -350,7 +349,6 @@ private:
   // get the field length by `column id`, all columns are fixed length.
   int get_field_len(int col_id);
 };
-
 /**
  * @brief 管理整个文件中记录的增删改查
  * @ingroup RecordManager

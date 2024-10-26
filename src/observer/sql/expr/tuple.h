@@ -239,7 +239,7 @@ public:
         return rc;
       }
       cell.set_data(text, length);
-      // free(text);
+      free(text);
     } else {
       cell.set_type(field_meta->type());
       cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
