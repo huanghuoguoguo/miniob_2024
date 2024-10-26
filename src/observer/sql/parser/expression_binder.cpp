@@ -153,9 +153,24 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
-    if (context_.query_tables().size() != 1) {
-      LOG_INFO("cannot determine table for field: %s", field_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+    // if (context_.query_tables().size() != 1) {
+    //   LOG_INFO("cannot determine table for field: %s", field_name);
+    //   return RC::SCHEMA_TABLE_NOT_EXIST;
+    // }
+    // 循环table。应该只能找到当前table，暂时先找全部的table。
+
+    for (auto &q_table : context_.query_tables()) {
+      const std::vector<FieldMeta> * field_metas = q_table->table_meta().field_metas();
+      for (const auto &q_field : *field_metas) {
+        if (strcmp(q_field.name(), field_name) == 0) {
+          // 继续查找，如果有别的表也有该字段，返回错误。
+          if (table != nullptr) {
+            LOG_INFO("cannot determine table for field: %s", field_name);
+            return RC::SCHEMA_TABLE_NOT_EXIST;
+          }
+          table = q_table;
+        }
+      }
     }
 
     table = context_.query_tables()[0];
@@ -525,6 +540,8 @@ RC ExpressionBinder::bind_sub_expression(
   Stmt *stmt = nullptr;
   SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
   if(sub_query_expr->select_sql_node() != nullptr) {
+    // 如果存在sqlnode。
+    sub_query_expr->select_sql_node()->binder_context = &this->context_;
     rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
     sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
   } else {

@@ -91,6 +91,10 @@ public:
 
   std::vector<std::unique_ptr<PhysicalOperator>> &children() { return children_; }
 
+  void add_value_tuple(const ValueListTuple& value_list_tuple) { values_.push_back(value_list_tuple); }
+  void clear_tuple() { values_.clear(); }
+
 protected:
   std::vector<std::unique_ptr<PhysicalOperator>> children_;
+  std::vector<ValueListTuple> values_;
 };

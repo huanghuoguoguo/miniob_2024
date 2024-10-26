@@ -29,7 +29,7 @@ public:
 
   Table *find_table(const char *table_name) const;
 
-  const std::vector<Table *> &query_tables() const { return query_tables_; }
+  std::vector<Table *> &query_tables() { return query_tables_; }
 
 private:
   std::vector<Table *> query_tables_;
