@@ -108,6 +108,7 @@ RC PredicatePhysicalOperator::next()
 
 
     Value value;
+    // LOG_WARN("get a tuple: %s", tuple->to_string().c_str());
     rc = expression_->get_value(*tuple, value);
     if(rc == RC::DIVIDE_ZERO) {
       continue;
@@ -126,23 +127,38 @@ RC PredicatePhysicalOperator::next()
 RC PredicatePhysicalOperator::close()
 {
   children_[0]->close();
+  std::vector<Expression*> children_expr;
+
   if (expression_->type() == ExprType::COMPARISON) {
-    auto comparison_expr = static_cast<ComparisonExpr *>(expression_.get());
-    auto left            = comparison_expr->left().get();
-    auto right           = comparison_expr->right().get();
-    if (left->type() == ExprType::SUB_QUERY) {
-      SubQueryExpr *left_sub_query_expr = static_cast<SubQueryExpr *>(left);
-      if (left_sub_query_expr->phy_op() != nullptr) {
-        left_sub_query_expr->phy_op()->close();
-      }
+    children_expr.push_back(expression_.get());
+  }
+  else if(expression_->type() == ExprType::CONJUNCTION) {
+    auto                                             conjunction_expr = static_cast<ConjunctionExpr *>(expression_.get());
+    std::vector<std::unique_ptr<Expression>>& children         = conjunction_expr->children();
+    for(auto& child : children) {
+      children_expr.push_back(child.get());
     }
-    if (right->type() == ExprType::SUB_QUERY) {
-      SubQueryExpr *right_sub_query_expr = static_cast<SubQueryExpr *>(right);
-      if (right_sub_query_expr->phy_op() != nullptr) {
-        right_sub_query_expr->phy_op()->close();
+  }
+  for (auto &child : children_expr) {
+    if (child->type() == ExprType::COMPARISON) {
+      auto comparison_expr = static_cast<ComparisonExpr *>(expression_.get());
+      auto left            = comparison_expr->left().get();
+      auto right           = comparison_expr->right().get();
+      if (left->type() == ExprType::SUB_QUERY) {
+        SubQueryExpr *left_sub_query_expr = static_cast<SubQueryExpr *>(left);
+        if (left_sub_query_expr->phy_op() != nullptr) {
+          left_sub_query_expr->phy_op()->close();
+        }
+      }
+      if (right->type() == ExprType::SUB_QUERY) {
+        SubQueryExpr *right_sub_query_expr = static_cast<SubQueryExpr *>(right);
+        if (right_sub_query_expr->phy_op() != nullptr) {
+          right_sub_query_expr->phy_op()->close();
+        }
       }
     }
   }
+
   return RC::SUCCESS;
 }
 

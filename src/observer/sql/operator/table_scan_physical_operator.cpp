@@ -35,7 +35,7 @@ RC TableScanPhysicalOperator::next()
   bool filter_result = false;
   while (OB_SUCC(rc = record_scanner_.next(current_record_))) {
     LOG_TRACE("got a record. rid=%s", current_record_.rid().to_string().c_str());
-    
+
     tuple_.set_record(&current_record_);
     rc = filter(tuple_, filter_result);
     if (rc != RC::SUCCESS) {
@@ -44,7 +44,7 @@ RC TableScanPhysicalOperator::next()
     }
 
     if (filter_result) {
-      sql_debug("get a tuple: %s", tuple_.to_string().c_str());
+      // sql_debug("get a tuple: %s", tuple_.to_string().c_str());
       break;
     } else {
       sql_debug("a tuple is filtered: %s", tuple_.to_string().c_str());

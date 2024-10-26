@@ -100,7 +100,14 @@ public:
   {
     std::string str;
     const int   cell_num = this->cell_num();
+    // 跳过输出null
     for (int i = 0; i < cell_num - 1; i++) {
+      TupleCellSpec spec;
+      spec_at(i,spec);
+      if (strcmp(spec.field_name(), "null_list") == 0)
+      {
+        continue;
+      }
       Value cell;
       cell_at(i, cell);
       str += cell.to_string();

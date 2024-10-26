@@ -706,7 +706,8 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   // 如果外部传来的tuple有效，应该是一个值，获取一批结果。
   if (list_type_ != nullptr) {
     list_type_->get_value(value);
-  } else {
+  }
+  else {
     // 需要多次执行。 每次的listType也不一样。
     ListType *list_type = new ListType();
 
@@ -759,8 +760,12 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     if(rc == RC::RECORD_EOF) {
       rc = RC::SUCCESS;
     }
-
     project_phy_op_->close();
+    if(rc!=RC::SUCCESS) {
+      return rc;
+    }
+
+
     if (list_type->empty()) {
       // 如果没有，提供默认null值。
       list_type->add(new Value());
