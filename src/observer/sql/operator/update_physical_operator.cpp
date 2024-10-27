@@ -44,7 +44,10 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         auto expression = e->right().get();
         if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
           auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
-          sub_query_expr->open(trx,true);
+          rc = sub_query_expr->open(trx);
+          if(rc != RC::SUCCESS) {
+            return rc;
+          }
           // 如果返回多个tuple。返回错误。
           if (!sub_query_expr->is_single_tuple()) {
             return RC::SUB_QUERY_NUILTI_VALUE;

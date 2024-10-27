@@ -763,6 +763,10 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
         list_type->add(value);
       }
     }
+    if (this->list_type_->empty()) {
+      // 如果没有，提供默认null值。
+      this->list_type_->add(new Value());
+    }
     if(rc == RC::RECORD_EOF) {
       rc = RC::SUCCESS;
     }
@@ -770,8 +774,6 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     if(rc!=RC::SUCCESS) {
       return rc;
     }
-
-
     if (list_type->empty()) {
       // 如果没有，提供默认null值。
       list_type->add(new Value());
@@ -785,13 +787,13 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   return RC::SUCCESS;
 }
 
-RC SubQueryExpr::open(Trx* trx,bool no_check)
+RC SubQueryExpr::open(Trx* trx)
 {
   RC rc = RC::SUCCESS;
   this->trx_ = trx;
   if (project_phy_op_) {
     // 可能还需要接受上层传入的tuple。如果没有不确定的变量，那么就可以直接进行运算。
-    if (no_check || check_single()) {
+    if (check_single()) {
       // 首次运行将子查询的结果获取。
       rc = project_phy_op_->open(trx);
       if (rc != RC::SUCCESS) {
@@ -824,15 +826,15 @@ RC SubQueryExpr::open(Trx* trx,bool no_check)
           // 不需要，如果是需要值的，只要返回两个value就认为错误。
           list_type_->add(value);
         }
-        if(rc == RC::RECORD_EOF) {
-          rc = RC::SUCCESS;
-        }
-        if(rc != RC::SUCCESS) {
-          return rc;
-        }
         if (this->list_type_->empty()) {
           // 如果没有，提供默认null值。
           this->list_type_->add(new Value());
+        }
+        if (rc == RC::RECORD_EOF) {
+          rc = RC::SUCCESS;
+        }
+        if (rc != RC::SUCCESS) {
+          return rc;
         }
       }
     }

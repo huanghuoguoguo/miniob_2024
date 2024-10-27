@@ -32,7 +32,7 @@ Table *BinderContext::find_table(const char *table_name) const
   return *iter;
 }
 
-Table *BinderContext::find_table_by_field(const char *field_name) const
+Table *BinderContext::find_table_by_field(const char *field_name)
 {
   // 先查询cur的。
   for(auto& table : cur_tables_) {
@@ -41,6 +41,7 @@ Table *BinderContext::find_table_by_field(const char *field_name) const
       return table;
     }
   }
+  is_single_ = false;
   for(auto& table : query_tables_) {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr != field_meta) {
@@ -146,7 +147,7 @@ RC ExpressionBinder::bind_star_expression(
 
     tables_to_wildcard.push_back(table);
   } else {
-    const vector<Table *> &all_tables = context_.query_tables();
+    const vector<Table *> &all_tables = context_.cur_tables();
     tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
   }
 
@@ -181,7 +182,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     if (find_table_by_field != nullptr) {
       table = find_table_by_field;
     } else {
-      table = context_.query_tables()[0];
+      table = *context_.query_tables().begin();
     }
 
 
@@ -551,8 +552,13 @@ RC ExpressionBinder::bind_sub_expression(
   Stmt *stmt = nullptr;
   SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
   if(sub_query_expr->select_sql_node() != nullptr) {
+    BinderContext * sub_context = new BinderContext();
+    // 将当前的所有table放入下一层。
+    for(auto& table :context_.query_tables()) {
+      sub_context->add_table(table);
+    }
     // 如果存在sqlnode。
-    sub_query_expr->select_sql_node()->binder_context = &this->context_;
+    sub_query_expr->select_sql_node()->binder_context = sub_context;
     rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
     sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
   } else {

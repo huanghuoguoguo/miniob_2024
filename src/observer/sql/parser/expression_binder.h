@@ -22,35 +22,46 @@ See the Mulan PSL v2 for more details. */
 class BinderContext
 {
 public:
-  BinderContext()          = default;
-  virtual ~BinderContext() = default;
+    BinderContext() = default;
+    virtual ~BinderContext() = default;
 
-  void add_table(Table *table) { query_tables_.push_back(table); }
+    void add_table(Table* table) { query_tables_.insert(table); }
 
-  Table *find_table(const char *table_name) const;
+    Table* find_table(const char* table_name) const;
 
-  std::vector<Table *> &query_tables() { return query_tables_; }
+    std::set<Table*>& query_tables() { return query_tables_; }
 
     // 才发现好像没用上当前table，不过既然过了，就不修改了。
-  void add_cur_table(Table *table){cur_tables_.push_back(table);}
+    void add_cur_table(Table* table) { cur_tables_.push_back(table); }
 
-   Table* find_table_by_field(const char *field_name) const;
+    Table* find_table_by_field(const char* field_name);
+
+    std::vector<Table*>& cur_tables()
+    {
+        return cur_tables_;
+    }
 
 private:
-  std::vector<Table *> query_tables_;
-  std::vector<Table *> cur_tables_;  // 只存储在当前select出现的table，不存储上方存下来的table。查询时如果为空，查当前table。没查到，查全局table。
-  Db* db_;
+    std::set<Table*> query_tables_;
+    std::vector<Table*> cur_tables_; // 只存储在当前select出现的table，不存储上方存下来的table。查询时如果为空，查当前table。没查到，查全局table。
+    Db* db_;
+    bool is_single_ = true;
 
 public:
-  Db* db() const
-  {
-      return db_;
-  }
+    bool is_single() const
+    {
+        return is_single_;
+    }
 
-  void db(Db* db)
-  {
-      db_ = db;
-  }
+    Db* db() const
+    {
+        return db_;
+    }
+
+    void db(Db* db)
+    {
+        db_ = db;
+    }
 };
 
 /**
