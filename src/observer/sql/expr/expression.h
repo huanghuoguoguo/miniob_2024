@@ -500,7 +500,7 @@ public:
   AttrType value_type() const override { return AttrType::UNDEFINED; }
   int      value_length() const override { return 0; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
-  RC open(Trx* trx);
+  RC open(Trx* trx,bool no_check = false);
   // RC next();
 
   RC close();

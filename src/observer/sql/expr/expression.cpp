@@ -785,13 +785,13 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
   return RC::SUCCESS;
 }
 
-RC SubQueryExpr::open(Trx* trx)
+RC SubQueryExpr::open(Trx* trx,bool no_check)
 {
   RC rc = RC::SUCCESS;
   this->trx_ = trx;
   if (project_phy_op_) {
     // 可能还需要接受上层传入的tuple。如果没有不确定的变量，那么就可以直接进行运算。
-    if (check_single()) {
+    if (no_check || check_single()) {
       // 首次运行将子查询的结果获取。
       rc = project_phy_op_->open(trx);
       if (rc != RC::SUCCESS) {

@@ -31,6 +31,7 @@ public:
 
   std::vector<Table *> &query_tables() { return query_tables_; }
 
+    // 才发现好像没用上当前table，不过既然过了，就不修改了。
   void add_cur_table(Table *table){cur_tables_.push_back(table);}
 
    Table* find_table_by_field(const char *field_name) const;
