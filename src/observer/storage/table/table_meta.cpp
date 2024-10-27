@@ -89,12 +89,15 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
     if (attr_info.name.compare("null_list") == 0) {
       visible = false;
     }
-
+    int attr_len = attr_info.length;
+    if (attr_info.type == AttrType::VECTORS) {
+      attr_len = attr_info.length * sizeof(float);
+    }
     rc = fields_[i + trx_field_num].init(
         attr_info.name.c_str(),
         attr_info.type,
         field_offset,
-        attr_info.length,
+        attr_len,
         visible /*visible*/,
         i,
         attr_info.nullable);

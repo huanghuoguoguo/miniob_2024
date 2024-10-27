@@ -19,14 +19,23 @@ See the Mulan PSL v2 for more details. */
 class VectorType : public DataType
 {
 public:
-  VectorType() : DataType(AttrType::VECTORS) {}
-  virtual ~VectorType() {}
+    VectorType() : DataType(AttrType::VECTORS)
+    {
+    }
 
-  int compare(const Value &left, const Value &right) const override { return INT32_MAX; }
+    virtual ~VectorType()
+    {
+    }
 
-  RC add(const Value &left, const Value &right, Value &result) const override { return RC::UNIMPLEMENTED; }
-  RC subtract(const Value &left, const Value &right, Value &result) const override { return RC::UNIMPLEMENTED; }
-  RC multiply(const Value &left, const Value &right, Value &result) const override { return RC::UNIMPLEMENTED; }
+    int compare(const Value& left, const Value& right) const override;
 
-  RC to_string(const Value &val, string &result) const override { return RC::UNIMPLEMENTED; }
+    RC add(const Value& left, const Value& right, Value& result) const override;
+    RC subtract(const Value& left, const Value& right, Value& result) const override;
+    RC multiply(const Value& left, const Value& right, Value& result) const override;
+    int cast_cost(AttrType type) override;
+    RC cast_to(const Value& val, AttrType type, Value& result) const override;
+
+    RC to_string(const Value& val, string& result) const override;
+private:
+    string formatFloat(float value) const;
 };
