@@ -52,7 +52,10 @@ public:
     {
         return is_single_;
     }
-
+    void is_single(bool is_single)
+    {
+        is_single_ = is_single;
+    }
     Db* db() const
     {
         return db_;

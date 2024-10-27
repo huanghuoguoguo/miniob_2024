@@ -41,7 +41,6 @@ Table *BinderContext::find_table_by_field(const char *field_name)
       return table;
     }
   }
-  is_single_ = false;
   for(auto& table : query_tables_) {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr != field_meta) {
@@ -192,6 +191,17 @@ RC ExpressionBinder::bind_unbound_field_expression(
       LOG_INFO("no such table in from list: %s", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
+  }
+  if(context_.is_single()) {
+    std::vector<Table *>& tables = context_.cur_tables();
+    bool t = false;
+    for(auto& table_ : tables) {
+      if(table == table_) {
+        t = true;
+      }
+    }
+    // 如果已经是非独立的了，就不需要再判断了。
+    context_.is_single(t);
   }
 
   if (0 == strcmp(field_name, "*")) {

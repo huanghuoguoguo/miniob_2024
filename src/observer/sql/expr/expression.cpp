@@ -763,9 +763,9 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
         list_type->add(value);
       }
     }
-    if (this->list_type_->empty()) {
+    if (list_type->empty()) {
       // 如果没有，提供默认null值。
-      this->list_type_->add(new Value());
+      list_type->add(new Value());
     }
     if(rc == RC::RECORD_EOF) {
       rc = RC::SUCCESS;
@@ -773,10 +773,6 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
     project_phy_op_->close();
     if(rc!=RC::SUCCESS) {
       return rc;
-    }
-    if (list_type->empty()) {
-      // 如果没有，提供默认null值。
-      list_type->add(new Value());
     }
     list_type->get_value(value);
     for(auto& p : predicates) {
