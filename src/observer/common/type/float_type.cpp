@@ -72,8 +72,10 @@ int FloatType::cast_cost(AttrType type)
 {
   if (type == AttrType::FLOATS) {
     return 0;
-  } else if (type == AttrType::CHARS || type == AttrType::INTS) {
+  } else if (type == AttrType::CHARS) {
     return 1;
+  } else if (type == AttrType::INTS) {
+    return 10;
   }
   return INT32_MAX;
 }
