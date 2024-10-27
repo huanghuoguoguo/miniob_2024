@@ -188,12 +188,13 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     return rc;
   }
 
-  // 加载text数据
+  // 如果 text 文件存在，则加载text文件
   rc = init_text_handler(base_dir);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to open table %s due to init text handler failed.", base_dir);
     return rc;
   }
+
 
   const int index_num = table_meta_.index_num();
   for (int i = 0; i < index_num; i++) {
@@ -464,9 +465,15 @@ RC Table::init_record_handler(const char *base_dir)
   return rc;
 }
 
-RC Table::init_text_handler(const char *base_dir){
+RC Table::init_text_handler(const char *base_dir) {
   // 构建文本文件路径
   std::string text_file = table_text_file(base_dir, table_meta_.name());
+
+  // 检查文本文件是否存在
+  if (!std::filesystem::exists(text_file)) {  // C++17 文件存在性检查
+    LOG_INFO("Text file %s not found. Skipping buffer pool initialization.", text_file.c_str());
+    return RC::SUCCESS;  // 如果文件不存在，返回成功状态，跳过初始化
+  }
 
   // 获取 BufferPoolManager 实例
   BufferPoolManager &bpm = db_->buffer_pool_manager();
@@ -478,9 +485,8 @@ RC Table::init_text_handler(const char *base_dir){
     return rc;
   }
 
-  return  rc;
+  return rc;
 }
-
 
 RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode)
 {
