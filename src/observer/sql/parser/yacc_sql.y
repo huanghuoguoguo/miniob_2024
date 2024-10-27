@@ -522,9 +522,9 @@ value:
         for (auto &v : *$2) {
             // 获取信息，封装为vector
           if (v->attr_type() == AttrType::INTS) {
-            float_data.push_back(static_cast<float>(v->get_int()));
+            float_data.insert(float_data.begin(), static_cast<float>(v->get_int()));
           }else {
-            float_data.push_back(v->get_float());
+            float_data.insert(float_data.begin(), v->get_float());
           }
         }
         $$->set_vector(float_data);

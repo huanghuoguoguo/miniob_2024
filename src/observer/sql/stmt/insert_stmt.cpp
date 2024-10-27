@@ -102,22 +102,26 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
           return RC::INVALID_ARGUMENT;
         }
       }
-      else if (AttrType::VECTORS == field_type) {
-        if (val.attr_type() == AttrType::VECTORS) {
-          // 如果values不为空，证明直接是[]，保存在了values当中。
-          if (val.length() != field_meta->len()) {
-            return RC::INVALID_ARGUMENT;
-          }
-        } else {
-          // char先转vector
-          Value v;
-          DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
-          std::vector<float> vector = v.get_vector();
-          if (vector.size() != field_meta->len() / sizeof(float)) {
-            v.reset();
-            return RC::INVALID_ARGUMENT;
-          }
+    }
+    if (AttrType::VECTORS == field_type) {
+      if (val.attr_type() == AttrType::VECTORS) {
+        // 如果values不为空，证明直接是[]，保存在了values当中。
+        if (val.length() != field_meta->len()) {
+          return RC::INVALID_ARGUMENT;
         }
+      } else if (val.attr_type() == AttrType::CHARS) {
+        // char先转vector
+        Value v;
+        DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
+        std::vector<float> vector = v.get_vector();
+        if (vector.size() != field_meta->len() / sizeof(float)) {
+          v.reset();
+          return RC::INVALID_ARGUMENT;
+        }
+        // 直接替换吧？
+        val = v;
+      } else {
+        return RC::INVALID_ARGUMENT;
       }
     }
 

@@ -234,7 +234,7 @@ public:
   RC get_column(Chunk &chunk, Column &column) override;
   RC try_get_value(Value &value) const override
   {
-    value = *new Value(value_);
+    value = value_;
     return RC::SUCCESS;
   }
 
