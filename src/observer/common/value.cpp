@@ -39,7 +39,11 @@ Value::Value(const Value &other)
     case AttrType::CHARS: {
       set_string_from_other(other);
     } break;
-
+    case AttrType::VECTORS: {
+      // TODO 多次拷贝。。。
+      std::vector<float> vector = other.get_vector();
+      set_vector(vector);
+    }
     default: {
       this->value_ = other.value_;
     } break;
@@ -69,7 +73,11 @@ Value &Value::operator=(const Value &other)
     case AttrType::CHARS: {
       set_string_from_other(other);
     } break;
-
+    case AttrType::VECTORS: {
+      // TODO 多次拷贝。。。
+      std::vector<float> vector = other.get_vector();
+      set_vector(vector);
+    }break;
     default: {
       this->value_ = other.value_;
     } break;
