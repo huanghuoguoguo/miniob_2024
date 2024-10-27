@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/stmt/insert_stmt.h"
 
+#include <common/type/vector_type.h>
 #include <sql/parser/expression_binder.h>
 
 #include "common/log/log.h"
@@ -76,7 +77,6 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     values_data->push_back(value);
   }
   bound_expressions.clear();
-  const Value *    values     = values_data->data();
   const int        value_num  = static_cast<int>(values_data->size());
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
@@ -89,26 +89,41 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 
   // check field type
   for (int i = 0; i < value_num; i++) {
-    const FieldMeta *field_meta = table_meta.field(i+sys_field_num);
-    const AttrType field_type = field_meta->type();
-    const AttrType value_type = values[i].attr_type();
+    const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
+    const AttrType   field_type = field_meta->type();
+    const AttrType   value_type = values_data->at(i).attr_type();
 
     // 解决TEXT太长的问题
     if(field_type != value_type) {
       if (AttrType::TEXTS == field_type && AttrType::CHARS == value_type) {
-        if(MAX_TEXT_LENGTH < values[i].length()) {
-          LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535",values[i].length());
+        if(MAX_TEXT_LENGTH < values_data->at(i).length()) {
+          LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535",values_data->at(i).length());
           return RC::INVALID_ARGUMENT;
         }
       }
+      if (AttrType::VECTORS == field_type) {
+        if (value_type == AttrType::VECTORS) {
+          // TODO 直接比较。
+        } else {
+          // char先转vector
+          Value v;
+          DataType::type_instance(AttrType::CHARS)->cast_to(values_data->at(i), AttrType::VECTORS, v);
+          std::vector<float> vector = v.get_vector();
+          if (vector.size() != field_meta->len() / sizeof(float)) {
+            v.reset();
+            return RC::INVALID_ARGUMENT;
+          }
+        }
+      }
     }
+
   }
 
   // 不能为null的值为null insert into t1 values(null)
   const std::vector<FieldMeta> *field_metas = table_meta.field_metas();
   for (unsigned long i = 0; i < field_metas->size() - table_meta.sys_field_num(); ++i) {
     const FieldMeta &field_meta = field_metas->at(i + table_meta.sys_field_num());
-    Value            value      = values[i];
+    Value&           value      = values_data->at(i);
     if (field_meta.nullable() == false && value.is_null()) {
       LOG_WARN("schema mismatch. null field=%d", field_meta.name());
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
@@ -116,6 +131,6 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   }
 
   // everything alright
-  stmt = new InsertStmt(table, values, value_num);
+  stmt = new InsertStmt(table, values_data->data(), value_num);
   return RC::SUCCESS;
 }
