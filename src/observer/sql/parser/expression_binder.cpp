@@ -572,6 +572,10 @@ RC ExpressionBinder::bind_sub_expression(
     sub_query_expr->select_sql_node()->binder_context = sub_context;
     rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
     sub_query_expr->set_select_stmt(static_cast<SelectStmt *>(stmt));
+    // 如果sub_context不独立，那么当前stmt也不独立。
+    if(!sub_context->is_single()) {
+      this->context_.is_single(false);
+    }
   } else {
     std::vector<std::unique_ptr<Expression>> * expressions = sub_query_expr->values();
     if(expressions != nullptr) {
