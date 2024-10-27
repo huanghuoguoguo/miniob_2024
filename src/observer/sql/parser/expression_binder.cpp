@@ -553,6 +553,7 @@ RC ExpressionBinder::bind_sub_expression(
   SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
   if(sub_query_expr->select_sql_node() != nullptr) {
     BinderContext * sub_context = new BinderContext();
+    sub_context->db(this->context_.db());
     // 将当前的所有table放入下一层。
     for(auto& table :context_.query_tables()) {
       sub_context->add_table(table);
