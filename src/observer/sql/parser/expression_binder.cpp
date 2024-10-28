@@ -632,35 +632,35 @@ RC ExpressionBinder::bind_function_expression(
   // 绑定其他函数。
   auto func_expr = static_cast<FunctionExpr *>(expr.get());
 
-  string              func_name = func_expr->get_func_name();
+  string             func_name = func_expr->get_func_name();
   FunctionExpr::Type func_type;
   rc = FunctionExpr::type_from_string(func_name.c_str(), func_type);
   if (rc != RC::SUCCESS) {
     return rc;
   }
   // 这里粗糙的设定参数只能为两个。
-  if(func_expr->params().size() != 2) {
+  if (func_expr->params().size() != 2) {
     return RC::INVALID_ARGUMENT;
   }
   // 绑定函数类型
   func_expr->func_type(func_type);
   // 将param都绑定
   vector<unique_ptr<Expression>> child_bound_expressions;
-  for(auto& param : func_expr->params()) {
+  for (auto &param : func_expr->params()) {
     rc = bind_expression(param, child_bound_expressions);
   }
   func_expr->params().swap(child_bound_expressions);
   // 对每个params检查，这里偷懒，必须是vector的，如果是char的，转为vector。
-  for(auto& param : func_expr->params()) {
+  for (auto &param : func_expr->params()) {
     // 如果是字段，检查是不是vector
-    if(param->type()==ExprType::FIELD) {
-      FieldExpr * field_expr = static_cast<FieldExpr*>(param.get());
-      if(field_expr->field().meta()->type()!=AttrType::VECTORS) {
+    if (param->type() == ExprType::FIELD) {
+      FieldExpr *field_expr = static_cast<FieldExpr *>(param.get());
+      if (field_expr->field().meta()->type() != AttrType::VECTORS) {
         return RC::INVALID_ARGUMENT;
       }
-    }else if(param->type()==ExprType::VALUE) {
-      ValueExpr * value_expr = static_cast<ValueExpr*>(param.get());
-      if(value_expr->value_type()==AttrType::CHARS) {
+    } else if (param->type() == ExprType::VALUE) {
+      ValueExpr *value_expr = static_cast<ValueExpr *>(param.get());
+      if (value_expr->value_type() == AttrType::CHARS) {
         // 直接将其转为vector
         Value v;
         DataType::type_instance(AttrType::CHARS)->cast_to(value_expr->get_value(), AttrType::VECTORS, v);
@@ -671,9 +671,9 @@ RC ExpressionBinder::bind_function_expression(
       if (param->value_type() != AttrType::VECTORS) {
         return RC::INVALID_ARGUMENT;
       }
-    }else {
+    } else {
       // 可能是表达式？
-      if(param->value_type()!=AttrType::VECTORS) {
+      if (param->value_type() != AttrType::VECTORS) {
         return RC::INVALID_ARGUMENT;
       }
     }

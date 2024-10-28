@@ -18,21 +18,53 @@ int VectorType::compare(const Value &left, const Value &right) const
 } 
 
 RC VectorType::add(const Value &left, const Value &right, Value &result) const 
-{ 
-
-    return RC::SUCCESS; 
+{
+  std::vector<float> left_ = left.get_vector();
+  std::vector<float> right_ = right.get_vector();
+  if (left_.size() != right_.size()) {
+    return RC::INVALID_ARGUMENT;
+  }
+  vector<float> res(left_.size());
+  for (size_t i = 0; i < left_.size(); ++i) {
+    res[i] = left_[i] + right_[i];
+  }
+  result.set_vector(res);
+  return RC::SUCCESS;
 } 
 
-RC VectorType::subtract(const Value &left, const Value &right, Value &result) const 
-{ 
+RC VectorType::subtract(const Value &left, const Value &right, Value &result) const {
 
-    return RC::SUCCESS; 
-} 
+  std::vector<float> left_ = left.get_vector();
+  std::vector<float> right_ = right.get_vector();
 
-RC VectorType::multiply(const Value &left, const Value &right, Value &result) const 
-{ 
+  if (left_.size() != right_.size()) {
+    return RC::INVALID_ARGUMENT;
+  }
 
-    return RC::SUCCESS; 
+  std::vector<float> res(left_.size());
+  for (size_t i = 0; i < left_.size(); ++i) {
+    res[i] = left_[i] - right_[i];
+  }
+
+  result.set_vector(res);
+  return RC::SUCCESS;
+}
+
+RC VectorType::multiply(const Value &left, const Value &right, Value &result) const {
+  std::vector<float> left_ = left.get_vector();
+  std::vector<float> right_ = right.get_vector();
+
+  if (left_.size() != right_.size()) {
+    return RC::INVALID_ARGUMENT;
+  }
+
+  std::vector<float> res(left_.size());
+  for (size_t i = 0; i < left_.size(); ++i) {
+    res[i] = left_[i] * right_[i];
+  }
+
+  result.set_vector(res);
+  return RC::SUCCESS;
 }
 
 RC VectorType::to_string(const Value &val, std::string &result) const
@@ -78,10 +110,8 @@ RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const
 
 int VectorType::cast_cost(AttrType type)
 {
-  if (type == AttrType::INTS) {
-    return 0;
-  } else if (type == AttrType::CHARS || type == AttrType::FLOATS) {
-    return -1;
+  if (type == AttrType::CHARS) {
+    return 99;
   }
   return INT32_MAX;
 }

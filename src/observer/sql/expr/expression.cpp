@@ -411,6 +411,9 @@ AttrType ArithmeticExpr::value_type() const
       arithmetic_type_ != Type::DIV) {
     return AttrType::INTS;
   }
+  if(left_->value_type() == AttrType::VECTORS || right_->value_type() == AttrType::VECTORS) {
+    return AttrType::VECTORS;
+  }
 
   return AttrType::FLOATS;
 }
@@ -937,7 +940,7 @@ RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
     if (vc == -1) {
       vc = static_cast<int>(vector.size());
     } else {
-      if (vc != vector.size()) {
+      if (vc != static_cast<int>(vector.size())) {
         return RC::INVALID_ARGUMENT;
       }
     }
