@@ -43,12 +43,13 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   return expr;
 }
 
-UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
-                                           Expression *child,
+FunctionExpr *create_aggregate_expression(const char *aggregate_name,
+                                           std::vector<std::unique_ptr<Expression>> * expression_list,
                                            const char *sql_string,
                                            YYLTYPE *llocp)
 {
-  UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, child);
+  // UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, child);
+  FunctionExpr *expr = new FunctionExpr(aggregate_name, expression_list);
   expr->set_name(token_name(sql_string, llocp));
   return expr;
 }
@@ -144,7 +145,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   AttrInfoSqlNode *                          attr_info;
   Expression *                               expression;
   std::vector<std::unique_ptr<Expression>> * expression_list;
-  std::vector<Value> *                       value_list;
+  std::vector<Value*> *                      value_list;
   std::vector<ConditionSqlNode> *            condition_list;
   std::vector<JoinSqlNode> *                 join_list;
   JoinSqlNode *                              join;
@@ -184,6 +185,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition_list>      having_condition
 %type <string>              storage_format
 %type <relation_list>       rel_list
+%type <value_list>          value_list
 %type <expression>          expression
 %type <expression_list>     expression_list
 %type <expression_list>     group_by
@@ -553,7 +555,36 @@ value:
       $$ = new Value();
       @$ = @1;
     }
+    | '[' value_list ']' {
+        $$ = new Value();
+        $$->set_type(AttrType::VECTORS);
+        vector<float> float_data;
+        for (auto &v : *$2) {
+            // 获取信息，封装为vector
+          if (v->attr_type() == AttrType::INTS) {
+            float_data.insert(float_data.begin(), static_cast<float>(v->get_int()));
+          }else {
+            float_data.insert(float_data.begin(), v->get_float());
+          }
+        }
+        $$->set_vector(float_data);
+    }
     ;
+value_list:
+    value {
+        $$ = new std::vector<Value*>;
+        $$->push_back($1);
+    }
+    | value COMMA value_list{
+        if($3 != nullptr){
+           $3->push_back($1);
+           $$ = $3;
+        }else{
+           $$ = new std::vector<Value*>;
+           $$->push_back($1);
+        }
+    }
+
 storage_format:
     /* empty */
     {
@@ -707,11 +738,7 @@ expression:
     aggre_type LBRACE aggre_list RBRACE {
       $$ = nullptr;
       if ($3 != nullptr) {
-        if($3->size() == 1){
-            $$ = create_aggregate_expression($1, $3->front().release(), sql_string, &@$);
-        } else {
-            $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
-        }
+        $$ = create_aggregate_expression($1, $3, sql_string, &@$);
       }else{
         $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
       }
@@ -738,7 +765,7 @@ expression:
     | value {
       $$ = new ValueExpr(*$1);
       $$->set_name(token_name(sql_string, &@$));
-      delete $1;
+
     }
     | rel_attr {
       RelAttrSqlNode *node = $1;

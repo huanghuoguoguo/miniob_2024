@@ -39,7 +39,11 @@ Value::Value(const Value &other)
     case AttrType::CHARS: {
       set_string_from_other(other);
     } break;
-
+    case AttrType::VECTORS: {
+      // TODO 多次拷贝。。。
+      std::vector<float> vector = other.get_vector();
+      set_vector(vector);
+    } break;
     default: {
       this->value_ = other.value_;
     } break;
@@ -69,7 +73,11 @@ Value &Value::operator=(const Value &other)
     case AttrType::CHARS: {
       set_string_from_other(other);
     } break;
-
+    case AttrType::VECTORS: {
+      // TODO 多次拷贝。。。
+      std::vector<float> vector = other.get_vector();
+      this->set_vector(vector);
+    }break;
     default: {
       this->value_ = other.value_;
     } break;
@@ -95,6 +103,7 @@ Value &Value::operator=(Value &&other)
 void Value::reset()
 {
   switch (attr_type_) {
+    case AttrType::VECTORS:
     case AttrType::CHARS:
       if (own_data_ && value_.pointer_value_ != nullptr) {
         delete[] value_.pointer_value_;
@@ -138,6 +147,9 @@ void Value::set_data(char *data, int length)
     case AttrType::UNDEFINED: {
       set_type(AttrType::UNDEFINED);
     } break;
+    case AttrType::VECTORS: {
+      set_vector(data, length);
+    }break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -173,6 +185,14 @@ void Value::set_date(int val)
   length_ = sizeof(val);
 }
 
+void Value::set_vector(vector<float> &list)
+{
+  int size         = static_cast<int>(list.size());
+  this->attr_type_ = AttrType::VECTORS;
+  this->length_    = size * sizeof(float);
+  set_vector(reinterpret_cast<char *>(list.data())  , size * sizeof(float));
+}
+
 void Value::set_text(int64_t val)
 {
   attr_type_ = AttrType::TEXTS;
@@ -200,7 +220,20 @@ void Value::set_string(const char *s, int len /*= 0*/)
     value_.pointer_value_[len] = '\0';
   }
 }
-
+void Value::set_vector(char* s, int len /*= 0*/)
+{
+  reset();
+  attr_type_ = AttrType::VECTORS;
+  if (s == nullptr) {
+    value_.pointer_value_ = nullptr;
+    length_               = 0;
+  } else {
+    own_data_             = true;
+    value_.pointer_value_ = new char[len];
+    length_               = len;
+    memcpy(value_.pointer_value_, s, len);
+  }
+}
 void Value::set_value(const Value &value)
 {
   switch (value.attr_type_) {
@@ -246,6 +279,7 @@ void Value::set_string_from_other(const Value &other)
 const char *Value::data() const
 {
   switch (attr_type_) {
+    case AttrType::VECTORS:
     case AttrType::CHARS: {
       return value_.pointer_value_;
     } break;
@@ -335,7 +369,20 @@ int64_t Value::get_text() const
 {
   return value_.long_value_;
 }
-
+vector<float> Value::get_vector() const
+{
+  if(attr_type_ == AttrType::CHARS) {
+    Value v;
+    DataType::type_instance(AttrType::CHARS)->cast_to(*this, AttrType::VECTORS, v);
+    return v.get_vector();
+  }
+  int size = length_/sizeof(float);
+  vector<float> res(size);
+  if (value_.pointer_value_ != nullptr) {
+    std::memcpy(res.data(), value_.pointer_value_, length_);
+  }
+  return res;
+}
 string           Value::get_string() const { return this->to_string(); }
 bool             Value::is_null() const { return this->attr_type_ == AttrType::UNDEFINED; }
 vector<Value *> *Value::get_list() const

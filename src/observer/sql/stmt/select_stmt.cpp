@@ -40,6 +40,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   if (select_sql.binder_context == nullptr) {
     select_sql.binder_context = new BinderContext();
     select_sql.binder_context->query_tables().clear();
+    select_sql.binder_context->cur_tables().clear();
     select_sql.binder_context->db(db);
   }
   BinderContext& binder_context = *select_sql.binder_context;
@@ -67,6 +68,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
+    binder_context.add_cur_table(table);
     binder_context.add_table(table);
     tables.push_back(table);
     table_map.insert({table_name, table});
@@ -209,7 +211,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->join_filter_stmts_.swap(join_filter_stmts);
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
-  select_stmt->is_single_ = binder_context.query_tables().size() <= tables.size();
+  select_stmt->is_single_ = binder_context.is_single();
   stmt                    = select_stmt;
   return RC::SUCCESS;
 }

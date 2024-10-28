@@ -33,6 +33,7 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(SUB_QUERY_NUILTI_TUPLE)      \
   DEFINE_RC(ERR_UNIQUE_INDEX_VIOLATION)  \
   DEFINE_RC(NOTFOUND)                    \
+  DEFINE_RC(UNKNOWN_FUNC)                    \
   DEFINE_RC(EMPTY)                       \
   DEFINE_RC(FULL)                        \
   DEFINE_RC(EXIST)                       \
