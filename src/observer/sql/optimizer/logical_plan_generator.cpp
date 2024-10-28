@@ -272,6 +272,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     std::unique_ptr<Expression>             left       = std::move(filter_unit->left());
     std::unique_ptr<Expression>             right       = std::move(filter_unit->right());
     if (left->value_type() != AttrType::UNDEFINED && right->value_type() != AttrType::UNDEFINED) {
+      if(AttrType::TEXTS==left->value_type()&&AttrType::CHARS==right->value_type()) {continue;}
       if (left->value_type() != right->value_type()) {
         auto left_to_right_cost = implicit_cast_cost(left->value_type(), right->value_type());
         auto right_to_left_cost = implicit_cast_cost(right->value_type(), left->value_type());
@@ -313,17 +314,17 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
     }
 
     // 如果是子查询。将其转换为逻辑计划。
-    if(left->type()==ExprType::SUB_QUERY) {
-      auto                        sub_query_expr = static_cast<SubQueryExpr*>(left.get());
-      if(sub_query_expr->select_stmt() != nullptr) {
+    if (left->type() == ExprType::SUB_QUERY) {
+      auto sub_query_expr = static_cast<SubQueryExpr *>(left.get());
+      if (sub_query_expr->select_stmt() != nullptr) {
         unique_ptr<LogicalOperator> sub_oper(nullptr);
         create_plan(sub_query_expr->select_stmt(), sub_oper);
         sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
       }
     }
-    if(right->type()==ExprType::SUB_QUERY) {
-      auto                        sub_query_expr = static_cast<SubQueryExpr*>(right.get());
-      if(sub_query_expr->select_stmt() != nullptr) {
+    if (right->type() == ExprType::SUB_QUERY) {
+      auto sub_query_expr = static_cast<SubQueryExpr *>(right.get());
+      if (sub_query_expr->select_stmt() != nullptr) {
         unique_ptr<LogicalOperator> sub_oper(nullptr);
         create_plan(sub_query_expr->select_stmt(), sub_oper);
         sub_query_expr->set_logical_op(static_cast<ProjectLogicalOperator *>(sub_oper.release()));
@@ -335,9 +336,11 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   }
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
-  if (!cmp_exprs.empty()) {
+  if (cmp_exprs.size() > 1) {
     unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
     predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
+  } else {
+    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(cmp_exprs.front())));
   }
 
   logical_operator = std::move(predicate_oper);

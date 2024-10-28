@@ -18,6 +18,8 @@ See the Mulan PSL v2 for more details. */
 #include <regex>
 #include <string>
 #include <common/type/list_type.h>
+#include <sql/operator/operator_iterator.h>
+#include <sql/operator/predicate_physical_operator.h>
 #include <sql/operator/project_physical_operator.h>
 
 using namespace std;
@@ -148,8 +150,13 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
   RC  rc         = RC::SUCCESS;
   // int cmp_result = left.compare(right);
   int cmp_result;
-  if(comp_ < IS_NULL)
-  {
+  if (comp_ < IS_NULL) {
+    if (left.get_list() != nullptr && left.get_list()->size() > 1) {
+      return RC::SUB_QUERY_NUILTI_VALUE;
+    }
+    if (right.get_list() != nullptr && right.get_list()->size() > 1) {
+      return RC::SUB_QUERY_NUILTI_VALUE;
+    }
     cmp_result = left.compare(right);
   }
 
@@ -696,42 +703,137 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
 
 RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  list_type_->get_value(value);
+  // 如果外部传来的tuple有效，应该是一个值，获取一批结果。
+  if (list_type_ != nullptr) {
+    list_type_->get_value(value);
+  }
+  else {
+    // 需要多次执行。 每次的listType也不一样。
+    ListType *list_type = new ListType();
+
+    ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
+    RC rc = RC::SUCCESS;
+    std::vector<Tuple*>  tuples;
+    // 拿到外部获取的tuple后，怎么让其获取？
+    // 放到predicate的tuple中去？
+    // 拿到子物理计划中的所有predicate计划，将上方传过来的tuple传进去。
+    auto                          *const_value_tuple = new ValueListTuple();
+    rc = ValueListTuple::make(tuple, *const_value_tuple);
+    if(OB_FAIL(rc)) {
+      return rc;
+    }
+    vector<PredicatePhysicalOperator *> predicates;
+
+    rc = OperatorIterator::iterate_child_oper(project_phy_op_,
+        [&](PhysicalOperator *child) {
+          if (child->type() == PhysicalOperatorType::PREDICATE) {
+            predicates.push_back(static_cast<PredicatePhysicalOperator *>(child));
+          }
+          return RC::SUCCESS;
+        });
+    if(rc != RC::SUCCESS) {
+      return rc;
+    }
+    for(auto& p : predicates) {
+      p->add_value_tuple(*const_value_tuple);
+    }
+
+    rc = project_phy_op->open(this->trx_);
+    if(rc != RC::SUCCESS) {
+      return rc;
+    }
+    while (OB_SUCC(rc = project_phy_op->next())) {
+      Tuple *tuple = project_phy_op->current_tuple();
+      if (nullptr == tuple) {
+        LOG_WARN("failed to get current record: %s", strrc(rc));
+        return rc;
+      }
+      auto                          *child_value_tuple = new ValueListTuple();
+      rc = ValueListTuple::make(*tuple, *child_value_tuple);
+      if(OB_FAIL(rc)) {
+        return rc;
+      }
+      tuples.emplace_back(child_value_tuple);
+      Value *value = new Value();
+      rc           = tuple->cell_at(0, *value);
+      if(OB_FAIL(rc)) {
+        return rc;
+      }
+      if(!list_type->count(value)) {
+        list_type->add(value);
+      }
+    }
+    if(rc == RC::RECORD_EOF) {
+      rc = RC::SUCCESS;
+    }
+    project_phy_op_->close();
+    if(rc!=RC::SUCCESS) {
+      return rc;
+    }
+
+
+    if (list_type->empty()) {
+      // 如果没有，提供默认null值。
+      list_type->add(new Value());
+    }
+    list_type->get_value(value);
+    for(auto& p : predicates) {
+      p->clear_tuple();
+    }
+  }
+
   return RC::SUCCESS;
 }
 
 RC SubQueryExpr::open(Trx* trx)
 {
   RC rc = RC::SUCCESS;
+  this->trx_ = trx;
   if (project_phy_op_) {
-    rc = project_phy_op_->open(trx);
-    // 首次运行将子查询的结果获取。
-    if (list_type_ == nullptr) {
-      this->list_type_                        = new ListType();
-      ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
-      if (project_phy_op->cell_num() > 1) {
-        project_phy_op->close();
-        return RC::SUB_QUERY_ERROR;
+    // 可能还需要接受上层传入的tuple。如果没有不确定的变量，那么就可以直接进行运算。
+    if (check_single()) {
+      // 首次运行将子查询的结果获取。
+      rc = project_phy_op_->open(trx);
+      if (rc != RC::SUCCESS) {
+        return rc;
       }
-      while (OB_SUCC(rc = project_phy_op->next())) {
-        Tuple *tuple = project_phy_op->current_tuple();
-        if (nullptr == tuple) {
-          LOG_WARN("failed to get current record: %s", strrc(rc));
-          return rc;
-        }
-        this->tuples_.emplace_back(tuple);
-        Value *value = new Value();
-        rc           = tuple->cell_at(0, *value);
-        if(OB_FAIL(rc)) {
-          return rc;
-        }
-        if(!list_type_->count(value)) {
+      if (list_type_ == nullptr) {
+        this->list_type_                        = new ListType();
+        ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
+
+        while (OB_SUCC(rc = project_phy_op->next())) {
+          Tuple *tuple = project_phy_op->current_tuple();
+          if (nullptr == tuple) {
+            LOG_WARN("failed to get current record: %s", strrc(rc));
+            return rc;
+          }
+          auto                          *order_by_evaluated_tuple = new ValueListTuple();
+          rc = ValueListTuple::make(*tuple, *order_by_evaluated_tuple);
+          if(OB_FAIL(rc)) {
+            return rc;
+          }
+          this->tuples_.emplace_back(order_by_evaluated_tuple);
+          Value *value = new Value();
+          rc           = tuple->cell_at(0, *value);
+          if(OB_FAIL(rc)) {
+            return rc;
+          }
+          // if(!list_type_->count(value)) {
+          //   list_type_->add(value);
+          // }
+          // 不需要，如果是需要值的，只要返回两个value就认为错误。
           list_type_->add(value);
         }
-      }
-      if (this->list_type_->empty()) {
-        // 如果没有，提供默认null值。
-        this->list_type_->add(new Value());
+        if(rc == RC::RECORD_EOF) {
+          rc = RC::SUCCESS;
+        }
+        if(rc != RC::SUCCESS) {
+          return rc;
+        }
+        if (this->list_type_->empty()) {
+          // 如果没有，提供默认null值。
+          this->list_type_->add(new Value());
+        }
       }
     }
   } else {
@@ -791,4 +893,16 @@ bool SubQueryExpr::is_single_tuple() const
     return false;
   }
   return true;
+}
+bool SubQueryExpr::check_single()
+{
+  // 如果没有物理计划，那么一定是不需要
+  if (!this->project_phy_op_) {
+    return true;
+  }
+  // 存在物理计划，判断所有所需变量是否能够自己完成搜索。
+  if (select_stmt_ && select_stmt_->is_single()) {
+    return true;
+  }
+  return false;
 }

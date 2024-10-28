@@ -15,6 +15,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include "common/lang/string.h"
+#include "common/lang/memory.h"
 #include "common/type/attr_type.h"
 #include "common/type/data_type.h"
 
@@ -34,6 +35,7 @@ public:
   friend class BooleanType;
   friend class CharType;
   friend class DateType;
+  friend class TextType;
   friend class VectorType;
   friend class ListType;
 
@@ -49,6 +51,7 @@ public:
   explicit Value(int val);
   explicit Value(float val);
   explicit Value(bool val);
+  explicit Value(int64_t val);
   explicit Value(const char *s, int len = 0);
 
   Value(const Value &other);
@@ -92,6 +95,7 @@ public:
   void set_type(AttrType type) { this->attr_type_ = type; }
   void set_data(char *data, int length);
   void set_date(int val);
+  void set_text(int64_t val);
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
@@ -116,6 +120,8 @@ public:
   string get_string() const;
   bool   get_boolean() const;
   bool   is_null() const;
+  int64_t get_text() const;
+
   vector<Value*> *get_list() const;
 
 private:
@@ -135,6 +141,7 @@ private:
     float   float_value_;
     bool    bool_value_;
     char   *pointer_value_;
+    int64_t long_value_;
   } value_ = {.int_value_ = 0};
 
   /// 是否申请并占有内存, 目前对于 CHARS 类型 own_data_ 为true, 其余类型 own_data_ 为false

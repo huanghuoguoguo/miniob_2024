@@ -197,6 +197,14 @@ RC Db::drop_table(const char *table_name) {
     return RC::IOERR_UNLINK;
   }
 
+  //TEXTS类型存放数据路径
+  auto table_text_name = table_text_file(path_.c_str(), table_name);
+  LOG_WARN("table text file : %s",table_text_name);
+  if(unlink(table_text_name.c_str()) == -1){
+    // 删除元文件数据
+    LOG_ERROR("failed to delete table (%s) text file %s.",table_name,table_text_name.c_str());
+  }
+
   return RC::SUCCESS;
   return rc;
 }

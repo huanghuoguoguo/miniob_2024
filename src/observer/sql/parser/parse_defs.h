@@ -20,6 +20,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/value.h"
 
+class BinderContext;
 struct JoinSqlNode;
 struct OrderBySqlNode;
 class Expression;
@@ -116,6 +117,7 @@ struct SelectSqlNode
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
   std::vector<ConditionSqlNode>            group_by_having;     ///< group by having clause
   std::vector<OrderBySqlNode>              order_unit_list;     ///< order_unit_list
+  BinderContext*                           binder_context = nullptr;
 };
 
 

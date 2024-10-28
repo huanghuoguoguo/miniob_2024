@@ -260,6 +260,12 @@ public:
    */
   RC recover_page(PageNum page_num);
 
+public:
+  // 用于text数据的读写
+  RC append_data(int64_t &offset, int64_t length, const char *data);
+
+  RC get_data(int64_t offset, int64_t length, char *data);
+
   /**
    * 刷新页面到磁盘
    */
@@ -342,6 +348,7 @@ public:
    * @param bp buffer pool 对象
    */
   RC get_buffer_pool(int32_t id, DiskBufferPool *&bp);
+ static BufferPoolManager&instance();
 
 private:
   BPFrameManager frame_manager_{"BufPool"};

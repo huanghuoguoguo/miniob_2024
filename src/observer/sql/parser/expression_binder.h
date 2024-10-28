@@ -29,10 +29,15 @@ public:
 
   Table *find_table(const char *table_name) const;
 
-  const std::vector<Table *> &query_tables() const { return query_tables_; }
+  std::vector<Table *> &query_tables() { return query_tables_; }
+
+  void add_cur_table(Table *table){cur_tables_.push_back(table);}
+
+   Table* find_table_by_field(const char *field_name) const;
 
 private:
   std::vector<Table *> query_tables_;
+  std::vector<Table *> cur_tables_;  // 只存储在当前select出现的table，不存储上方存下来的table。查询时如果为空，查当前table。没查到，查全局table。
   Db* db_;
 
 public:

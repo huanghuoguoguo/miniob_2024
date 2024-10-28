@@ -37,9 +37,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_WARN("invalid argument. db is null");
     return RC::INVALID_ARGUMENT;
   }
+  if (select_sql.binder_context == nullptr) {
+    select_sql.binder_context = new BinderContext();
+    select_sql.binder_context->query_tables().clear();
+    select_sql.binder_context->db(db);
+  }
+  BinderContext& binder_context = *select_sql.binder_context;
 
-  BinderContext binder_context;
-  binder_context.db(db);
 
   // collect tables in `from` and `join` statement
   vector<Table *>                tables;
@@ -67,6 +71,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     tables.push_back(table);
     table_map.insert({table_name, table});
   }
+
 
   // collect query fields in `select` statement
   vector<unique_ptr<Expression>> bound_expressions;
@@ -204,6 +209,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->join_filter_stmts_.swap(join_filter_stmts);
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
-  stmt                      = select_stmt;
+  select_stmt->is_single_ = binder_context.query_tables().size() <= tables.size();
+  stmt                    = select_stmt;
   return RC::SUCCESS;
 }

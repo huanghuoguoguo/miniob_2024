@@ -52,6 +52,10 @@ public:
   std::vector<std::pair<Table *, FilterStmt *>> join_filter_stmts() const {
     return join_filter_stmts_;
   }
+  bool is_single()
+  {
+    return is_single_;
+  }
 
 private:
   std::vector<std::unique_ptr<Expression>> query_expressions_;
@@ -61,4 +65,5 @@ private:
   std::vector<std::unique_ptr<Expression>> group_by_;
   std::vector<std::unique_ptr<OrderBySqlNode>> order_by_;
   FilterStmt*                              group_by_having_;
+  bool is_single_ = true;
 };

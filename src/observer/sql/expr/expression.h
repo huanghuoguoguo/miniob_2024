@@ -508,8 +508,11 @@ public:
   int      value_length() const override { return 0; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
   RC open(Trx* trx);
+  // RC next();
+
   RC close();
   RC check(CompOp op);
+  bool check_single();
 
   bool is_single_tuple() const;
 
@@ -533,7 +536,8 @@ private:
   mutable ListType* list_type_ = nullptr;
   // 这个values是保存如in{}一个集合的情况，如果存在的话会将valueExpr的值获取，然后存入list_type中。
   std::vector<std::unique_ptr<Expression>>* values_ = nullptr;
-  std::vector<Tuple*> tuples_;
+  std::vector<const Tuple*>  tuples_;
+  Trx* trx_ = nullptr;
 public:
   std::vector<std::unique_ptr<Expression>>* values() const
   {

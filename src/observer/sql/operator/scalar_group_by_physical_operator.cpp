@@ -106,6 +106,11 @@ RC ScalarGroupByPhysicalOperator::close()
 {
   group_value_.reset();
   emitted_ = false;
+  // if(!children_.empty()) {
+  //   for (auto& child : children_) {
+  //     child->close();
+  //   }
+  // }
   return RC::SUCCESS;
 }
 
