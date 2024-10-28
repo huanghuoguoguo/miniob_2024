@@ -611,13 +611,19 @@ public:
   ExprType type() const override { return ExprType::FUNCTION; }
   AttrType value_type() const override { return AttrType::UNDEFINED; }
   int      value_length() const override { return 0; }
-  RC       get_value(const Tuple &tuple, Value &value) const override{return RC::SUCCESS;}
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  Type func_type() const { return func_type_; }
+  void func_type(Type t){ this->func_type_ = t; }
   string   get_func_name(){return this->func_name;}
   std::vector<std::unique_ptr<Expression>>& params()
   {
     return this->params_;
   }
+
+  static RC type_from_string(const char* type_str, Type& type);
+
 private:
   string func_name;
   std::vector<std::unique_ptr<Expression>> params_;
+  Type                        func_type_;
 };
