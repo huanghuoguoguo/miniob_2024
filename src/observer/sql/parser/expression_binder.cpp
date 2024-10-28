@@ -570,10 +570,13 @@ RC ExpressionBinder::bind_sub_expression(
   if(sub_query_expr->select_sql_node() != nullptr) {
     BinderContext * sub_context = new BinderContext();
     sub_context->db(this->context_.db());
-    // 将当前的所有table放入下一层。
+    //把外部的别名指针对应表传入子查询
+    sub_context->as_table(this->context_.query_as_tables());
+    // 将当前的所有table放入下一层。  感觉没必要了
     for(auto& table :context_.query_tables()) {
       sub_context->add_table(table);
     }
+
     // 如果存在sqlnode。
     sub_query_expr->select_sql_node()->binder_context = sub_context;
     rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);

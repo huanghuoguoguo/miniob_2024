@@ -32,6 +32,7 @@ public:
     Table* find_table(const char* table_name) const;
     Table* get_as_table(std::string as) {return as_tables_.find(as)->second; }
     std::set<Table*>& query_tables() { return query_tables_; }
+    std::unordered_map<std::string,Table*>& query_as_tables() { return as_tables_; }
 
     // 才发现好像没用上当前table，不过既然过了，就不修改了。
     void add_cur_table(Table* table) { cur_tables_.push_back(table); }
@@ -67,6 +68,10 @@ public:
     void db(Db* db)
     {
         db_ = db;
+    }
+    void as_table(std::unordered_map<std::string,Table*> as_tables)
+    {
+        as_tables_=as_tables;
     }
 };
 
