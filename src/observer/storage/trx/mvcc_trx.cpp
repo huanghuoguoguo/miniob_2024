@@ -209,7 +209,7 @@ RC MvccTrx::update_record(Table *table, Record &record)
 
   RC update_result = RC::SUCCESS;
   RC rc            = table->visit_record(record.rid(),
-      [this, &record,&end_field,&begin_field, table, &update_result](Record &inplace_record) -> bool {
+      [this,&end_field, table, &update_result](Record &inplace_record) -> bool {
         // 检查对当前行是否可以访问。
         RC rc = this->visit_record(table, inplace_record, ReadWriteMode::READ_WRITE);
         if (OB_FAIL(rc)) {
@@ -220,11 +220,6 @@ RC MvccTrx::update_record(Table *table, Record &record)
         // this->delete_record(table, inplace_record);
         // this->insert_record(table, record);
         end_field.set_int(inplace_record, -trx_id_);
-        rc = table->insert_record(record);
-        if (rc != RC::SUCCESS) {
-          LOG_WARN("failed to insert record into table. rc=%s", strrc(rc));
-          return false;
-        }
         return true;
       });
 
@@ -232,7 +227,11 @@ RC MvccTrx::update_record(Table *table, Record &record)
     LOG_WARN("failed to visit record. rc=%s", strrc(rc));
     return rc;
   }
-
+  rc = table->insert_record(record);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("failed to insert record into table. rc=%s", strrc(rc));
+    return rc;
+  }
   // TODO update
   rc = log_handler_.update_record(trx_id_, table, record.rid());
   ASSERT(rc == RC::SUCCESS,
