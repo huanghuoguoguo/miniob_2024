@@ -152,11 +152,12 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
   OrderBySqlNode *                           order_unit;
   std::vector<OrderBySqlNode> *              order_unit_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
+  std::vector<pair<std::string, std::string>> *  relation_list;
   char *                                     string;
   int                                        number;
   float                                      floats;
   bool                                       boolean;
+  std::pair<std::string, std::string> *      relation_type;
 }
 
 %token <number> NUMBER

@@ -19,6 +19,8 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression.h"
 
+#include <json/config.h>
+
 class BinderContext
 {
 public:
@@ -26,9 +28,9 @@ public:
     virtual ~BinderContext() = default;
 
     void add_table(Table* table) { query_tables_.insert(table); }
-
+    void add_as_table(std::string as,Table* table) { as_tables_.insert({as, table}); }
     Table* find_table(const char* table_name) const;
-
+    Table* get_as_table(std::string as) {return as_tables_.find(as)->second; }
     std::set<Table*>& query_tables() { return query_tables_; }
 
     // 才发现好像没用上当前table，不过既然过了，就不修改了。
@@ -44,6 +46,7 @@ public:
 private:
     std::set<Table*> query_tables_;
     std::vector<Table*> cur_tables_; // 只存储在当前select出现的table，不存储上方存下来的table。查询时如果为空，查当前table。没查到，查全局table。
+    std::unordered_map<std::string,Table*> as_tables_;
     Db* db_;
     bool is_single_ = true;
 

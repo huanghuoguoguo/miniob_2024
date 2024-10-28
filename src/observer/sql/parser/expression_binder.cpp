@@ -24,12 +24,12 @@ using namespace common;
 
 Table *BinderContext::find_table(const char *table_name) const
 {
-  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
-  auto iter = ranges::find_if(query_tables_, pred);
-  if (iter == query_tables_.end()) {
-    return nullptr;
+
+  auto iter = as_tables_.find(table_name);
+  if (iter == as_tables_.end()) {
+    return nullptr; // 如果找不到对应的表
   }
-  return *iter;
+  return iter->second; // 返回找到的 Table* 指针
 }
 
 Table *BinderContext::find_table_by_field(const char *field_name)
