@@ -170,7 +170,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
-%type <string>              relation
+%type <relation_type>       relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
@@ -654,8 +654,7 @@ join_list:
 join:
     relation ON condition_list {
       $$ = new JoinSqlNode;
-      $$->relation = $1;
-      free($1);
+      $$->relations.push_back(*$1);
       $$->conditions.swap(*$3);
     }
     ;
@@ -774,25 +773,29 @@ rel_attr:
     ;
 
 relation:
-    ID {
-      $$ = $1;
+    ID alias {
+      if($2 != nullptr){
+        $$ = new std::pair<std::string, std::string>($1, $2);
+      } else {
+        $$ = new std::pair<std::string, std::string>($1, $1);
+      }
     }
     ;
 rel_list:
     relation {
-      $$ = new std::vector<std::string>();
-      $$->push_back($1);
-      free($1);
+      $$ = new std::vector<std::pair<std::string, std::string>>;
+      $$->push_back(*$1);
+      delete $1;
     }
     | relation COMMA rel_list {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
-        $$ = new std::vector<std::string>;
+        $$ = new std::vector<std::pair<std::string, std::string>>;
       }
 
-      $$->insert($$->begin(), $1);
-      free($1);
+      $$->insert($$->begin(), *$1);
+      delete $1;
     }
     ;
 
