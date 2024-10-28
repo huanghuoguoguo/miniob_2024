@@ -82,7 +82,10 @@ RC MvccTrxLogHandler::insert_record(int32_t trx_id, Table *table, const RID &rid
   return log_handler_.append(
       lsn, LogModule::Id::TRANSACTION, span<const char>(reinterpret_cast<const char *>(&log_entry), sizeof(log_entry)));
 }
-
+RC MvccTrxLogHandler::update_record(int32_t trx_id, Table *table, const RID &rid)
+{
+  return RC::SUCCESS;
+}
 RC MvccTrxLogHandler::delete_record(int32_t trx_id, Table *table, const RID &rid)
 {
   ASSERT(trx_id > 0, "invalid trx_id:%d", trx_id);

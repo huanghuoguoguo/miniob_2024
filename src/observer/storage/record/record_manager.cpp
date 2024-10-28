@@ -696,8 +696,6 @@ RC RecordFileHandler::visit_record(const RID &rid, function<bool(Record &)> upda
   bool updated = updater(record);
   if (updated) {
     rc = page_handler->update_record(rid, record.data());
-    // 还要删除索引，再加入索引。
-
   }
   return rc;
 }

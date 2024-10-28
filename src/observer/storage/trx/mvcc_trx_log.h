@@ -39,6 +39,7 @@ public:
   {
     INSERT_RECORD,  ///< 插入一条记录
     DELETE_RECORD,  ///< 删除一条记录
+    UPDATE_RECORD,  ///< 删除一条记录
     COMMIT,         ///< 提交事务
     ROLLBACK        ///< 回滚事务
   };
@@ -121,6 +122,15 @@ public:
    * @brief 记录删除一条记录的日志
    */
   RC delete_record(int32_t trx_id, Table *table, const RID &rid);
+
+  /**
+   * 记录一次更新的日志。
+   * @param trx_id
+   * @param table
+   * @param rid
+   * @return
+   */
+  RC update_record(int32_t trx_id, Table *table, const RID &rid);
 
   /**
    * @brief 记录提交事务的日志
