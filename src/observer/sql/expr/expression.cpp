@@ -696,7 +696,7 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
   } else if (0 == strcasecmp(type_str, "min")) {
     type = Type::MIN;
   } else {
-    rc = RC::INVALID_ARGUMENT;
+    rc = RC::UNKNOWN_FUNC;
   }
   return rc;
 }

@@ -612,7 +612,11 @@ public:
   AttrType value_type() const override { return AttrType::UNDEFINED; }
   int      value_length() const override { return 0; }
   RC       get_value(const Tuple &tuple, Value &value) const override{return RC::SUCCESS;}
-
+  string   get_func_name(){return this->func_name;}
+  std::vector<std::unique_ptr<Expression>>& params()
+  {
+    return this->params_;
+  }
 private:
   string func_name;
   std::vector<std::unique_ptr<Expression>> params_;

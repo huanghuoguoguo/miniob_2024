@@ -100,6 +100,8 @@ private:
       std::unique_ptr<Expression> &aggregate_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
     RC bind_sub_expression(
           std::unique_ptr<Expression> &sub_query_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+  RC bind_function_expression(std::unique_ptr<Expression>& expr,
+                              std::vector<std::unique_ptr<Expression>>& bound_expressions);
 
 private:
   BinderContext &context_;

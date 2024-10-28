@@ -117,6 +117,9 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
     case ExprType::SUB_QUERY: {
       return bind_sub_expression(expr, bound_expressions);
     }
+    case ExprType::FUNCTION: {
+      return bind_function_expression(expr, bound_expressions);
+    }
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
@@ -472,17 +475,21 @@ RC ExpressionBinder::bind_aggregate_expression(
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
+  auto func_expr = static_cast<FunctionExpr *>(expr.get());
 
-  auto unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
-  const char *aggregate_name = unbound_aggregate_expr->aggregate_name();
+  string              func_name = func_expr->get_func_name();
   AggregateExpr::Type aggregate_type;
-  RC rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
+  RC                  rc = AggregateExpr::type_from_string(func_name.c_str(), aggregate_type);
   if (OB_FAIL(rc)) {
-    LOG_WARN("invalid aggregate name: %s", aggregate_name);
+    LOG_WARN("invalid aggregate name: %s", func_name);
     return rc;
   }
+  // 到这里能够确定他是聚合函数了，判断是不是只有一个字段。
+  if (func_expr->params().size() != 1) {
+    return RC::INVALID_ARGUMENT;
+  }
 
-  unique_ptr<Expression>        &child_expr = unbound_aggregate_expr->child();
+  unique_ptr<Expression> &       child_expr = func_expr->params().front();
   vector<unique_ptr<Expression>> child_bound_expressions;
 
   if (child_expr->type() == ExprType::STAR && aggregate_type == AggregateExpr::Type::COUNT) {
@@ -505,7 +512,7 @@ RC ExpressionBinder::bind_aggregate_expression(
   }
 
   auto aggregate_expr = make_unique<AggregateExpr>(aggregate_type, std::move(child_expr));
-  aggregate_expr->set_name(unbound_aggregate_expr->name());
+  aggregate_expr->set_name(func_expr->name());
   rc = check_aggregate_expression(*aggregate_expr);
   if (OB_FAIL(rc)) {
     return rc;
@@ -607,5 +614,14 @@ RC ExpressionBinder::bind_sub_expression(
     }
   }
   bound_expressions.emplace_back(sub_query_expr);
+  return rc;
+}
+RC ExpressionBinder::bind_function_expression(
+      std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions)
+{
+  // 传输进来的是类似于func(params...)的类型。在这里进行一个分类，如果是聚合函数，直接调用绑定聚合函数。
+  RC rc = RC::SUCCESS;
+
+  rc = bind_aggregate_expression(expr, bound_expressions);
   return rc;
 }
