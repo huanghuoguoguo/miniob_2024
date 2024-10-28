@@ -208,8 +208,9 @@ RC MvccTrx::update_record(Table *table, Record &record)
   end_field.set_int(record, trx_kit_.max_trx_id());
 
   RC update_result = RC::SUCCESS;
+  RID oid;
   RC rc            = table->visit_record(record.rid(),
-      [this,&end_field, table, &update_result](Record &inplace_record) -> bool {
+      [this,&end_field, table,&oid, &update_result](Record &inplace_record) -> bool {
         // 检查对当前行是否可以访问。
         RC rc = this->visit_record(table, inplace_record, ReadWriteMode::READ_WRITE);
         if (OB_FAIL(rc)) {
@@ -220,6 +221,7 @@ RC MvccTrx::update_record(Table *table, Record &record)
         // this->delete_record(table, inplace_record);
         // this->insert_record(table, record);
         end_field.set_int(inplace_record, -trx_id_);
+        oid = inplace_record.rid();
         return true;
       });
 
@@ -242,8 +244,9 @@ RC MvccTrx::update_record(Table *table, Record &record)
       record.len(),
       strrc(rc));
 
-  operations_.push_back(Operation(Operation::Type::UPDATE, table, record.rid()));
-
+  // operations_.push_back(Operation(Operation::Type::UPDATE, table, record.rid()));
+  operations_.push_back(Operation(Operation::Type::DELETE, table, oid));
+  operations_.push_back(Operation(Operation::Type::INSERT, table, record.rid()));
   return RC::SUCCESS;
 }
 
@@ -353,13 +356,16 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
         Field  begin_xid_field, end_xid_field;
         trx_fields(table, begin_xid_field, end_xid_field);
 
-        auto record_updater = [this, &begin_xid_field, commit_xid](Record &record) -> bool {
+        auto record_updater = [this, &table,&begin_xid_field, commit_xid](Record &record) -> bool {
           LOG_DEBUG("before commit insert record. trx id=%d, begin xid=%d, commit xid=%d, lbt=%s",
                     trx_id_, begin_xid_field.get_int(record), commit_xid, lbt());
-          ASSERT(begin_xid_field.get_int(record) == -this->trx_id_ && (!recovering_), 
-                 "got an invalid record while committing. begin xid=%d, this trx id=%d", 
-                 begin_xid_field.get_int(record), trx_id_);
-
+          // ASSERT(begin_xid_field.get_int(record) == -this->trx_id_ && (!recovering_),
+          //        "got an invalid record while committing. begin xid=%d, this trx id=%d",
+          //        begin_xid_field.get_int(record), trx_id_);
+          if(begin_xid_field.get_int(record) != -this->trx_id_) {
+            return false;
+          }
+          table->insert_entry_of_indexes(record.data(),record.rid());
           begin_xid_field.set_int(record, commit_xid);
           return true;
         };
@@ -376,12 +382,15 @@ RC MvccTrx::commit_with_trx_id(int32_t commit_xid)
         Field begin_xid_field, end_xid_field;
         trx_fields(table, begin_xid_field, end_xid_field);
 
-        auto record_updater = [this, &end_xid_field, commit_xid](Record &record) -> bool {
+        auto record_updater = [this, &end_xid_field,&table, commit_xid](Record &record) -> bool {
           (void)this;
-          ASSERT(end_xid_field.get_int(record) == -trx_id_, 
-                 "got an invalid record while committing. end xid=%d, this trx id=%d", 
-                 end_xid_field.get_int(record), trx_id_);
-
+          // ASSERT(end_xid_field.get_int(record) == -trx_id_,
+          //        "got an invalid record while committing. end xid=%d, this trx id=%d",
+          //        end_xid_field.get_int(record), trx_id_);
+          if(end_xid_field.get_int(record) != -trx_id_) {
+            return false;
+          }
+          table->delete_entry_of_indexes(record.data(),record.rid(),false);
           end_xid_field.set_int(record, commit_xid);
           return true;
         };
