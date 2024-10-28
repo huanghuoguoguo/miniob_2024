@@ -6,13 +6,27 @@
 #include <vector>
 #include <sstream>
 #include <string>
-
+#include <bits/ranges_algo.h>
 
 
 int VectorType::compare(const Value &left, const Value &right) const 
 { 
     if (left.is_null() || right.is_null()) 
         return INT32_MAX;
+  std::vector<float> left_ = left.get_vector();
+  std::vector<float> right_ = right.get_vector();
+  auto size = left_.size();
+  size = std::min(size, right_.size());
+
+  for(auto i = 0; i < size; i++) {
+    if(left_[i] == right_[i]) {
+      continue;
+    }
+    if(left_[i] < right_[i]) {
+      return -1;
+    }
+    return 1;
+  }
 
     return 0; // 相等
 } 
