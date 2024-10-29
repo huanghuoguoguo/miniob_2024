@@ -137,6 +137,10 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
+  if(!star_expr->alias().empty()) {
+    return RC::INTERNAL;
+  }
+
   vector<Table *> tables_to_wildcard;
 
   const char *table_name = star_expr->table_name();
@@ -166,12 +170,11 @@ RC ExpressionBinder::bind_unbound_field_expression(
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
-
   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
 
   const char *table_name = unbound_field_expr->table_name();
   const char *field_name = unbound_field_expr->field_name();
-
+ std::string field_as_name = unbound_field_expr->alias();
   Table *table = nullptr;
   if (is_blank(table_name)) {
     // if (context_.query_tables().size() != 1) {
@@ -190,6 +193,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   } else {
     table = context_.find_table(table_name);
+    // const FieldMeta *field_meta = table->table_meta().field(field_name);
+    // context_.add_as_field(field_as_name, field_meta);
     if (nullptr == table) {
       LOG_INFO("no such table in from list: %s", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -210,12 +215,22 @@ RC ExpressionBinder::bind_unbound_field_expression(
   if (0 == strcmp(field_name, "*")) {
     wildcard_fields(table, bound_expressions, false);
   } else {
-    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    const FieldMeta* field_meta = context_.get_as_field_meta(field_name); // 先尝试从上下文获取 field_meta
+
+    // 检查 field_meta 是否为 nullptr
+    if (nullptr == field_meta) {
+      // 如果未找到，从 table 的元数据获取
+      field_meta = table->table_meta().field(field_name);
+
+      // 将找到的 field_meta 加入到上下文
+      context_.add_as_field(field_as_name, field_meta);
+    }
+
+    // 检查 field_meta 是否仍为 nullptr
     if (nullptr == field_meta) {
       LOG_INFO("no such field in table: %s.%s", table_name, field_name);
       return RC::SCHEMA_FIELD_MISSING;
     }
-
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
     string     name       = string(table->table_meta().name()) + "." + string(field.field_name());
