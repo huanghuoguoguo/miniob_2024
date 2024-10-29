@@ -119,11 +119,11 @@ public:
   RC delete_entry_of_indexes(const char* record, const RID& rid, bool error_on_not_exists);
 
 
-private:
+protected:
 
   RC set_value_to_record(char *record_data, const Value &value, const FieldMeta *field);
 
-private:
+protected:
   RC init_record_handler(const char *base_dir);
   RC init_text_handler(const char *base_dir);
 
@@ -133,7 +133,7 @@ public:
   Index* find_index_by_field(const std::vector<string> field_names) const;
   RC drop_all_index();
 
-private:
+protected:
   Db                *db_ = nullptr;
   string             base_dir_;
   TableMeta          table_meta_;
