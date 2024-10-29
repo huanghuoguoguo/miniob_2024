@@ -29,11 +29,14 @@ public:
 
     void add_table(Table* table) { query_tables_.insert(table); }
     void add_as_table(std::string as,Table* table) { as_tables_.insert({as, table}); }
+    void add_as_field(std::string as,const FieldMeta* field_meta) { as_fields_.insert({as, field_meta}); }
     Table* find_table(const char* table_name) const;
-    Table* get_as_table(std::string as) {return as_tables_.find(as)->second; }
+    Table            *get_as_table(std::string as) { return as_tables_.find(as)->second; }
+    const FieldMeta  *get_as_field_meta(const char *as) {auto it = as_fields_.find(as);
+        return (it != as_fields_.end()) ? it->second : nullptr;  }
     std::set<Table*>& query_tables() { return query_tables_; }
     std::unordered_map<std::string,Table*>& query_as_tables() { return as_tables_; }
-
+    std::unordered_map<std::string,const FieldMeta*>& query_as_fields() { return as_fields_; }
     // 才发现好像没用上当前table，不过既然过了，就不修改了。
     void add_cur_table(Table* table) { cur_tables_.push_back(table); }
 
@@ -48,6 +51,7 @@ private:
     std::set<Table*> query_tables_;
     std::vector<Table*> cur_tables_; // 只存储在当前select出现的table，不存储上方存下来的table。查询时如果为空，查当前table。没查到，查全局table。
     std::unordered_map<std::string,Table*> as_tables_;
+    std::unordered_map<std::string,const FieldMeta*> as_fields_;
     Db* db_;
     bool is_single_ = true;
 
