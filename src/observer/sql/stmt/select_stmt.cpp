@@ -116,7 +116,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
   std::vector<FilterStmt*> group_by_having;
   FilterStmt *having_filter_stmt = nullptr;
-  // conditions
+  // group by
   rc = expression_binder.bind_condition_expression(select_sql.group_by_having);
   if (OB_FAIL(rc)) {
     LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));

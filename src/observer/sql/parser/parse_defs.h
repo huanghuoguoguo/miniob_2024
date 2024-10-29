@@ -89,6 +89,7 @@ struct ConditionSqlNode
     Expression* left_expr;
     CompOp comp; ///< comparison operator
     Expression* right_expr;
+    bool is_or = false; // or is true
 };
 
 struct OrderBySqlNode

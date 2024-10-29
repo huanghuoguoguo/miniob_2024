@@ -87,10 +87,21 @@ public:
     return right_;
   }
 
+  bool is_or() const
+  {
+    return is_or_;
+  }
+
+  void is_or(bool is_or)
+  {
+    this->is_or_ = is_or;
+  }
+
 private:
   CompOp comp_ = NO_OP;
   std::unique_ptr<Expression> left_;
   std::unique_ptr<Expression> right_;
+  bool is_or_ = false; // 只有第二个filter才有效。
 };
 
 /**

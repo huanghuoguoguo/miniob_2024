@@ -31,6 +31,9 @@ RC PredicatePushdownRewriter::try_rewriter_table_get(
 
   std::vector<std::unique_ptr<Expression>> pushdown_exprs;
   rc = get_exprs_can_pushdown(predicate_expr, pushdown_exprs, table_get_oper);
+  if (rc == RC::UNIMPLEMENTED) {
+    rc = RC::SUCCESS;
+  }
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to get exprs can pushdown. rc=%s", strrc(rc));
     return rc;
@@ -163,6 +166,7 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     // 或 操作的比较，太复杂，现在不考虑
     if (conjunction_expr->conjunction_type() == ConjunctionExpr::Type::OR) {
       LOG_WARN("unsupported or operation");
+      // or不下推。
       rc = RC::UNIMPLEMENTED;
       return rc;
     }

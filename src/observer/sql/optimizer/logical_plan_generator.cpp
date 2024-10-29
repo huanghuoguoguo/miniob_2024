@@ -268,6 +268,7 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
   }
   std::vector<unique_ptr<Expression>> cmp_exprs;
   const std::vector<FilterUnit *> &   filter_units = filter_stmt->filter_units();
+  bool and_cond = true;
   for (FilterUnit *filter_unit : filter_units) {
     std::unique_ptr<Expression> left  = std::move(filter_unit->left());
     std::unique_ptr<Expression> right = std::move(filter_unit->right());
@@ -333,12 +334,21 @@ RC LogicalPlanGenerator::create_plan(FilterStmt *filter_stmt, unique_ptr<Logical
 
     ComparisonExpr *cmp_expr = new ComparisonExpr(filter_unit->comp(), std::move(left), std::move(right));
     cmp_exprs.emplace_back(cmp_expr);
+    if(filter_unit->is_or()) {
+      and_cond = false;
+    }
   }
 
   unique_ptr<PredicateLogicalOperator> predicate_oper;
   if (cmp_exprs.size() > 1) {
-    unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
-    predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
+    if(and_cond) {
+      unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::AND, cmp_exprs));
+      predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
+    }else {
+      unique_ptr<ConjunctionExpr> conjunction_expr(new ConjunctionExpr(ConjunctionExpr::Type::OR, cmp_exprs));
+      predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(conjunction_expr)));
+    }
+
   } else {
     predicate_oper = unique_ptr<PredicateLogicalOperator>(new PredicateLogicalOperator(std::move(cmp_exprs.front())));
   }
