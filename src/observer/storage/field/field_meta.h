@@ -57,6 +57,8 @@ public:
 protected:
   // TEXT类型数据不直接存到Record内部，列中只是记录它在文件中的偏移量、长度
   const static int TEXT_FIELD_LENGTH = 16;
+  // VECTOR类型高维数据和TEXT数据类型类似
+  const static int VECTOR_FIELD_LENGTH = 16;
 
 protected:
   string   name_;

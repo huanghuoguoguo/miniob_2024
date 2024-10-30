@@ -11,6 +11,7 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 static constexpr int MAX_TEXT_LENGTH = 65535;
+static constexpr int MAX_VECTOR_LENGTH = 16000;
 
 /**
  * @brief 属性的类型
