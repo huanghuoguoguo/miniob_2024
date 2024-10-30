@@ -117,6 +117,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
     return rc;
   }
+  if (tables.size() > 1 && bound_expressions.size() == 1 && select_sql.conditions.empty()) {
+    return RC::INTERNAL;
+  }
 
   // group
   vector<unique_ptr<Expression>> group_by_expressions;

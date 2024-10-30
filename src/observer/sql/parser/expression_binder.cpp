@@ -154,11 +154,11 @@ RC ExpressionBinder::bind_star_expression(
     tables_to_wildcard.push_back(table);
   } else {
     const vector<Table *> &all_tables = context_.cur_tables();
-    // 判断是否存在多个表
-    if (all_tables.size() > 1) {
-      LOG_WARN("SELECT * is not allowed for multiple tables.");
-      return RC::INTERNAL;
-    }
+    // // 判断是否存在多个表
+    // if (all_tables.size() > 1) {
+    //   LOG_WARN("SELECT * is not allowed for multiple tables.");
+    //   return RC::INTERNAL;
+    // }
     tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
   }
 
