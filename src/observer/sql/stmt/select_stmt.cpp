@@ -65,10 +65,12 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return RC::INVALID_ARGUMENT;
     }
     const char *as_table_name = select_sql.relations[i].second.c_str();  //拿到的表名是表别名
-    Table *as_table = db->find_table(as_table_name);
-    if (nullptr != as_table) {
-      LOG_WARN("invalid argument. relation name is not match.");
-      return RC::INVALID_ARGUMENT;
+    if (as_table_name && strcmp(table_name, as_table_name) != 0) {// 使用 strcmp 比较 table_name 和 as_table_name 是否相同
+      Table *as_table = db->find_table(as_table_name);
+      if (nullptr != as_table) {
+        LOG_WARN("invalid argument. relation name is not match.");
+        return RC::INVALID_ARGUMENT;
+      }
     }
 
     Table *table = db->find_table(table_name);
