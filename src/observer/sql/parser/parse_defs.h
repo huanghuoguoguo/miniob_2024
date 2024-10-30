@@ -121,6 +121,11 @@ struct SelectSqlNode
   BinderContext*                           binder_context = nullptr;
 };
 
+struct CreateViewSqlNode
+{
+    std::string view_name;
+    SelectSqlNode* select_sql_node;   // view列到原始表的映射
+};
 
 /**
  * 表示一个join relation列表
@@ -316,6 +321,7 @@ enum SqlCommandFlag
   SCF_HELP,
   SCF_EXIT,
   SCF_EXPLAIN,
+  SCF_CREATE_VIEW,
   SCF_SET_VARIABLE,  ///< 设置变量
 };
 /**
@@ -340,6 +346,7 @@ public:
   LoadDataSqlNode     load_data;
   ExplainSqlNode      explain;
   SetVariableSqlNode  set_variable;
+  CreateViewSqlNode   create_view;
 
 public:
   ParsedSqlNode();

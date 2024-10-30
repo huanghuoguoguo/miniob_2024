@@ -43,6 +43,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     select_sql.binder_context->cur_tables().clear();
     select_sql.binder_context->db(db);
   }
+
   BinderContext& binder_context = *select_sql.binder_context;
 
 
@@ -212,6 +213,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
   select_stmt->is_single_ = binder_context.is_single();
+  select_stmt->binder_context_ = select_sql.binder_context;
   stmt                    = select_stmt;
   return RC::SUCCESS;
 }

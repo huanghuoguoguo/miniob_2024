@@ -431,6 +431,28 @@ public:
     }
     return RC::SUCCESS;
   }
+  static RC make(const Tuple &tuple,const std::vector<TupleCellSpec>& spec, ValueListTuple &value_list)
+  {
+    const int cell_num = tuple.cell_num();
+    for (int i = 0; i < cell_num; i++) {
+      Value cell;
+      RC    rc = tuple.cell_at(i, cell);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+      TupleCellSpec spec_;
+      rc = tuple.spec_at(i, spec_);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+      value_list.cells_.push_back(cell);
+
+      string alias = std::string(spec[i].table_name()) + "." + std::string(spec_.alias());
+      value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name(),alias.c_str());
+    }
+
+    return RC::SUCCESS;
+  }
 
 private:
   std::vector<Value>         cells_;

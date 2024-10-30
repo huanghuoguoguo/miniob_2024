@@ -133,6 +133,8 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
         IN
         UNIQUE
         OR
+        AS
+        VIEW
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -205,6 +207,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
 %type <sql_node>            commit_stmt
+%type <sql_node>            create_view_stmt
 %type <sql_node>            rollback_stmt
 %type <sql_node>            load_data_stmt
 %type <sql_node>            explain_stmt
@@ -241,6 +244,7 @@ command_wrapper:
   | drop_index_stmt
   | sync_stmt
   | begin_stmt
+  | create_view_stmt
   | commit_stmt
   | rollback_stmt
   | load_data_stmt
@@ -306,6 +310,16 @@ desc_table_stmt:
     }
     ;
 
+create_view_stmt:
+    CREATE VIEW ID AS select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+      $$->flag = SCF_CREATE_VIEW;
+      $$->create_view.view_name = $3;
+      $$->create_view.select_sql_node = &$5->selection;
+      free($3);
+    }
+    ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
     CREATE INDEX ID ON ID LBRACE expression_list RBRACE

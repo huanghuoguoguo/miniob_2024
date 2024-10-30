@@ -138,6 +138,8 @@ HAVING                                  RETURN_TOKEN(HAVING);
 IN                                      RETURN_TOKEN(IN);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);
 OR                                      RETURN_TOKEN(OR);
+AS                                      RETURN_TOKEN(AS);
+VIEW                                    RETURN_TOKEN(VIEW);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);

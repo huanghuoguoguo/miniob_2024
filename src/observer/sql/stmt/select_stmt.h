@@ -65,5 +65,14 @@ private:
   std::vector<std::unique_ptr<Expression>> group_by_;
   std::vector<std::unique_ptr<OrderBySqlNode>> order_by_;
   FilterStmt*                              group_by_having_;
+  BinderContext*                  binder_context_;
+
+public:
+  BinderContext* binder_context()
+  {
+    return binder_context_;
+  }
+
+private:
   bool is_single_ = true;
 };

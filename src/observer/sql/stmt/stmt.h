@@ -32,6 +32,7 @@ class Db;
 #define DEFINE_ENUM()            \
   DEFINE_ENUM_ITEM(CALC)         \
   DEFINE_ENUM_ITEM(SELECT)       \
+  DEFINE_ENUM_ITEM(CREATE_VIEW)  \
   DEFINE_ENUM_ITEM(INSERT)       \
   DEFINE_ENUM_ITEM(UPDATE)       \
   DEFINE_ENUM_ITEM(DELETE)       \
