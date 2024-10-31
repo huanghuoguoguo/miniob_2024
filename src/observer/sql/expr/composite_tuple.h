@@ -45,6 +45,11 @@ public:
   void   add_tuple(std::unique_ptr<Tuple> tuple);
   Tuple &tuple_at(size_t index);
 
+  std::vector<std::unique_ptr<Tuple>>& tuples()
+  {
+      return tuples_;
+  }
+
 private:
   std::vector<std::unique_ptr<Tuple>> tuples_;
 };

@@ -194,7 +194,7 @@ public:
     null_list = std::bitset<32>(v);
   }
 
-  void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
+  void set_schema(Table *table, const std::vector<FieldMeta> *fields)
   {
     table_ = table;
     // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
@@ -290,7 +290,7 @@ public:
 
 private:
   Record                  *record_ = nullptr;
-  const Table             *table_  = nullptr;
+  Table             *table_  = nullptr;
   std::vector<FieldExpr *> speces_;
   std::bitset<32>         null_list;
 };
@@ -450,7 +450,9 @@ public:
       string alias = std::string(spec[i].table_name()) + "." + std::string(spec_.alias());
       value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name(),alias.c_str());
     }
-
+    // 还要加入null_list
+    value_list.cells_.insert(value_list.cells_.begin(),Value());
+    value_list.specs_.insert(value_list.specs_.begin(),TupleCellSpec(spec[0].table_name(), "null_list"));
     return RC::SUCCESS;
   }
 

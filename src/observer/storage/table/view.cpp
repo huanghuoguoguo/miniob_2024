@@ -199,62 +199,62 @@ RC View::init()
 
 RC View::make_record(int value_num, const Value *values, Record &record)
 {
-  RC rc = RC::SUCCESS;
+
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  this->current_table->make_record(value_num, values, record);
-  return rc;
+
+  return this->current_table->make_record(value_num, values, record);
 }
 
 RC View::insert_record(Record &record)
 {
-  RC rc = RC::SUCCESS;
+
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  this->current_table->insert_record(record);
-  return rc;
+
+  return this->current_table->insert_record(record);
 }
 
 RC View::delete_record(const Record &record)
 {
-  RC rc = RC::SUCCESS;
+
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  this->current_table->delete_record(record);
-  return rc;
+
+  return this->current_table->delete_record(record);
 }
 
 RC View::delete_record(const RID &rid)
 {
-  RC rc = RC::SUCCESS;
+
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  this->current_table->delete_record(rid);
-  return rc;
+
+  return this->current_table->delete_record(rid);
 }
 
 RC View::update_record(const Record &record)
 {
-  RC rc = RC::SUCCESS;
+
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  this->current_table->update_record(record);
-  return rc;
+
+  return this->current_table->update_record(record);
 }
 
 RC View::get_record(const RID &rid, Record &record)
 {
-  RC rc = RC::SUCCESS;
+
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  this->current_table->get_record(rid, record);
-  return rc;
+
+  return this->current_table->get_record(rid, record);
 }
 
 RC View::sync()
@@ -264,115 +264,115 @@ RC View::sync()
 
 RC View::recover_insert_record(Record &record)
 {
-  RC rc = RC::SUCCESS;
+
   // 假设有一个方法可以恢复插入的记录
   // 这里可以添加具体的恢复逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  this->current_table->recover_insert_record(record);
-  return rc;
+
+  return this->current_table->recover_insert_record(record);
 }
 
 RC View::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressions_, const char *index_name,
     bool                   is_unique)
 {
-  RC rc = RC::SUCCESS;
+
   // 创建索引的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
   // 调用当前表的创建索引方法
-  rc = this->current_table->create_index(trx, column_expressions_, index_name, is_unique);
-  return rc;
+
+  return this->current_table->create_index(trx, column_expressions_, index_name, is_unique);
 }
 
 RC View::get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode)
 {
-  RC rc = RC::SUCCESS;
+
   // 获取记录扫描器的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->get_record_scanner(scanner, trx, mode);
-  return rc;
+
+  return this->current_table->get_record_scanner(scanner, trx, mode);
 }
 
 RC View::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode mode)
 {
-  RC rc = RC::SUCCESS;
+
   // 获取块扫描器的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->get_chunk_scanner(scanner, trx, mode);
-  return rc;
+
+  return this->current_table->get_chunk_scanner(scanner, trx, mode);
 }
 
 RC View::write_text(int64_t &offset, int64_t length, const char *data) const
 {
-  RC rc = RC::SUCCESS;
+
   // 写入文本的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->write_text(offset, length, data);
-  return rc;
+
+  return this->current_table->write_text(offset, length, data);
 }
 
 RC View::read_text(int64_t offset, int64_t length, char *data) const
 {
-  RC rc = RC::SUCCESS;
+
   // 读取文本的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->read_text(offset, length, data);
-  return rc;
+
+  return this->current_table->read_text(offset, length, data);
 }
 
 RC View::visit_record(const RID &rid, function<bool(Record &)> visitor)
 {
-  RC rc = RC::SUCCESS;
+
   // 访问记录的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->visit_record(rid, visitor);
-  return rc;
+
+  return this->current_table->visit_record(rid, visitor);
 }
 
 RC View::insert_entry_of_indexes(const char *record, const RID &rid)
 {
-  RC rc = RC::SUCCESS;
+
   // 插入索引条目的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->insert_entry_of_indexes(record, rid);
-  return rc;
+
+  return this->current_table->insert_entry_of_indexes(record, rid);
 }
 
 RC View::delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists)
 {
-  RC rc = RC::SUCCESS;
+
   // 删除索引条目的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->delete_entry_of_indexes(record, rid, error_on_not_exists);
-  return rc;
+
+  return this->current_table->delete_entry_of_indexes(record, rid, error_on_not_exists);
 }
 
 RC View::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
-  RC rc = RC::SUCCESS;
+
   // 设置记录值的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->set_value_to_record(record_data, value, field);
-  return rc;
+
+  return this->current_table->set_value_to_record(record_data, value, field);
 }
 
 
@@ -405,33 +405,32 @@ Index *View::find_index_by_field(const std::vector<string> field_names) const
 
 RC View::drop_all_index()
 {
-  RC rc = RC::SUCCESS;
+
   // 删除所有索引的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->drop_all_index();
-  return rc;
+
+  return  this->current_table->drop_all_index();
 }
 
 RC View::init_record_handler(const char *base_dir)
 {
-  RC rc = RC::SUCCESS;
+
   // 删除所有索引的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->init_record_handler(base_dir);
-  return rc;
+
+  return  this->current_table->init_record_handler(base_dir);
 }
 
 RC View::init_text_handler(const char *base_dir)
 {
-  RC rc = RC::SUCCESS;
+
   // 删除所有索引的逻辑
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  rc = this->current_table->init_text_handler(base_dir);
-  return rc;
+  return  this->current_table->init_text_handler(base_dir);
 }

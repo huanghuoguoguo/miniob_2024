@@ -47,7 +47,7 @@ private:
   using GroupType = std::tuple<ValueListTuple, GroupValueType>;
 
 private:
-  RC find_group(const Tuple &child_tuple, GroupType *&found_group);
+  RC find_group(Tuple &child_tuple, GroupType *&found_group);
 
 private:
   std::vector<std::unique_ptr<Expression>> group_by_exprs_;
