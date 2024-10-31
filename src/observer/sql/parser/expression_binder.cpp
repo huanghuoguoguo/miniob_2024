@@ -24,12 +24,21 @@ using namespace common;
 
 Table *BinderContext::find_table(const char *table_name) const
 {
+  // 先在 as_tables_ 中查找表别名
+  auto alias_iter = as_tables_.find(table_name);
+  if (alias_iter != as_tables_.end()) {
+    return alias_iter->second; // 返回找到的 Table* 指针
+  }
 
-  auto iter = as_tables_.find(table_name);
-  if (iter == as_tables_.end()) {
+  // 如果 as_tables_ 中没有找到，再在 query_tables_ 中查找表名
+  auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
+  auto iter = ranges::find_if(query_tables_, pred);
+
+  if (iter == query_tables_.end()) {
     return nullptr; // 如果找不到对应的表
   }
-  return iter->second; // 返回找到的 Table* 指针
+
+  return *iter;
 }
 
 Table *BinderContext::find_table_by_field(const char *field_name)
@@ -144,6 +153,7 @@ RC ExpressionBinder::bind_star_expression(
   vector<Table *> tables_to_wildcard;
 
   const char *table_name = star_expr->table_name();
+  //若 table_name 不是空且不等于 "*", 则表示只从指定的 table_name 表中获取字段。
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
     Table *table = context_.find_table(table_name);
     if (nullptr == table) {
@@ -153,8 +163,9 @@ RC ExpressionBinder::bind_star_expression(
 
     tables_to_wildcard.push_back(table);
   } else {
+    //处理未指定表名的情况:
     const vector<Table *> &all_tables = context_.cur_tables();
-    // // 判断是否存在多个表
+    // 判断是否存在多个表 用于判断select * from t1,t2
     // if (all_tables.size() > 1) {
     //   LOG_WARN("SELECT * is not allowed for multiple tables.");
     //   return RC::INTERNAL;
@@ -245,6 +256,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     }
 
     field_expr->set_name(name);
+    field_expr->set_alias(field_as_name);
     bound_expressions.emplace_back(field_expr);
   }
 

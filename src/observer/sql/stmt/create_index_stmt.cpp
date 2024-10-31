@@ -46,6 +46,7 @@ RC CreateIndexStmt::create(Db *db, CreateIndexSqlNode &create_index, Stmt *&stmt
   BinderContext binder_context;
   binder_context.db(db);
   binder_context.add_table(table);
+  binder_context.add_as_table(table_name, table);
 
   // collect fields
   vector<unique_ptr<Expression>> bound_expressions;

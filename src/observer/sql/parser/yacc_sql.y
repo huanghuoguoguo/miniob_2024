@@ -322,7 +322,6 @@ create_index_stmt:    /*create index 语句的语法解析树*/
       create_index.columns.swap(*$7);
       free($3);
       free($5);
-      free($7);
     }
     | CREATE UNIQUE INDEX ID ON ID LBRACE expression_list RBRACE
      {
@@ -686,7 +685,7 @@ join_list:
 join:
     relation ON condition_list {
       $$ = new JoinSqlNode;
-      $$->relations.push_back(*$1);
+      $$->relation = *$1;
       $$->conditions.swap(*$3);
     }
     ;
@@ -816,7 +815,7 @@ relation:
       if($2 != nullptr){
         $$ = new std::pair<std::string, std::string>($1, $2);
       } else {
-        $$ = new std::pair<std::string, std::string>($1, $1);
+        $$ = new std::pair<std::string, std::string>($1, "");
       }
     }
     ;
