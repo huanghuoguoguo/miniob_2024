@@ -29,6 +29,10 @@ Table *BinderContext::find_table(const char *table_name) const
   if (alias_iter != as_tables_.end()) {
     return alias_iter->second; // 返回找到的 Table* 指针
   }
+   alias_iter = as_parent_tables_.find(table_name);
+  if (alias_iter != as_parent_tables_.end()) {
+    return alias_iter->second; // 返回找到的 Table* 指针
+  }
 
   // 如果 as_tables_ 中没有找到，再在 query_tables_ 中查找表名
   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
@@ -598,14 +602,21 @@ RC ExpressionBinder::bind_sub_expression(
       std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions)
 {
   RC rc = RC::SUCCESS;
-  Stmt *stmt = nullptr;
-  SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
-  if(sub_query_expr->select_sql_node() != nullptr) {
+  Stmt         *stmt           = nullptr;
+  SubQueryExpr *sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
+  if (sub_query_expr->select_sql_node() != nullptr) {
     BinderContext * sub_context = new BinderContext();
     sub_context->db(this->context_.db());
     //把外部的别名指针对应表传入子查询
-    sub_context->as_table(this->context_.query_as_tables());
-    // 将当前的所有table放入下一层。  感觉没必要了
+    for(auto as :this->context_.query_as_tables()) {
+      sub_context->add_as_parent_table(as.first,as.second);
+    }
+    for(auto as :this->context_.query_as_parent_tables()) {
+      sub_context->add_as_parent_table(as.first,as.second);
+    }
+
+
+    // 将当前的所有table放入下一层。
     for(auto& table :context_.query_tables()) {
       sub_context->add_table(table);
     }
