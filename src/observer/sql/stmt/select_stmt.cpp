@@ -201,6 +201,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     order_by_expressions.push_back(std::move(order_by_sql_node));
   }
 
+  if (select_sql.limit <= 0) {
+    return RC::INVALID_ARGUMENT;
+  }
+
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
 
@@ -212,6 +216,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
   select_stmt->is_single_ = binder_context.is_single();
+  select_stmt->limit_ = select_sql.limit;
   stmt                    = select_stmt;
   return RC::SUCCESS;
 }
