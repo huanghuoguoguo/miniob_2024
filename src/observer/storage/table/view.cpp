@@ -27,6 +27,7 @@
 
 #include <regex>
 #include <sql/expr/expression.h>
+#include <sql/stmt/create_view_stmt.h>
 
 #include "storage/trx/trx.h"
 int sql_parse(const char *st, ParsedSqlResult *sql_result);
@@ -37,8 +38,9 @@ View::~View()
   // ~Table();
 }
 
-RC View::create_view(Db *db, const char *         path, const char *base_dir, int32_t table_id, const char *name,
-    SelectStmt *         select_stmt, std::string sql)
+RC View::create_view(Db *db, const char *path, const char *base_dir, int32_t table_id, const char *name,
+    SelectStmt *         select_stmt,
+    std::string &        sql, std::vector<std::unique_ptr<Expression>> &query_expressions)
 {
   if (table_id < 0) {
     LOG_WARN("invalid table id. table_id=%d, table_name=%s", table_id, name);
@@ -77,6 +79,10 @@ RC View::create_view(Db *db, const char *         path, const char *base_dir, in
   }
 
   ofs.close();
+  // 将元数据保存在文件中。
+  db_       = db;
+  base_dir_ = base_dir;
+  /*                       读取结束                    */
   this->table_id_          = table_id;
   this->sql                = sql;
   this->view_name_         = name;
@@ -86,20 +92,15 @@ RC View::create_view(Db *db, const char *         path, const char *base_dir, in
   for (auto &table : tables) {
     this->tables.insert(table);
   }
-  rc = init();
-  if (rc != RC::SUCCESS) {
-    return rc;
-  }
-
-  // 将元数据保存在文件中。
-  db_       = db;
-  base_dir_ = base_dir;
+  this->query_expressions.swap(query_expressions);
+  rc = init_tuple_spec();
 
   return rc;
 }
 
 SelectStmt *View::select_stmt()
 {
+  // 每次都返回一个新的stmt。
   ParsedSqlResult parsed_sql_result;
   sql_parse(sql.c_str(), &parsed_sql_result);
   std::unique_ptr<ParsedSqlNode> sql_node        = std::move(parsed_sql_result.sql_nodes().front());
@@ -150,7 +151,14 @@ RC View::open(Db *db, const char *meta_file, const char *base_dir)
   for (auto &table : tables) {
     this->tables.insert(table);
   }
-  rc = init();
+  // 将指定列从sql中解析出来。
+  ParsedSqlResult parsed_sql_result;
+  sql_parse(sql.c_str(), &parsed_sql_result);
+  std::unique_ptr<ParsedSqlNode> sql_node        = std::move(parsed_sql_result.sql_nodes().front());
+  Stmt* stmt;
+  CreateViewStmt::create(this->db_, sql_node->create_view,stmt);
+  this->query_expressions.swap(static_cast<CreateViewStmt *>(stmt)->query_expressions());
+  rc = init_tuple_spec();
   if (rc != RC::SUCCESS) {
     return rc;
   }
@@ -158,45 +166,58 @@ RC View::open(Db *db, const char *meta_file, const char *base_dir)
   return rc;
 }
 
-RC View::init()
+RC View::init_tuple_spec()
 {
   RC rc = RC::SUCCESS;
-  if (tables.size() == 1) {
-    this->current_table                       = *tables.begin();
-    this->table_meta_                         = &current_table->table_meta();
-    const std::vector<FieldMeta> *field_metas = this->table_meta_->field_metas();
-    for (auto &field_meta : *field_metas) {
-      this->tuple_schemata_.emplace_back(this->view_name_.c_str(), field_meta.name(), "");
+  // 收集tuple_schame
+  if (this->query_expressions.empty()) {
+    // 如果没有指定映射列
+    if (tables.size() == 1) {
+      // 如果只有一个表，默认是该表的所有。
+      this->current_table                       = *tables.begin();
+      this->table_meta_                         = &current_table->table_meta();
+      const std::vector<FieldMeta> *field_metas = this->table_meta_->field_metas();
+      for (auto &field_meta : *field_metas) {
+        this->tuple_schemata_.emplace_back(this->view_name_.c_str(), field_meta.name(), "");
+      }
+      this->tuple_schemata_.erase(this->tuple_schemata_.begin());
+    } else {
+      // 如果是多个表，那么是多个表的所有列。
+      rc = this->init_(this->select_stmt()->query_expressions());
     }
-    this->tuple_schemata_.erase(this->tuple_schemata_.begin());
   } else {
-    // 将查询列拿出来作为新的table_meta
-    std::vector<AttrInfoSqlNode>              spv;
-    std::vector<std::unique_ptr<Expression>> &query_expressions = this->select_stmt()->query_expressions();
-    for (auto &query_expression : query_expressions) {
-      AttrInfoSqlNode attr_info_sql_node;
-      attr_info_sql_node.type     = query_expression->value_type();
-      attr_info_sql_node.name     = query_expression->name();
-      attr_info_sql_node.length   = query_expression->value_length();
-      attr_info_sql_node.nullable = true;
-      spv.push_back(attr_info_sql_node);
-      // TODO 有坑。
-      this->tuple_schemata_.emplace_back(this->view_name_.c_str(), query_expression->name(), "");
-    }
-    std::span<AttrInfoSqlNode> attributes(spv);
-    // 创建文件
-    const vector<FieldMeta> *trx_fields = this->db_->trx_kit().trx_fields();
-    if ((rc = table_meta_->init(this->table_id_,
-             this->view_name_.c_str(),
-             trx_fields,
-             attributes,
-             StorageFormat::ROW_FORMAT)) != RC::SUCCESS) {
-      return rc; // delete table file
-    }
+    rc = this->init_(this->query_expressions);
   }
   return rc;
 }
 
+RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
+{
+  // 将查询列拿出来作为新的table_meta
+  RC                           rc = RC::SUCCESS;
+  std::vector<AttrInfoSqlNode> spv;
+  for (auto &query_expression : query_expressions) {
+    AttrInfoSqlNode attr_info_sql_node;
+    attr_info_sql_node.type     = query_expression->value_type();
+    attr_info_sql_node.name     = query_expression->name();
+    attr_info_sql_node.length   = query_expression->value_length();
+    attr_info_sql_node.nullable = true;
+    spv.push_back(attr_info_sql_node);
+    // TODO 有坑。
+    this->tuple_schemata_.emplace_back(this->view_name_.c_str(), query_expression->name(), "");
+  }
+  std::span<AttrInfoSqlNode> attributes(spv);
+  // 创建文件
+  const vector<FieldMeta> *trx_fields = this->db_->trx_kit().trx_fields();
+  if ((rc = table_meta_->init(this->table_id_,
+           this->view_name_.c_str(),
+           trx_fields,
+           attributes,
+           StorageFormat::ROW_FORMAT)) != RC::SUCCESS) {
+    return rc; // delete table file
+  }
+  return rc;
+}
 RC View::make_record(int value_num, const Value *values, Record &record)
 {
 

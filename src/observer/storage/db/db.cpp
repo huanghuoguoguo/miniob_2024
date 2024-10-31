@@ -169,7 +169,7 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
 }
 
 
-RC Db::create_view(const char *view_name, SelectStmt *select_stmt,std::string sql)
+RC Db::create_view(const char *view_name, SelectStmt *select_stmt, std::string& sql,std::vector<std::unique_ptr<Expression>>& query_expressions)
 {
   RC rc = RC::SUCCESS;
   // check table_name
@@ -180,9 +180,16 @@ RC Db::create_view(const char *view_name, SelectStmt *select_stmt,std::string sq
   }
   // 文件路径可以移到Table模块
   string  table_file_path = view_meta_file(path_.c_str(), view_name);
-  Table * view     = new View();
-  int32_t table_id = next_table_id_++; // 给每一个table都分配一个id 用来记录日志
-  rc               = view->create_view(this,table_file_path.c_str(),path_.c_str(), table_id, view_name, select_stmt, sql);
+  Table * view            = new View();
+  int32_t table_id        = next_table_id_++; // 给每一个table都分配一个id 用来记录日志
+  rc                      = view->create_view(this,
+      table_file_path.c_str(),
+      path_.c_str(),
+      table_id,
+      view_name,
+      select_stmt,
+      sql,
+      query_expressions);
   if (rc != RC::SUCCESS) {
     delete view;
     return rc;

@@ -15,10 +15,10 @@ CreateViewStmt::CreateViewStmt(const std::string &view_name,
     SelectStmt *                                  select_stmt)
   : view_name_(view_name)
 {
-  this->select_stmt_    = select_stmt;
+  this->select_stmt_ = select_stmt;
 }
 
-RC CreateViewStmt::create(Db *db, const CreateViewSqlNode &create_view, Stmt *&stmt)
+RC CreateViewStmt::create(Db *db, CreateViewSqlNode &create_view, Stmt *&stmt)
 {
   RC rc = RC::SUCCESS;
   if (nullptr == db) {
@@ -42,7 +42,24 @@ RC CreateViewStmt::create(Db *db, const CreateViewSqlNode &create_view, Stmt *&s
   }
   SelectStmt *select_stmt = static_cast<SelectStmt *>(sub_stmt);
 
-  stmt = new CreateViewStmt(create_view.view_name, select_stmt);
+  // 绑定列。
+  BinderContext &binder_context = *create_view.select_sql_node->binder_context;
+  // collect query fields in `select` statement
+  vector<unique_ptr<Expression>> bound_expressions;
+  ExpressionBinder               expression_binder(binder_context);
+
+  // 绑定搜索列。
+  for (unique_ptr<Expression> &expression : create_view.expressions) {
+    rc = expression_binder.bind_expression(expression, bound_expressions);
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+
+  CreateViewStmt *view_stmt = new CreateViewStmt(create_view.view_name, select_stmt);
+  view_stmt->query_expressions_.swap(bound_expressions);
+  stmt = view_stmt;
 
   sql_debug("create view statement: table name %s", create_view.view_name.c_str());
 

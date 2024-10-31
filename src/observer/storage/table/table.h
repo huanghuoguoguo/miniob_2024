@@ -56,7 +56,8 @@ public:
               span<const AttrInfoSqlNode> attributes, StorageFormat storage_format);
 
     virtual RC create_view(Db* db, const char* path, const char* base_dir, int32_t table_id, const char* name,
-                           SelectStmt* select_stmt, std::string sql) { return RC::INTERNAL; };
+                           SelectStmt* select_stmt, std::string& sql,
+                           std::vector<std::unique_ptr<Expression>>& query_expressions) { return RC::INTERNAL; };
     /**
      * 打开一个表
      * @param meta_file 保存表元数据的文件完整路径

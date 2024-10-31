@@ -21,23 +21,28 @@ class Field;
 class CreateViewStmt : public Stmt
 {
 public:
-  CreateViewStmt(const std::string &view_name, SelectStmt *select_stmt);
-  virtual   ~CreateViewStmt() = default;
-  static RC create(Db *db, const CreateViewSqlNode &create_table, Stmt *&stmt);
+    CreateViewStmt(const std::string& view_name, SelectStmt* select_stmt);
+    virtual ~CreateViewStmt() = default;
+    static RC create(Db* db, CreateViewSqlNode& create_table, Stmt*& stmt);
 
-public:
-  std::string view_name() const { return view_name_; }
+    std::vector<std::unique_ptr<Expression>>& query_expressions()
+    {
+        return query_expressions_;
+    }
 
-  StmtType type() const override { return StmtType::CREATE_VIEW; }
+    std::string view_name() const { return view_name_; }
+
+    StmtType type() const override { return StmtType::CREATE_VIEW; }
 
 private:
-  std::string    view_name_;
-  SelectStmt *   select_stmt_; // SelectStmt里存的是指针，不便于落盘管理
+    std::string view_name_;
+    SelectStmt* select_stmt_; // SelectStmt里存的是指针，不便于落盘管理
+    std::vector<std::unique_ptr<Expression>> query_expressions_;
 public:
-  SelectStmt * select_stmt()
-  {
-    return select_stmt_;
-  }
+    SelectStmt* select_stmt()
+    {
+        return select_stmt_;
+    }
 };
 
 

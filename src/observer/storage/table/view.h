@@ -25,8 +25,9 @@ class View : public Table
 public:
     View() = default;
     ~View() override;
-    RC create_view(Db* db, const char* path,const char *base_dir, int32_t table_id, const char* name, SelectStmt* select_stmt,
-                   std::string sql) override;
+    RC create_view(Db* db, const char* path, const char* base_dir, int32_t table_id, const char* name,
+                   SelectStmt* select_stmt,
+                   std::string& sql, std::vector<std::unique_ptr<Expression>>& query_expressions) override;
     RC open(Db* db, const char* meta_file, const char* base_dir) override;
     const char* name() const override{return this->view_name_.c_str();}
     // 真实表会打开一个table，存储表的元数据，view也要进行持久化。
@@ -65,9 +66,12 @@ public:
         return tuple_schemata_;
     }
 
-    RC init();
+
 
 private:
+    RC init_tuple_spec();
+    RC init_(std::vector<std::unique_ptr<Expression>>& query_expressions);
+
     string view_name_;
     // 持有真实表的指针。
     std::set<Table*> tables;
@@ -77,6 +81,7 @@ private:
     BinderContext* binderContext_ = nullptr;
     std::vector<TupleCellSpec> tuple_schemata_;
     int table_id_ = 0;
+    std::vector<std::unique_ptr<Expression>> query_expressions;
     string sql;
 };
 

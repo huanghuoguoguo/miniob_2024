@@ -69,7 +69,8 @@ public:
   RC create_table(const char *table_name, span<const AttrInfoSqlNode> attributes,
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
 
-  RC create_view(const char* table_name, SelectStmt* select_stmt, std::string sql);
+  RC create_view(const char* view_name, SelectStmt* select_stmt, std::string& sql,
+                 std::vector<std::unique_ptr<Expression>>& query_expressions);
   /**
    * @brief 根据表名查找表
    */
