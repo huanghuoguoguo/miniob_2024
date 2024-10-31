@@ -140,7 +140,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
       exist_text_feild = true;
       break;
     }
-    if(AttrType::VECTORS == field.type() && field.len()/sizeof(float)>1000) {
+    if(AttrType::VECTORS == field.type() && field.is_high_dim()==true) {
+      LOG_INFO("table.cpp vector size is high dimension: %s", field.is_high_dim() ? "true" : "false");
       exist_vector_feild = true;
       break;
     }
@@ -432,6 +433,14 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     // 假设 `text_buffer_pool_` 是一个用于存储大文本的缓冲池
     text_buffer_pool_->append_data(position[0], position[1], value.data());
     // 将偏移量和长度写入record
+    memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
+  }else if(field->type() == AttrType::VECTORS && field->is_high_dim()==true){
+    // 对于高纬度Vector类型字段，解决思路和TEXTS类型类似
+    //TODO 这里放入position的值可能有点问题
+    int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    position[0] = field->offset();
+    position[1] = value.length();
+    vector_buffer_pool_->append_data(position[0], position[1], value.data());
     memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
   }else {
     memcpy(record_data + field->offset(), value.data(), copy_len);

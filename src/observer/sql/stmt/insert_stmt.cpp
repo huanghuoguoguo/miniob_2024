@@ -90,20 +90,23 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   // check field type
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
-    Value&             val        = values_data->at(i);
+    Value           &val        = values_data->at(i);
     const AttrType   field_type = field_meta->type();
     const AttrType   value_type = val.attr_type();
 
     // 解决TEXT太长的问题
-    if(field_type != value_type) {
+    if (field_type != value_type) {
       if (AttrType::TEXTS == field_type && AttrType::CHARS == value_type) {
-        if(MAX_TEXT_LENGTH < val.length()) {
+        if (MAX_TEXT_LENGTH < val.length()) {
           LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535",values_data->at(i).length());
           return RC::INVALID_ARGUMENT;
         }
-      }
-      else if (AttrType::VECTORS == field_type) {
+      } else if (AttrType::VECTORS == field_type) {
         if (val.attr_type() == AttrType::VECTORS) {
+          if (MAX_VECTOR_LENGTH < val.length()) {
+            LOG_WARN("VECTOR_LENGTH:%d IS TOO LONG, longer than 16500",values_data->at(i).length());
+            return RC::INVALID_ARGUMENT;
+          }
           // 如果values不为空，证明直接是[]，保存在了values当中。
           if (val.length() != field_meta->len()) {
             return RC::INVALID_ARGUMENT;
@@ -114,13 +117,16 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
           DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
           std::vector<float> vector = v.get_vector();
           if (vector.size() != field_meta->len() / sizeof(float)) {
+            if(field_meta->is_high_dim()==true) {
+              LOG_INFO("vector size is high dimension: %s", field_meta->is_high_dim() ? "true" : "false");
+              continue;
+            }
             v.reset();
             return RC::INVALID_ARGUMENT;
           }
         }
       }
     }
-
   }
 
   // 不能为null的值为null insert into t1 values(null)

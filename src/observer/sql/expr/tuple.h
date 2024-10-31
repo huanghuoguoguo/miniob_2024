@@ -240,7 +240,21 @@ public:
       }
       cell.set_data(text, length);
       free(text);
-    } else {
+    }
+    // 如果是高维vector类型
+    if (AttrType::VECTORS == field_meta->type() && field_meta->is_high_dimensional()) {
+      int64_t offset   = *(int64_t *)(record_->data() + field_meta->offset());
+      int64_t length = *(int64_t *)(record_->data() + field_meta->offset() + sizeof(int64_t));
+      char *hyper_vector = (char *)malloc(length+2);
+      RC rc = table_->read_vector(offset, length, hyper_vector);
+      if (RC::SUCCESS != rc) {
+        LOG_WARN("Failed to read vector from table, rc=%s", strrc(rc));
+        return rc;
+      }
+      cell.set_data(hyper_vector, length);
+      free(hyper_vector);
+    }
+    else {
       cell.set_type(field_meta->type());
       cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
     }

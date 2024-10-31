@@ -19,7 +19,7 @@ See the Mulan PSL v2 for more details. */
 class VectorType : public DataType
 {
 public:
-    VectorType() : DataType(AttrType::VECTORS)
+    VectorType() : DataType(AttrType::VECTORS), is_high_dimensional_(false) // 默认低纬度
     {
     }
 
@@ -36,6 +36,18 @@ public:
     RC cast_to(const Value& val, AttrType type, Value& result) const override;
 
     RC to_string(const Value& val, string& result) const override;
+
+    // 新增方法：设置向量是否为高纬度
+    void set_high_dimensional(bool is_high_dimensional) {
+      is_high_dimensional_ = is_high_dimensional;
+    }
+
+    // 新增方法：获取向量是否为高纬度
+    bool is_high_dimensional() const {
+        return is_high_dimensional_;
+      }
 private:
     string formatFloat(float value) const;
+    // 新增私有成员变量：是否为高纬度向量
+    bool is_high_dimensional_;
 };
