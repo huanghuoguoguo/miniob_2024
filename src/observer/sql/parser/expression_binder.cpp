@@ -235,18 +235,19 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   if (0 == strcmp(field_name, "*")) {
     wildcard_fields(table, bound_expressions, false);
-  } else {
-    const FieldMeta* field_meta = context_.get_as_field_meta(field_name); // 先尝试从上下文获取 field_meta
-
-    // 检查 field_meta 是否为 nullptr
-    if (nullptr == field_meta) {
-      // 如果未找到，从 table 的元数据获取
-      field_meta = table->table_meta().field(field_name);
-
-      // 将找到的 field_meta 加入到上下文
-      context_.add_as_field(field_as_name, field_meta);
-    }
-
+  }
+  // } else {
+  //   const FieldMeta* field_meta = context_.get_as_field_meta(field_name); // 先尝试从上下文获取 field_meta
+  //
+  //   // 检查 field_meta 是否为 nullptr
+  //   if (nullptr == field_meta) {
+  //     // 如果未找到，从 table 的元数据获取
+  //     field_meta = table->table_meta().field(field_name);
+  //
+  //     // 将找到的 field_meta 加入到上下文
+  //     context_.add_as_field(field_as_name, field_meta);
+  //   }
+    const FieldMeta* field_meta = table->table_meta().field(field_name);
     // 检查 field_meta 是否仍为 nullptr
     if (nullptr == field_meta) {
       LOG_INFO("no such field in table: %s.%s", table_name, field_name);
