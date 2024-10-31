@@ -201,9 +201,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     order_by_expressions.push_back(std::move(order_by_sql_node));
   }
 
-  if (select_sql.limit <= 0) {
-    return RC::INVALID_ARGUMENT;
-  }
+  // if (select_sql.limit <= 0) {
+  //   return RC::INVALID_ARGUMENT;
+  // }
 
   // everything alright
   SelectStmt *select_stmt = new SelectStmt();
