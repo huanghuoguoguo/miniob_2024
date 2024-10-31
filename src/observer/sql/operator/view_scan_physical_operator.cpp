@@ -59,14 +59,7 @@ RC ViewScanPhysicalOperator::close()
   return child_->close();
 }
 
-// Tuple *ViewScanPhysicalOperator::current_tuple()
-// {
-//   Tuple *         child_tuple = child_->current_tuple();
-//
-//   ValueListTuple *tuple       = new ValueListTuple();
-//   ValueListTuple::make(*child_tuple, view_->tuple_schemata(), *tuple);
-//   return tuple;
-// }
+
 Tuple *ViewScanPhysicalOperator::current_tuple()
 {
   Tuple *           child_tuple = child_->current_tuple();

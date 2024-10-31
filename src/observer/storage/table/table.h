@@ -121,6 +121,7 @@ public:
     virtual RC sync();
     virtual RC insert_entry_of_indexes(const char* record, const RID& rid);
     virtual RC delete_entry_of_indexes(const char* record, const RID& rid, bool error_on_not_exists);
+    virtual int sys_field_nums() { return table_meta().sys_field_num(); }
 
 
     virtual RC set_value_to_record(char* record_data, const Value& value, const FieldMeta* field);

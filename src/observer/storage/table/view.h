@@ -40,6 +40,8 @@ public:
     RC sync() override;
     RC recover_insert_record(Record& record);
 
+    // 只考虑null_list
+    int sys_field_nums() override { return 1; }
     Index* find_index(const char* index_name) const override;
     Index* find_index_by_field(const char* field_name) const override;
     Index* find_index_by_field(const std::vector<string> field_names) const override;

@@ -451,8 +451,6 @@ public:
       value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name(),alias.c_str());
     }
     // 还要加入null_list
-    value_list.cells_.insert(value_list.cells_.begin(),Value());
-    value_list.specs_.insert(value_list.specs_.begin(),TupleCellSpec(spec[0].table_name(), "null_list"));
     return RC::SUCCESS;
   }
 

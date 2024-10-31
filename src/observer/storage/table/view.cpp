@@ -154,10 +154,12 @@ RC View::open(Db *db, const char *meta_file, const char *base_dir)
   // 将指定列从sql中解析出来。
   ParsedSqlResult parsed_sql_result;
   sql_parse(sql.c_str(), &parsed_sql_result);
-  std::unique_ptr<ParsedSqlNode> sql_node        = std::move(parsed_sql_result.sql_nodes().front());
-  Stmt* stmt;
-  CreateViewStmt::create(this->db_, sql_node->create_view,stmt);
-  this->query_expressions.swap(static_cast<CreateViewStmt *>(stmt)->query_expressions());
+  std::unique_ptr<ParsedSqlNode> sql_node = std::move(parsed_sql_result.sql_nodes().front());
+  Stmt *                         stmt;
+  CreateViewStmt::create(this->db_, sql_node->create_view, stmt);
+  CreateViewStmt *                          view_stmt   = static_cast<CreateViewStmt *>(stmt);
+  std::vector<std::unique_ptr<Expression>> &expressions = view_stmt->select_stmt()->query_expressions();
+  this->query_expressions.swap(expressions);
   rc = init_tuple_spec();
   if (rc != RC::SUCCESS) {
     return rc;
@@ -170,6 +172,7 @@ RC View::init_tuple_spec()
 {
   RC rc = RC::SUCCESS;
   // 收集tuple_schame
+  this->current_table = *tables.begin();
   if (this->query_expressions.empty()) {
     // 如果没有指定映射列
     if (tables.size() == 1) {
@@ -188,6 +191,7 @@ RC View::init_tuple_spec()
   } else {
     rc = this->init_(this->query_expressions);
   }
+
   return rc;
 }
 
@@ -196,6 +200,7 @@ RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
   // 将查询列拿出来作为新的table_meta
   RC                           rc = RC::SUCCESS;
   std::vector<AttrInfoSqlNode> spv;
+  spv.emplace_back(AttrType::INTS, "null_list", 4, true);
   for (auto &query_expression : query_expressions) {
     AttrInfoSqlNode attr_info_sql_node;
     attr_info_sql_node.type     = query_expression->value_type();
@@ -206,6 +211,7 @@ RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
     // TODO 有坑。
     this->tuple_schemata_.emplace_back(this->view_name_.c_str(), query_expression->name(), "");
   }
+
   std::span<AttrInfoSqlNode> attributes(spv);
   // 创建文件
   const vector<FieldMeta> *trx_fields = this->db_->trx_kit().trx_fields();
@@ -218,11 +224,44 @@ RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
   }
   return rc;
 }
+
 RC View::make_record(int value_num, const Value *values, Record &record)
 {
 
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
+  }
+  // 如果映射列不为空，根据映射列，把值拿出来，然后将其放在正确的位置
+  if (value_num == this->query_expressions.size()) {
+
+    // 先找到字段在原本位置的index
+    vector<int>                   indices;
+    int                           start       = this->current_table->table_meta().sys_field_num();
+    int                           field_num   = this->current_table->table_meta().field_num();
+    const std::vector<FieldMeta> *field_metas = this->current_table->table_meta().field_metas();
+    // 拿到映射列在原始table中的对应索引。
+    for (auto &query_expression : this->query_expressions) {
+      FieldExpr *field_expr = dynamic_cast<FieldExpr *>(query_expression.get());
+      if (field_expr) {
+        Field &field = field_expr->field();
+        // 循环table的feild，不处理null_list
+        for (int i = start; i < field_num; i++) {
+          if (strcmp(field_metas->at(i).name(), field.field_name()) == 0) {
+            indices.push_back(i - start);
+          }
+        }
+        // 获取到索引后，将数据读取，然后将其放置在正确的位置上。然后再将新的values放进去。
+      }
+      // 非field_expr不处理。
+    }
+
+    // 通过view新增。
+    vector<Value> new_values(field_num - start, Value());
+    for (int i = 0; i < indices.size(); i++) {
+      auto value             = values[i];
+      new_values[indices[i]] = value;
+    }
+    return this->current_table->make_record(new_values.size(), new_values.data(), record);
   }
 
   return this->current_table->make_record(value_num, values, record);
@@ -432,7 +471,7 @@ RC View::drop_all_index()
     return RC::INVALID_ARGUMENT;
   }
 
-  return  this->current_table->drop_all_index();
+  return this->current_table->drop_all_index();
 }
 
 RC View::init_record_handler(const char *base_dir)
@@ -443,7 +482,7 @@ RC View::init_record_handler(const char *base_dir)
     return RC::INVALID_ARGUMENT;
   }
 
-  return  this->current_table->init_record_handler(base_dir);
+  return this->current_table->init_record_handler(base_dir);
 }
 
 RC View::init_text_handler(const char *base_dir)
@@ -453,5 +492,5 @@ RC View::init_text_handler(const char *base_dir)
   if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  return  this->current_table->init_text_handler(base_dir);
+  return this->current_table->init_text_handler(base_dir);
 }
