@@ -124,6 +124,7 @@ struct SelectSqlNode
 struct CreateViewSqlNode
 {
     std::string view_name;
+    std::vector<std::unique_ptr<Expression>> expressions;
     SelectSqlNode* select_sql_node;   // view列到原始表的映射
 };
 

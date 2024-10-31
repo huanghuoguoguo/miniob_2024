@@ -319,6 +319,15 @@ create_view_stmt:
       $$->create_view.select_sql_node = &$5->selection;
       free($3);
     }
+    | CREATE VIEW ID LBRACE expression_list RBRACE AS select_stmt
+     {
+       $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+       $$->flag = SCF_CREATE_VIEW;
+       $$->create_view.expressions.swap(*$5);
+       $$->create_view.view_name = $3;
+       $$->create_view.select_sql_node = &$8->selection;
+       free($3);
+     }
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
