@@ -553,7 +553,7 @@ RC Table::init_text_handler(const char *base_dir) {
 
 RC Table::init_vector_handler(const char *base_dir) {
   // 构建文本文件路径
-  std::string vector_file = table_vector_file(base_dir, table_meta_.name());
+  std::string vector_file = table_vector_file(base_dir, table_meta_->name());
 
   // 检查文本文件是否存在
   if (!std::filesystem::exists(vector_file)) {  // C++17 文件存在性检查

@@ -139,7 +139,7 @@ public:
     virtual Index* find_index_by_field(const char* field_name) const;
     virtual Index* find_index_by_field(const std::vector<string> field_names) const;
     virtual RC drop_all_index();
-
+    virtual RC init_vector_handler(const char *base_dir);
 protected:
     Db* db_ = nullptr;
     string base_dir_;

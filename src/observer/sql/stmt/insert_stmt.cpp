@@ -71,6 +71,7 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     RC rc = bound_expression->try_get_value(value);
     if (OB_FAIL(rc)) {
       LOG_INFO("try get insert value failed. rc=%s", strrc(rc));
+      delete values_data;
       return rc;
     }
     values_data->push_back(value);
@@ -84,6 +85,7 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 
   if (field_num != value_num) {
     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
+    delete values_data;
     return RC::SCHEMA_FIELD_MISSING;
   }
 
@@ -98,60 +100,31 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     if (field_type != value_type) {
       if (AttrType::TEXTS == field_type && AttrType::CHARS == value_type) {
         if (MAX_TEXT_LENGTH < val.length()) {
-          LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535",values_data->at(i).length());
+          LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535", values_data->at(i).length());
+          delete values_data;
           return RC::INVALID_ARGUMENT;
         }
       }
     }
     if (AttrType::VECTORS == field_type) {
-      if (val.attr_type() == AttrType::VECTORS) {
-        // 如果values不为空，证明直接是[]，保存在了values当中。
-        if (val.length() != field_meta->len()) {
-          return RC::INVALID_ARGUMENT;
-        }
-      } else if (val.attr_type() == AttrType::CHARS) {
+      if (val.attr_type() == AttrType::CHARS) {
         // char先转vector
         Value v;
         DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
-        std::vector<float> vector = v.get_vector();
-        if (vector.size() != field_meta->len() / sizeof(float)) {
-          v.reset();
-          return RC::INVALID_ARGUMENT;
-        }
-        // 直接替换吧？
+        // 直接将其替换为vector类型。
         val = v;
-      } else {
+      } else if (val.attr_type() != AttrType::VECTORS) {
+        delete values_data;
         return RC::INVALID_ARGUMENT;
-      } else if (AttrType::VECTORS == field_type) {
-        if (val.attr_type() == AttrType::VECTORS) {
-          // if (MAX_VECTOR_LENGTH < val.length()) {
-          //   LOG_WARN("VECTOR_LENGTH:%d IS TOO LONG, longer than 16500",values_data->at(i).length());
-          //   return RC::INVALID_ARGUMENT;
-          // }
-          // 如果values不为空，证明直接是[]，保存在了values当中。
-          if (val.length() != field_meta->len()) {
-            return RC::INVALID_ARGUMENT;
-          }
-        } else {
-          // char先转vector
-          Value v;
-          DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
-          std::vector<float> vector = v.get_vector();
-          if (vector.size() != field_meta->len() / sizeof(float)) {
-            if (field_meta->is_high_dimensional() == true) {
-              if (vector.size() != field_meta->is_high_dim()) {
-                v.reset();
-                return RC::INVALID_ARGUMENT;
-              }
-              LOG_INFO("vector size is high dimension: %s", field_meta->is_high_dimensional() ? "true" : "false");
-              continue;
-            }
-            v.reset();
-            return RC::INVALID_ARGUMENT;
-          }
-        }
+      }
+      // 此时已经是vector类型，判断维度是否一致。
+      std::vector<float> vector = val.get_vector();
+      if (vector.size() != field_meta->is_high_dim()) {
+        delete values_data;
+        return RC::INVALID_ARGUMENT;
       }
     }
+    // 检查结束。
   }
 
   // 不能为null的值为null insert into t1 values(null)
