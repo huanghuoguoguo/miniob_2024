@@ -81,6 +81,12 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   }
 
   RC rc = RC::SUCCESS;
+  for(auto  &attribute : attributes) {
+    if(attribute.type==AttrType::VECTORS&&attribute.length>MAX_VECTOR_LENGTH) {
+      LOG_ERROR("vector dimension is too large ! Show less than %d", MAX_VECTOR_LENGTH);
+      return RC::INVALID_ARGUMENT;
+    }
+  }
 
   // 使用 table_name.table记录一个表的元数据
   // 判断表文件是否已经存在
