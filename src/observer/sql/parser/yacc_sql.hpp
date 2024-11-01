@@ -100,36 +100,35 @@ extern int yydebug;
     SET = 301,                     /* SET  */
     ON = 302,                      /* ON  */
     LOAD = 303,                    /* LOAD  */
-    DATA = 304,                    /* DATA  */
-    INFILE = 305,                  /* INFILE  */
-    EXPLAIN = 306,                 /* EXPLAIN  */
-    STORAGE = 307,                 /* STORAGE  */
-    FORMAT = 308,                  /* FORMAT  */
-    EQ = 309,                      /* EQ  */
-    LT = 310,                      /* LT  */
-    GT = 311,                      /* GT  */
-    LE = 312,                      /* LE  */
-    GE = 313,                      /* GE  */
-    NE = 314,                      /* NE  */
-    IS = 315,                      /* IS  */
-    NOT = 316,                     /* NOT  */
-    LIKE = 317,                    /* LIKE  */
-    NULL_ = 318,                   /* NULL_  */
-    NULLABLE = 319,                /* NULLABLE  */
-    HAVING = 320,                  /* HAVING  */
-    IN = 321,                      /* IN  */
-    UNIQUE = 322,                  /* UNIQUE  */
-    OR = 323,                      /* OR  */
-    AS = 324,                      /* AS  */
-    VIEW = 325,                    /* VIEW  */
-    LIMIT = 326,                   /* LIMIT  */
-    WITH = 327,                    /* WITH  */
-    NUMBER = 328,                  /* NUMBER  */
-    FLOAT = 329,                   /* FLOAT  */
-    ID = 330,                      /* ID  */
-    SSS = 331,                     /* SSS  */
-    DATE_STR = 332,                /* DATE_STR  */
-    UMINUS = 333                   /* UMINUS  */
+    INFILE = 304,                  /* INFILE  */
+    EXPLAIN = 305,                 /* EXPLAIN  */
+    STORAGE = 306,                 /* STORAGE  */
+    FORMAT = 307,                  /* FORMAT  */
+    EQ = 308,                      /* EQ  */
+    LT = 309,                      /* LT  */
+    GT = 310,                      /* GT  */
+    LE = 311,                      /* LE  */
+    GE = 312,                      /* GE  */
+    NE = 313,                      /* NE  */
+    IS = 314,                      /* IS  */
+    NOT = 315,                     /* NOT  */
+    LIKE = 316,                    /* LIKE  */
+    NULL_ = 317,                   /* NULL_  */
+    NULLABLE = 318,                /* NULLABLE  */
+    HAVING = 319,                  /* HAVING  */
+    IN = 320,                      /* IN  */
+    UNIQUE = 321,                  /* UNIQUE  */
+    OR = 322,                      /* OR  */
+    AS = 323,                      /* AS  */
+    VIEW = 324,                    /* VIEW  */
+    LIMIT = 325,                   /* LIMIT  */
+    WITH = 326,                    /* WITH  */
+    NUMBER = 327,                  /* NUMBER  */
+    FLOAT = 328,                   /* FLOAT  */
+    ID = 329,                      /* ID  */
+    SSS = 330,                     /* SSS  */
+    DATE_STR = 331,                /* DATE_STR  */
+    UMINUS = 332                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -163,7 +162,7 @@ union YYSTYPE
   bool                                       boolean;
   std::pair<std::string, std::string> *      relation_type;
 
-#line 167 "yacc_sql.hpp"
+#line 166 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;
