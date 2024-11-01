@@ -52,12 +52,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   unordered_map<string, Table *> table_map;
   // 直接将join的表放入需要查询的表中，如果是*则全部获取，如果是table.field也不影响。并且可以参加后续的检查。
   for (size_t i = 0; i < select_sql.join_list.size(); i++) {
-    auto& table_name = select_sql.join_list[i].relation;
-    select_sql.relations.push_back(table_name);
-  }
+      auto& table_name = select_sql.join_list[i].relation;
+      select_sql.relations.push_back(table_name);
+    }
+
+
 
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
+    const char *table_name = select_sql.relations[i].first.c_str();  //拿到的表名是真实表名
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -73,6 +75,18 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     binder_context.add_table(table);
     tables.push_back(table);
     table_map.insert({table_name, table});
+    //在这里维护下 表别名和表指针的关系 放到binder_context的as_table_里
+    const char *as_name = select_sql.relations[i].second.c_str();
+    if (nullptr != as_name && strlen(as_name) > 0) {
+      // 判断别名是否重复
+      if (binder_context.query_as_tables().contains(as_name)  ) {
+        LOG_ERROR("Alias name '%s' is already used. Please use a unique alias.", as_name);
+        return RC::ALIAS_DUPLICATE;
+      }
+      binder_context.add_as_table(as_name,table);
+    }
+
+
   }
 
 
@@ -160,7 +174,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("cannot construct join stmt");
       return rc;
     }
-    auto& join_table = table_map[select_sql.join_list[i].relation];
+    auto& join_table = table_map[select_sql.join_list[i].relation.first];  //join_list中的relations 直接当作单个pair使用
     join_filter_stmts.emplace_back(join_table,join_filter_stmt);
   }
 

@@ -136,6 +136,7 @@ IS                                      RETURN_TOKEN(IS);
 NOT                                     RETURN_TOKEN(NOT);
 HAVING                                  RETURN_TOKEN(HAVING);
 IN                                      RETURN_TOKEN(IN);
+AS                                      RETURN_TOKEN(AS);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);
 OR                                      RETURN_TOKEN(OR);
 LIMIT                                   RETURN_TOKEN(LIMIT);
