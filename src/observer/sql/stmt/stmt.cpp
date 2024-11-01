@@ -13,6 +13,8 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/stmt.h"
+
+#include "create_view_stmt.h"
 #include "common/log/log.h"
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/create_index_stmt.h"
@@ -116,6 +118,9 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
 
     case SCF_CALC: {
       return CalcStmt::create(sql_node.calc, stmt);
+    }
+    case SCF_CREATE_VIEW: {
+      return CreateViewStmt::create(db, sql_node.create_view, stmt);
     }
 
     default: {

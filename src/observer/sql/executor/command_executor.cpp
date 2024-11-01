@@ -13,6 +13,8 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/executor/command_executor.h"
+
+#include "create_view_executor.h"
 #include "common/log/log.h"
 #include "event/sql_event.h"
 #include "sql/executor/create_index_executor.h"
@@ -87,12 +89,19 @@ RC CommandExecutor::execute(SQLStageEvent *sql_event)
 
     case StmtType::EXIT: {
       rc = RC::SUCCESS;
-    } break;
+    }
+    break;
+    case StmtType::CREATE_VIEW: {
+      CreateViewExecutor executor;
+      rc = executor.execute(sql_event);
+    }
+    break;
 
     default: {
       LOG_ERROR("unknown command: %d", static_cast<int>(stmt->type()));
       rc = RC::UNIMPLEMENTED;
-    } break;
+    }
+    break;
   }
 
   if (OB_SUCC(rc) && stmt_type_ddl(stmt->type())) {

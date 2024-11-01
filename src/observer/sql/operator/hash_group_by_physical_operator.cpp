@@ -126,7 +126,7 @@ Tuple *HashGroupByPhysicalOperator::current_tuple()
   return nullptr;
 }
 
-RC HashGroupByPhysicalOperator::find_group(const Tuple &child_tuple, GroupType *&found_group)
+RC HashGroupByPhysicalOperator::find_group(Tuple &child_tuple, GroupType *&found_group)
 {
   found_group = nullptr;
 
