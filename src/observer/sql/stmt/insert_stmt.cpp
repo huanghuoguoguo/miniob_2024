@@ -103,10 +103,10 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
         }
       } else if (AttrType::VECTORS == field_type) {
         if (val.attr_type() == AttrType::VECTORS) {
-          if (MAX_VECTOR_LENGTH < val.length()) {
-            LOG_WARN("VECTOR_LENGTH:%d IS TOO LONG, longer than 16500",values_data->at(i).length());
-            return RC::INVALID_ARGUMENT;
-          }
+          // if (MAX_VECTOR_LENGTH < val.length()) {
+          //   LOG_WARN("VECTOR_LENGTH:%d IS TOO LONG, longer than 16500",values_data->at(i).length());
+          //   return RC::INVALID_ARGUMENT;
+          // }
           // 如果values不为空，证明直接是[]，保存在了values当中。
           if (val.length() != field_meta->len()) {
             return RC::INVALID_ARGUMENT;
@@ -117,8 +117,12 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
           DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
           std::vector<float> vector = v.get_vector();
           if (vector.size() != field_meta->len() / sizeof(float)) {
-            if(field_meta->is_high_dim()==true) {
-              LOG_INFO("vector size is high dimension: %s", field_meta->is_high_dim() ? "true" : "false");
+            if (field_meta->is_high_dimensional() == true) {
+              if (vector.size() != field_meta->is_high_dim()) {
+                v.reset();
+                return RC::INVALID_ARGUMENT;
+              }
+              LOG_INFO("vector size is high dimension: %s", field_meta->is_high_dimensional() ? "true" : "false");
               continue;
             }
             v.reset();

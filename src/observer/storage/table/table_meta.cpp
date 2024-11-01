@@ -90,16 +90,9 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       visible = false;
     }
     int attr_len = attr_info.length;
-    bool is_hi = false;
+    int dimension= attr_info.length;
     if (attr_info.type == AttrType::VECTORS) {
-      // 判断长度
-      if(attr_info.length>1000) {
-        is_hi = true;
-      }else {
-        is_hi = false;
-        attr_len = attr_info.length * sizeof(float);
-      }
-
+      attr_len = attr_info.length * sizeof(float);
     }
     rc = fields_[i + trx_field_num].init(
         attr_info.name.c_str(),
@@ -109,7 +102,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
         visible /*visible*/,
         i,
         attr_info.nullable,
-        is_hi);
+        dimension);
     if (OB_FAIL(rc)) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;

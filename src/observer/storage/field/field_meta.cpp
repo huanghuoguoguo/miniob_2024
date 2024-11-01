@@ -60,7 +60,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   return this->init(name, attr_type, attr_offset, attr_len, visible, field_id, true);
 }
 RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id,
-    bool  nullable,bool is_high_dim)
+    bool  nullable,int is_high_dim)
 {
   if (common::is_blank(name)) {
     LOG_WARN("Name cannot be empty");
@@ -85,12 +85,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   nullable_    = nullable;
   is_high_dim_ = is_high_dim;
   if (AttrType::TEXTS == attr_type) { attr_len_ = TEXT_FIELD_LENGTH; }
-  if (AttrType::VECTORS == attr_type&&is_high_dim==true) { attr_len_ = VECTOR_FIELD_LENGTH; }
-  //TODO
-  // if (AttrType::VECTORS == attr_type && attr_len/sizeof(float)>1000) {
-  //   set_high_dimensional(true); // 设置高纬度标记
-  //   attr_len_ = VECTOR_FIELD_LENGTH;
-  // }
+  if (AttrType::VECTORS == attr_type&&is_high_dim>1000) { attr_len_ = VECTOR_FIELD_LENGTH; }
 
   LOG_INFO("Init a field with name=%s", name);
   return RC::SUCCESS;
@@ -98,7 +93,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
 RC FieldMeta::init(
     const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable)
 {
-  return this->init(name, attr_type, attr_offset, attr_len, visible, field_id, nullable, false);
+  return this->init(name, attr_type, attr_offset, attr_len, visible, field_id, nullable, is_high_dim_);
 }
 
 const char *FieldMeta::name() const { return name_.c_str(); }
@@ -116,7 +111,7 @@ bool FieldMeta::nullable() const { return nullable_; }
 
 int FieldMeta::field_id() const { return field_id_; }
 
-bool FieldMeta::is_high_dim() const { return is_high_dim_; }
+int FieldMeta::is_high_dim() const { return is_high_dim_; }
 
 void FieldMeta::desc(std::ostream &os) const
 {
@@ -183,8 +178,8 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
     return RC::INTERNAL;
   }
 
-  if (!is_high_dim_value.isBool()) {
-    LOG_ERROR("is_high_dim field is not a bool value. json value=%s", is_high_dim_value.toStyledString().c_str());
+  if (!is_high_dim_value.isInt()) {
+    LOG_ERROR("is_high_dim field is not a int value. json value=%s", is_high_dim_value.toStyledString().c_str());
     return RC::INTERNAL;
   }
 
@@ -200,8 +195,7 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
   bool        visible  = visible_value.asBool();
   bool        nullable = nullable_value.asBool();
   int         field_id = field_id_value.asInt();
-  bool        is_high_dim = is_high_dim_value.asBool();
-  RC rc =  field.init(name, type, offset, len, visible, field_id, nullable);
-  field.set_high_dimensional(is_high_dim);
+  int        is_high_dim = is_high_dim_value.asInt();
+  RC rc =  field.init(name, type, offset, len, visible, field_id, nullable,is_high_dim);
   return rc;
 }

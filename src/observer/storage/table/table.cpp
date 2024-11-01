@@ -140,8 +140,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
       exist_text_feild = true;
       break;
     }
-    if(AttrType::VECTORS == field.type() && field.is_high_dim()==true) {
-      LOG_INFO("table.cpp vector size is high dimension: %s", field.is_high_dim() ? "true" : "false");
+    if(AttrType::VECTORS == field.type() && field.is_high_dimensional()==true) {
+      LOG_INFO("table.cpp vector size is high dimension: %s", field.is_high_dimensional() ? "true" : "false");
       exist_vector_feild = true;
       break;
     }
@@ -434,7 +434,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     text_buffer_pool_->append_data(position[0], position[1], value.data());
     // 将偏移量和长度写入record
     memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
-  }else if(field->type() == AttrType::VECTORS && field->is_high_dim()==true){
+  }else if(field->type() == AttrType::VECTORS && field->is_high_dimensional()==true){
     // 对于高纬度Vector类型字段，解决思路和TEXTS类型类似
     //TODO 这里放入position的值可能有点问题
     int64_t position[2];  // position[0] 是 offset, position[1] 是 length

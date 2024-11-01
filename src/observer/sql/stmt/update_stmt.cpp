@@ -84,7 +84,7 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
         }
       }
       // 避免更新的vector维度过高
-      if(AttrType::VECTORS == field_expr->field().meta()->type()&&field_expr->field().meta()->is_high_dim()==true) {
+      if(AttrType::VECTORS == field_expr->field().meta()->type()&&field_expr->field().meta()->is_high_dimensional()==true) {
         if(MAX_VECTOR_LENGTH < value_expr->value_length()) {
           LOG_WARN("VECTOR_LENGTH:%d IS TOO LONG, longer than 16500",value_expr->value_length());
           return RC::INVALID_ARGUMENT;

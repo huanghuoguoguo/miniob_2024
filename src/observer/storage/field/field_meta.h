@@ -38,7 +38,7 @@ public:
   RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable);
   RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id);
   RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id,
-      bool nullable, bool is_high_dim);
+      bool nullable, int is_high_dim);
 
 public:
   const char *name() const;
@@ -48,7 +48,7 @@ public:
   bool        visible() const;
   bool        nullable() const;
   int         field_id() const;
-  bool        is_high_dim() const;
+  int        is_high_dim() const;
 
 public:
   void desc(ostream &os) const;
@@ -57,14 +57,11 @@ public:
   void      to_json(Json::Value &json_value) const;
   static RC from_json(const Json::Value &json_value, FieldMeta &field);
 
-  // 新增方法：设置是否为高纬度
-  void set_high_dimensional(bool is_high_dimensional) {
-    is_high_dim_ = is_high_dimensional;
-  }
 
   // 新增方法：获取是否为高纬度
   bool is_high_dimensional() const {
-    return is_high_dim_;
+    if(is_high_dim_>1000) return true;
+    return false;
   }
 
 protected:
@@ -82,5 +79,5 @@ protected:
   bool     visible_;
   int      field_id_;
   bool     nullable_;
-  bool    is_high_dim_;
+  int    is_high_dim_;
 };
