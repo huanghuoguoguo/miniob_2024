@@ -59,6 +59,7 @@ public:
 
     RC init_record_handler(const char *base_dir) override;
     RC init_text_handler(const char *base_dir) override;
+    RC init_vector_handler(const char *base_dir);
     RC set_value_to_record(char *record_data, const Value &value, const FieldMeta *field) override;
 
     SelectStmt* select_stmt();

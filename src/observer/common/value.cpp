@@ -369,6 +369,7 @@ int64_t Value::get_text() const
 {
   return value_.long_value_;
 }
+
 vector<float> Value::get_vector() const
 {
   if(attr_type_ == AttrType::CHARS) {
@@ -383,6 +384,7 @@ vector<float> Value::get_vector() const
   }
   return res;
 }
+
 string           Value::get_string() const { return this->to_string(); }
 bool             Value::is_null() const { return this->attr_type_ == AttrType::UNDEFINED; }
 vector<Value *> *Value::get_list() const

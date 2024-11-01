@@ -479,6 +479,16 @@ Index *View::find_index_by_field(const char *field_name) const
   return this->current_table->find_index_by_field(field_name);
 }
 
+RC View::init_vector_handler(const char *base_dir)
+{
+  // 根据字段查找索引的逻辑
+  if (this->tables.size() > 1) {
+    return RC::INVALID_ARGUMENT;
+  }
+  return this->current_table->init_vector_handler(base_dir);
+
+}
+
 Index *View::find_index_by_field(const std::vector<string> field_names) const
 {
   // 根据字段名列表查找索引的逻辑

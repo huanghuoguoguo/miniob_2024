@@ -36,6 +36,9 @@ public:
     RC cast_to(const Value& val, AttrType type, Value& result) const override;
 
     RC to_string(const Value& val, string& result) const override;
+
+
 private:
     string formatFloat(float value) const;
+
 };

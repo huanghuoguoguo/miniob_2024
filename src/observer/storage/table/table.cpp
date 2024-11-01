@@ -132,17 +132,24 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
     return rc;
   }
 
-  // 创建文件存放text
+  // 创建文件存放text 以及 高纬vector文件
   bool exist_text_feild = false;
+  bool exist_vector_feild = false;
   for (const FieldMeta &field : *table_meta_->field_metas()) {
     if (AttrType::TEXTS == field.type()) {
       exist_text_feild = true;
+      break;
+    }
+    if(AttrType::VECTORS == field.type() && field.is_high_dimensional()==true) {
+      LOG_INFO("table.cpp vector size is high dimension: %s", field.is_high_dimensional() ? "true" : "false");
+      exist_vector_feild = true;
       break;
     }
   }
   if (exist_text_feild) {
     std::string text_file = table_text_file(base_dir, name);
     rc = bpm.create_file(text_file.c_str());
+
     if (rc != RC::SUCCESS) {
       LOG_ERROR("Failed to create disk buffer pool of text file. file name=%s", text_file.c_str());
       return rc;
@@ -152,7 +159,21 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
       LOG_ERROR("Failed to create table %s due to init text handler failed.", text_file.c_str());
       return rc;
     }
+  }
+  if(exist_vector_feild) {
+    std::string vector_file = table_vector_file(base_dir, name);
+    rc = bpm.create_file(vector_file.c_str());
 
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create disk buffer pool of vector file. file name=%s", vector_file.c_str());
+      return rc;
+    }
+    rc = init_vector_handler(base_dir);
+
+    if (rc != RC::SUCCESS) {
+      LOG_ERROR("Failed to create table %s due to init vector handler failed.", vector_file.c_str());
+      return rc;
+    }
   }
 
   LOG_INFO("Successfully create table %s:%s", base_dir, name);
@@ -189,6 +210,13 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 
   // 如果 text 文件存在，则加载text文件
   rc = init_text_handler(base_dir);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to open table %s due to init text handler failed.", base_dir);
+    return rc;
+  }
+
+  // 加载高纬度vector数据文件
+  rc = init_vector_handler(base_dir);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to open table %s due to init text handler failed.", base_dir);
     return rc;
@@ -405,6 +433,14 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
     text_buffer_pool_->append_data(position[0], position[1], value.data());
     // 将偏移量和长度写入record
     memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
+  }else if(field->type() == AttrType::VECTORS && field->is_high_dimensional()==true){
+    // 对于高纬度Vector类型字段，解决思路和TEXTS类型类似
+    //TODO 这里放入position的值可能有点问题
+    int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    position[0] = field->offset();
+    position[1] = value.length();
+    vector_buffer_pool_->append_data(position[0], position[1], value.data());
+    memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
   }else {
     memcpy(record_data + field->offset(), value.data(), copy_len);
   }
@@ -434,6 +470,34 @@ RC Table::read_text(int64_t offset, int64_t length, char *data) const
   rc = text_buffer_pool_->get_data(offset, length, data);
   if (RC::SUCCESS != rc) {
     LOG_WARN("Failed to get text from disk_buffer_pool, rc=%s", strrc(rc));
+  }
+  return rc;
+}
+
+// write_vector
+RC Table::write_vector(int64_t &offset, int64_t length, const char *data)const
+{
+  RC rc = RC::SUCCESS;
+  rc = vector_buffer_pool_->append_data(offset, length, data);
+  if (RC::SUCCESS != rc) {
+    LOG_WARN("Failed to append vector data into disk_buffer_pool, rc=%s", strrc(rc));
+    offset = -1;
+    length = -1;
+  }
+  return rc;
+}
+// read_vector
+RC Table::read_vector(int64_t offset, int64_t length, char *data) const
+{
+  RC rc = RC::SUCCESS;
+  if (0 > offset || 0 > length) {
+    LOG_ERROR("Invalid param: vector offset %ld, length %ld", offset, length);
+    return RC::INVALID_ARGUMENT;
+  }
+
+  rc = vector_buffer_pool_->get_data(offset, length, data);
+  if (RC::SUCCESS != rc) {
+    LOG_WARN("Failed to get vector from disk_buffer_pool, rc=%s", strrc(rc));
   }
   return rc;
 }
@@ -481,6 +545,29 @@ RC Table::init_text_handler(const char *base_dir) {
   RC rc = bpm.open_file(db_->log_handler(), text_file.c_str(), text_buffer_pool_);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to open disk buffer pool for file:%s. rc=%d:%s", text_file.c_str(), rc, strrc(rc));
+    return rc;
+  }
+
+  return rc;
+}
+
+RC Table::init_vector_handler(const char *base_dir) {
+  // 构建文本文件路径
+  std::string vector_file = table_vector_file(base_dir, table_meta_->name());
+
+  // 检查文本文件是否存在
+  if (!std::filesystem::exists(vector_file)) {  // C++17 文件存在性检查
+    LOG_INFO("Text file %s not found. Skipping buffer pool initialization.", vector_file.c_str());
+    return RC::SUCCESS;  // 如果文件不存在，返回成功状态，跳过初始化
+  }
+
+  // 获取 BufferPoolManager 实例
+  BufferPoolManager &bpm = db_->buffer_pool_manager();
+
+  // 打开文件并关联到 vector_buffer_pool_
+  RC rc = bpm.open_file(db_->log_handler(), vector_file.c_str(), vector_buffer_pool_);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to open disk buffer pool for file:%s. rc=%d:%s", vector_file.c_str(), rc, strrc(rc));
     return rc;
   }
 
