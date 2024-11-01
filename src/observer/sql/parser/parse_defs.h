@@ -112,7 +112,8 @@ struct OrderBySqlNode
 struct SelectSqlNode
 {
   std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  std::vector<std::string>                 relations;    ///< 查询的表
+  // std::vector<std::string>                 relations;    ///< 查询的表
+  std::vector<std::pair<std::string, std::string>>   relations;    ///< 查询的表
   std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
   std::vector<JoinSqlNode>                 join_list;   ///< join节点
   std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
@@ -134,7 +135,8 @@ struct CreateViewSqlNode
 struct JoinSqlNode
 {
     std::vector<ConditionSqlNode>             conditions;  ///< 查询的表达式 on子句的内容
-    std::string                               relation;    ///< 连接的表 join后的表
+    // std::string                               relation;    ///< 连接的表 join后的表
+    std::pair<std::string, std::string>   relation;    ///< 连接的表 join后的表  默认是一个表，直接当pair用
     std::string                                     op;    ///< 连接方式 inner join,left join,right join,join TODO 暂时只实现join
 };
 /**

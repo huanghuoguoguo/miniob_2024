@@ -24,11 +24,24 @@ using namespace common;
 
 Table *BinderContext::find_table(const char *table_name) const
 {
+  // 先在 as_tables_ 中查找表别名
+  auto alias_iter = as_tables_.find(table_name);
+  if (alias_iter != as_tables_.end()) {
+    return alias_iter->second; // 返回找到的 Table* 指针
+  }
+   alias_iter = as_parent_tables_.find(table_name);
+  if (alias_iter != as_parent_tables_.end()) {
+    return alias_iter->second; // 返回找到的 Table* 指针
+  }
+
+  // 如果 as_tables_ 中没有找到，再在 query_tables_ 中查找表名
   auto pred = [table_name](Table *table) { return 0 == strcasecmp(table_name, table->name()); };
   auto iter = ranges::find_if(query_tables_, pred);
+
   if (iter == query_tables_.end()) {
-    return nullptr;
+    return nullptr; // 如果找不到对应的表
   }
+
   return *iter;
 }
 
@@ -137,9 +150,14 @@ RC ExpressionBinder::bind_star_expression(
 
   auto star_expr = static_cast<StarExpr *>(expr.get());
 
+  if(!star_expr->alias().empty()) {
+    return RC::INTERNAL;
+  }
+
   vector<Table *> tables_to_wildcard;
 
   const char *table_name = star_expr->table_name();
+  //若 table_name 不是空且不等于 "*", 则表示只从指定的 table_name 表中获取字段。
   if (!is_blank(table_name) && 0 != strcmp(table_name, "*")) {
     Table *table = context_.find_table(table_name);
     if (nullptr == table) {
@@ -149,9 +167,16 @@ RC ExpressionBinder::bind_star_expression(
 
     tables_to_wildcard.push_back(table);
   } else {
+    //处理未指定表名的情况:
     const vector<Table *> &all_tables = context_.cur_tables();
+    // 判断是否存在多个表 用于判断select * from t1,t2
+    // if (all_tables.size() > 1) {
+    //   LOG_WARN("SELECT * is not allowed for multiple tables.");
+    //   return RC::INTERNAL;
+    // }
     tables_to_wildcard.insert(tables_to_wildcard.end(), all_tables.begin(), all_tables.end());
   }
+
 
   for (Table *table : tables_to_wildcard) {
     wildcard_fields(table, bound_expressions, tables_to_wildcard.size() > 1);
@@ -166,12 +191,11 @@ RC ExpressionBinder::bind_unbound_field_expression(
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
-
   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
 
   const char *table_name = unbound_field_expr->table_name();
   const char *field_name = unbound_field_expr->field_name();
-
+ std::string field_as_name = unbound_field_expr->alias();
   Table *table = nullptr;
   if (is_blank(table_name)) {
     // if (context_.query_tables().size() != 1) {
@@ -190,6 +214,8 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   } else {
     table = context_.find_table(table_name);
+    // const FieldMeta *field_meta = table->table_meta().field(field_name);
+    // context_.add_as_field(field_as_name, field_meta);
     if (nullptr == table) {
       LOG_INFO("no such table in from list: %s", table_name);
       return RC::SCHEMA_TABLE_NOT_EXIST;
@@ -210,12 +236,22 @@ RC ExpressionBinder::bind_unbound_field_expression(
   if (0 == strcmp(field_name, "*")) {
     wildcard_fields(table, bound_expressions, false);
   } else {
-    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    // const FieldMeta* field_meta = context_.get_as_field_meta(field_name); // 先尝试从上下文获取 field_meta
+    //
+    // // 检查 field_meta 是否为 nullptr
+    // if (nullptr == field_meta) {
+    //   // 如果未找到，从 table 的元数据获取
+    //   field_meta = table->table_meta().field(field_name);
+    //
+    //   // 将找到的 field_meta 加入到上下文
+    //   context_.add_as_field(field_as_name, field_meta);
+    // }
+    const FieldMeta* field_meta = table->table_meta().field(field_name);
+    // 检查 field_meta 是否仍为 nullptr
     if (nullptr == field_meta) {
       LOG_INFO("no such field in table: %s.%s", table_name, field_name);
       return RC::SCHEMA_FIELD_MISSING;
     }
-
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
     string     name       = string(table->table_meta().name()) + "." + string(field.field_name());
@@ -224,6 +260,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     }
 
     field_expr->set_name(name);
+    field_expr->set_alias(field_as_name);
     bound_expressions.emplace_back(field_expr);
   }
 
@@ -565,15 +602,25 @@ RC ExpressionBinder::bind_sub_expression(
       std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions)
 {
   RC rc = RC::SUCCESS;
-  Stmt *stmt = nullptr;
-  SubQueryExpr * sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
-  if(sub_query_expr->select_sql_node() != nullptr) {
+  Stmt         *stmt           = nullptr;
+  SubQueryExpr *sub_query_expr = static_cast<SubQueryExpr *>(expr.release());
+  if (sub_query_expr->select_sql_node() != nullptr) {
     BinderContext * sub_context = new BinderContext();
     sub_context->db(this->context_.db());
+    //把外部的别名指针对应表传入子查询
+    for(auto as :this->context_.query_as_tables()) {
+      sub_context->add_as_parent_table(as.first,as.second);
+    }
+    for(auto as :this->context_.query_as_parent_tables()) {
+      sub_context->add_as_parent_table(as.first,as.second);
+    }
+
+
     // 将当前的所有table放入下一层。
     for(auto& table :context_.query_tables()) {
       sub_context->add_table(table);
     }
+
     // 如果存在sqlnode。
     sub_query_expr->select_sql_node()->binder_context = sub_context;
     rc = SelectStmt::create(this->context_.db(), *sub_query_expr->select_sql_node(), stmt);
