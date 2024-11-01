@@ -19,6 +19,7 @@ std::string physical_operator_type_name(PhysicalOperatorType type)
   switch (type) {
     case PhysicalOperatorType::TABLE_SCAN: return "TABLE_SCAN";
     case PhysicalOperatorType::INDEX_SCAN: return "INDEX_SCAN";
+    case PhysicalOperatorType::VECTOR_INDEX_SCAN: return "VECTOR_INDEX_SCAN";
     case PhysicalOperatorType::NESTED_LOOP_JOIN: return "NESTED_LOOP_JOIN";
     case PhysicalOperatorType::EXPLAIN: return "EXPLAIN";
     case PhysicalOperatorType::PREDICATE: return "PREDICATE";
@@ -30,6 +31,7 @@ std::string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::SCALAR_GROUP_BY: return "SCALAR_GROUP_BY";
     case PhysicalOperatorType::AGGREGATE_VEC: return "AGGREGATE_VEC";
     case PhysicalOperatorType::GROUP_BY_VEC: return "GROUP_BY_VEC";
+    case PhysicalOperatorType::ORDER_BY: return "ORDER_BY";
     case PhysicalOperatorType::PROJECT_VEC: return "PROJECT_VEC";
     case PhysicalOperatorType::TABLE_SCAN_VEC: return "TABLE_SCAN_VEC";
     case PhysicalOperatorType::EXPR_VEC: return "EXPR_VEC";

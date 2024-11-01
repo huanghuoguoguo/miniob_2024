@@ -22,24 +22,20 @@ public:
   IvfflatIndex(){};
   virtual ~IvfflatIndex() noexcept {};
 
-  RC create(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
-  {
-    return RC::UNIMPLEMENTED;
-  };
-  RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const FieldMeta &field_meta)
-  {
+  RC create(Table* table, const char* file_name, const IndexMeta& index_meta,
+                    const std::vector<const FieldMeta*>& field_meta) override;
 
-    return RC::UNIMPLEMENTED;
-  };
+  RC open(Table *table, const char *file_name, const IndexMeta &index_meta, const std::vector<const FieldMeta*>& field_meta) override;
 
-  vector<RID> ann_search(const vector<float> &base_vector, size_t limit) { return vector<RID>(); }
 
-  RC close() { return RC::UNIMPLEMENTED; }
+  vector<RID> ann_search(const vector<float> &base_vector, size_t limit);
 
-  RC insert_entry(const char *record, const RID *rid) override { return RC::UNIMPLEMENTED; };
-  RC delete_entry(const char *record, const RID *rid) override { return RC::UNIMPLEMENTED; };
+  RC close();
 
-  RC sync() override { return RC::UNIMPLEMENTED; };
+  RC insert_entry(const char *record, const RID *rid) override ;
+  RC delete_entry(const char *record, const RID *rid) override ;
+
+  RC sync() override;
 
 private:
   bool   inited_ = false;
