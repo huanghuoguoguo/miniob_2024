@@ -118,7 +118,7 @@ struct JoinSqlNode
 {
     std::vector<ConditionSqlNode>             conditions;  ///< 查询的表达式 on子句的内容
     std::string                               relation;    ///< 连接的表 join后的表
-    std::string                                     op;    ///< 连接方式 inner join,left join,right join,join TODO 暂时只实现join
+    std::string                                     op;    ///< 连接方式 inner join,left join,right join,join
 };
 /**
  * @brief 算术表达式计算的语法树
@@ -204,9 +204,11 @@ struct DropTableSqlNode
 struct CreateIndexSqlNode
 {
     std::string index_name; ///< Index name
+    std::string index_type;
     std::string relation_name;   ///< Relation name
     bool unique;
     std::vector<std::unique_ptr<Expression>> columns;
+    std::vector<ConditionSqlNode> equal_expression; ///< 要插入的值
 };
 
 /**
