@@ -193,10 +193,10 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
   auto unbound_field_expr = static_cast<UnboundFieldExpr *>(expr.get());
 
-  const char *table_name = unbound_field_expr->table_name();
-  const char *field_name = unbound_field_expr->field_name();
- std::string field_as_name = unbound_field_expr->alias();
-  Table *table = nullptr;
+  const char *table_name    = unbound_field_expr->table_name();
+  const char *field_name    = unbound_field_expr->field_name();
+  std::string field_as_name = unbound_field_expr->alias();
+  Table *     table         = nullptr;
   if (is_blank(table_name)) {
     // if (context_.query_tables().size() != 1) {
     //   LOG_INFO("cannot determine table for field: %s", field_name);
@@ -211,7 +211,6 @@ RC ExpressionBinder::bind_unbound_field_expression(
       table = *context_.query_tables().begin();
     }
 
-
   } else {
     table = context_.find_table(table_name);
     // const FieldMeta *field_meta = table->table_meta().field(field_name);
@@ -221,11 +220,11 @@ RC ExpressionBinder::bind_unbound_field_expression(
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
   }
-  if(context_.is_single()) {
-    std::vector<Table *>& tables = context_.cur_tables();
-    bool t = false;
-    for(auto& table_ : tables) {
-      if(table == table_) {
+  if (context_.is_single()) {
+    std::vector<Table *> &tables = context_.cur_tables();
+    bool                  t      = false;
+    for (auto &table_ : tables) {
+      if (table == table_) {
         t = true;
       }
     }
@@ -246,7 +245,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     //   // 将找到的 field_meta 加入到上下文
     //   context_.add_as_field(field_as_name, field_meta);
     // }
-    const FieldMeta* field_meta = table->table_meta().field(field_name);
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
     // 检查 field_meta 是否仍为 nullptr
     if (nullptr == field_meta) {
       LOG_INFO("no such field in table: %s.%s", table_name, field_name);
@@ -255,7 +254,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
     Field      field(table, field_meta);
     FieldExpr *field_expr = new FieldExpr(field);
     string     name       = string(table->table_meta().name()) + "." + string(field.field_name());
-    if(context_.query_tables().size() == 1) {
+    if (context_.query_tables().size() == 1) {
       name = string(field.field_name());
     }
 

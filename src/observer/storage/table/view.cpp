@@ -202,14 +202,34 @@ RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
   std::vector<AttrInfoSqlNode> spv;
   spv.emplace_back(AttrType::INTS, "null_list", 4, true);
   for (auto &query_expression : query_expressions) {
-    AttrInfoSqlNode attr_info_sql_node;
-    attr_info_sql_node.type     = query_expression->value_type();
-    attr_info_sql_node.name     = query_expression->name();
-    attr_info_sql_node.length   = query_expression->value_length();
-    attr_info_sql_node.nullable = true;
-    spv.push_back(attr_info_sql_node);
-    // TODO 有坑。
-    this->tuple_schemata_.emplace_back(this->view_name_.c_str(), query_expression->name(), "");
+    FieldExpr *field_expr = dynamic_cast<FieldExpr *>(query_expression.get());
+    if (field_expr) {
+      AttrInfoSqlNode attr_info_sql_node;
+      Field           field       = field_expr->field();
+      attr_info_sql_node.type     = field.attr_type();
+      attr_info_sql_node.name     = field_expr->alias().empty() ? field.field_name() : field_expr->alias().c_str();
+      attr_info_sql_node.length   = field_expr->value_length();
+      attr_info_sql_node.nullable = true;
+      spv.push_back(attr_info_sql_node);
+
+      this->tuple_schemata_.emplace_back(this->view_name_.c_str(),
+          field_expr->alias().empty() ? field.field_name() : field_expr->alias().c_str(),
+          field_expr->alias().c_str());
+    } else {
+      AttrInfoSqlNode attr_info_sql_node;
+      attr_info_sql_node.type = query_expression->value_type();
+      attr_info_sql_node.name = query_expression->alias().empty()
+                                  ? query_expression->name()
+                                  : query_expression->alias().c_str();
+      attr_info_sql_node.length   = query_expression->value_length();
+      attr_info_sql_node.nullable = true;
+      spv.push_back(attr_info_sql_node);
+
+      this->tuple_schemata_.emplace_back(this->view_name_.c_str(),
+          query_expression->alias().empty() ? query_expression->name() : query_expression->alias().c_str(),
+          query_expression->alias().c_str());
+    }
+
   }
 
   std::span<AttrInfoSqlNode> attributes(spv);
