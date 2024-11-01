@@ -68,7 +68,7 @@ public:
         return tuple_schemata_;
     }
 
-
+    void check();
 
 private:
     RC init_tuple_spec();
@@ -85,6 +85,7 @@ private:
     int table_id_ = 0;
     std::vector<std::unique_ptr<Expression>> query_expressions;
     string sql;
+    bool can_ddl_ = true;
 };
 
 

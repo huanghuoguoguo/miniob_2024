@@ -196,7 +196,7 @@ RC View::init_tuple_spec()
   } else {
     rc = this->init_(this->query_expressions);
   }
-
+  check();
   return rc;
 }
 
@@ -253,7 +253,7 @@ RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
 RC View::make_record(int value_num, const Value *values, Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables.size() > 1 || !can_ddl_) {
     return RC::INVALID_ARGUMENT;
   }
   // 如果映射列不为空，根据映射列，把值拿出来，然后将其放在正确的位置
@@ -295,7 +295,7 @@ RC View::make_record(int value_num, const Value *values, Record &record)
 RC View::insert_record(Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables.size() > 1 || !can_ddl_) {
     return RC::INVALID_ARGUMENT;
   }
 
@@ -325,7 +325,7 @@ RC View::delete_record(const RID &rid)
 RC View::update_record(const Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables.size() > 1 || !can_ddl_) {
     return RC::INVALID_ARGUMENT;
   }
 
@@ -518,4 +518,13 @@ RC View::init_text_handler(const char *base_dir)
     return RC::INVALID_ARGUMENT;
   }
   return this->current_table->init_text_handler(base_dir);
+}
+
+void View::check()
+{
+  for (auto &e : query_expressions) {
+    if (e->type() != ExprType::FIELD) {
+      this->can_ddl_ = false;
+    }
+  }
 }
