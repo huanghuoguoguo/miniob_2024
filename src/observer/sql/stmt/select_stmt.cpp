@@ -76,7 +76,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     table_map.insert({table_name, table});
     //在这里维护下 表别名和表指针的关系 放到binder_context的as_table_里
     const char *as_name = select_sql.relations[i].second.c_str();
-    if (nullptr != as_name) {
+    if (nullptr != as_name && strlen(as_name) > 0) {
       // 判断别名是否重复
       if (binder_context.query_as_tables().contains(as_name)  ) {
         LOG_ERROR("Alias name '%s' is already used. Please use a unique alias.", as_name);
