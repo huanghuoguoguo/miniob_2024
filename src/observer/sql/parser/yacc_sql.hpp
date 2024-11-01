@@ -119,12 +119,17 @@ extern int yydebug;
     HAVING = 320,                  /* HAVING  */
     IN = 321,                      /* IN  */
     UNIQUE = 322,                  /* UNIQUE  */
-    NUMBER = 323,                  /* NUMBER  */
-    FLOAT = 324,                   /* FLOAT  */
-    ID = 325,                      /* ID  */
-    SSS = 326,                     /* SSS  */
-    DATE_STR = 327,                /* DATE_STR  */
-    UMINUS = 328                   /* UMINUS  */
+    OR = 323,                      /* OR  */
+    AS = 324,                      /* AS  */
+    VIEW = 325,                    /* VIEW  */
+    LIMIT = 326,                   /* LIMIT  */
+    WITH = 327,                    /* WITH  */
+    NUMBER = 328,                  /* NUMBER  */
+    FLOAT = 329,                   /* FLOAT  */
+    ID = 330,                      /* ID  */
+    SSS = 331,                     /* SSS  */
+    DATE_STR = 332,                /* DATE_STR  */
+    UMINUS = 333                   /* UMINUS  */
   };
   typedef enum yytokentype yytoken_kind_t;
 #endif
@@ -133,7 +138,7 @@ extern int yydebug;
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 union YYSTYPE
 {
-#line 136 "yacc_sql.y"
+#line 142 "yacc_sql.y"
 
   ParsedSqlNode *                            sql_node;
   ConditionSqlNode *                         condition;
@@ -151,12 +156,14 @@ union YYSTYPE
   OrderBySqlNode *                           order_unit;
   std::vector<OrderBySqlNode> *              order_unit_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
+  std::vector<pair<std::string, std::string>> *  relation_list;
   char *                                     string;
   int                                        number;
   float                                      floats;
+  bool                                       boolean;
+  std::pair<std::string, std::string> *      relation_type;
 
-#line 160 "yacc_sql.hpp"
+#line 167 "yacc_sql.hpp"
 
 };
 typedef union YYSTYPE YYSTYPE;

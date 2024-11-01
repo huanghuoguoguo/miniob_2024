@@ -43,7 +43,7 @@ Value::Value(const Value &other)
       // TODO 多次拷贝。。。
       std::vector<float> vector = other.get_vector();
       set_vector(vector);
-    }
+    } break;
     default: {
       this->value_ = other.value_;
     } break;
@@ -76,7 +76,7 @@ Value &Value::operator=(const Value &other)
     case AttrType::VECTORS: {
       // TODO 多次拷贝。。。
       std::vector<float> vector = other.get_vector();
-      set_vector(vector);
+      this->set_vector(vector);
     }break;
     default: {
       this->value_ = other.value_;
@@ -372,6 +372,11 @@ int64_t Value::get_text() const
 
 vector<float> Value::get_vector() const
 {
+  if(attr_type_ == AttrType::CHARS) {
+    Value v;
+    DataType::type_instance(AttrType::CHARS)->cast_to(*this, AttrType::VECTORS, v);
+    return v.get_vector();
+  }
   int size = length_/sizeof(float);
   vector<float> res(size);
   if (value_.pointer_value_ != nullptr) {

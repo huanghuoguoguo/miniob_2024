@@ -13,6 +13,10 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/expr/expression.h"
+
+#include <cmath>
+#include <numeric>
+
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
 #include <regex>
@@ -26,7 +30,7 @@ using namespace std;
 
 RC FieldExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  return tuple.find_cell(TupleCellSpec(table_name(), field_name()), value);
+  return tuple.find_cell(TupleCellSpec(table_name(), field_name(),alias().c_str()), value);
 }
 
 bool FieldExpr::equal(const Expression &other) const
@@ -407,6 +411,9 @@ AttrType ArithmeticExpr::value_type() const
       arithmetic_type_ != Type::DIV) {
     return AttrType::INTS;
   }
+  if(left_->value_type() == AttrType::VECTORS || right_->value_type() == AttrType::VECTORS) {
+    return AttrType::VECTORS;
+  }
 
   return AttrType::FLOATS;
 }
@@ -696,7 +703,7 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
   } else if (0 == strcasecmp(type_str, "min")) {
     type = Type::MIN;
   } else {
-    rc = RC::INVALID_ARGUMENT;
+    rc = RC::UNKNOWN_FUNC;
   }
   return rc;
 }
@@ -763,18 +770,16 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
         list_type->add(value);
       }
     }
+    if (list_type->empty()) {
+      // 如果没有，提供默认null值。
+      list_type->add(new Value());
+    }
     if(rc == RC::RECORD_EOF) {
       rc = RC::SUCCESS;
     }
     project_phy_op_->close();
     if(rc!=RC::SUCCESS) {
       return rc;
-    }
-
-
-    if (list_type->empty()) {
-      // 如果没有，提供默认null值。
-      list_type->add(new Value());
     }
     list_type->get_value(value);
     for(auto& p : predicates) {
@@ -824,15 +829,15 @@ RC SubQueryExpr::open(Trx* trx)
           // 不需要，如果是需要值的，只要返回两个value就认为错误。
           list_type_->add(value);
         }
-        if(rc == RC::RECORD_EOF) {
-          rc = RC::SUCCESS;
-        }
-        if(rc != RC::SUCCESS) {
-          return rc;
-        }
         if (this->list_type_->empty()) {
           // 如果没有，提供默认null值。
           this->list_type_->add(new Value());
+        }
+        if (rc == RC::RECORD_EOF) {
+          rc = RC::SUCCESS;
+        }
+        if (rc != RC::SUCCESS) {
+          return rc;
         }
       }
     }
@@ -905,4 +910,94 @@ bool SubQueryExpr::check_single()
     return true;
   }
   return false;
+}
+
+RC FunctionExpr::type_from_string(const char *type_str, FunctionExpr::Type &type)
+{
+  RC rc = RC::SUCCESS;
+  if (0 == strcasecmp(type_str, "L2_DISTANCE")) {
+    type = Type::L2_DISTANCE;
+  } else if (0 == strcasecmp(type_str, "COSINE_DISTANCE")) {
+    type = Type::COSINE_DISTANCE;
+  } else if (0 == strcasecmp(type_str, "INNER_PRODUCT")) {
+    type = Type::INNER_PRODUCT;
+  } else {
+    rc = RC::UNKNOWN_FUNC;
+  }
+  return rc;
+}
+
+RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  RC rc = RC::SUCCESS;
+  vector<Value> values;
+  // 同时要求维度一致。
+  int vc = -1;
+  for(auto& pa:params_) {
+    Value v;
+    rc          = pa->get_value(tuple,v);
+    std::vector<float> vector = v.get_vector();
+    if (vc == -1) {
+      vc = static_cast<int>(vector.size());
+    } else {
+      if (vc != static_cast<int>(vector.size())) {
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+    if(RC::SUCCESS != rc) {
+      return rc;
+    }
+    values.emplace_back(v);
+  }
+  // 应该将函数变成函数指针，接受参数。这里直接简单化了。
+
+  switch (func_type_) {
+    case Type::L2_DISTANCE: {
+      auto left =  values[0].get_vector();
+      auto right = values[1].get_vector();
+      float sum = 0.0f;
+      for (size_t i = 0; i < left.size(); ++i) {
+        sum += std::pow(left[i] - right[i], 2);
+      }
+      float sqrt = std::sqrt(sum);
+      value = Value(sqrt);
+    }
+      break;
+    case Type::COSINE_DISTANCE: {
+      auto left =  values[0].get_vector();
+      auto right = values[1].get_vector();
+      float dotProduct = 0.0f;
+      float leftNorm = 0.0f;
+      float rightNorm = 0.0f;
+
+      for (size_t i = 0; i < left.size(); ++i) {
+        dotProduct += left[i] * right[i];
+        leftNorm += left[i] * left[i];
+        rightNorm += right[i] * right[i];
+      }
+
+      // 计算模
+      leftNorm = std::sqrt(leftNorm);
+      rightNorm = std::sqrt(rightNorm);
+
+      // 避免除以零
+      if (leftNorm == 0 || rightNorm == 0) {
+        return RC::DIVIDE_ZERO; // 或者根据需求返回其他值
+      }
+
+      float res = 1.0f - dotProduct / (leftNorm * rightNorm);
+      value = Value(res);
+    }
+      break;
+    case Type::INNER_PRODUCT: {
+      auto left =  values[0].get_vector();
+      auto right = values[1].get_vector();
+      float dotProduct = std::inner_product(left.begin(), left.end(), right.begin(), 0.0f);
+      value = Value(dotProduct);
+    }
+      break;
+    default:
+      return RC::UNKNOWN_FUNC;
+  }
+  return rc;
 }

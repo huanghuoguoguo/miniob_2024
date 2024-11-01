@@ -19,37 +19,67 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/expr/expression.h"
 
+#include <json/config.h>
+
 class BinderContext
 {
 public:
-  BinderContext()          = default;
-  virtual ~BinderContext() = default;
+    BinderContext() = default;
+    virtual ~BinderContext() = default;
 
-  void add_table(Table *table) { query_tables_.push_back(table); }
+    void add_table(Table* table) { query_tables_.insert(table); }
+    void add_as_table(std::string as,Table* table) { as_tables_.insert({as, table}); }
+    void add_as_parent_table(std::string as,Table* table) { as_parent_tables_.insert({as, table}); }
+    void add_as_field(std::string as,const FieldMeta* field_meta) { as_fields_.insert({as, field_meta}); }
+    Table* find_table(const char* table_name) const;
+    Table            *get_as_table(std::string as) { return as_tables_.find(as)->second; }
+    const FieldMeta  *get_as_field_meta(const char *as) {auto it = as_fields_.find(as);
+        return (it != as_fields_.end()) ? it->second : nullptr;  }
+    std::set<Table*>& query_tables() { return query_tables_; }
+    std::unordered_map<std::string,Table*>& query_as_tables() { return as_tables_; }
+    std::unordered_map<std::string,Table*>& query_as_parent_tables() { return as_parent_tables_; }
+    std::unordered_map<std::string,const FieldMeta*>& query_as_fields() { return as_fields_; }
+    // 才发现好像没用上当前table，不过既然过了，就不修改了。
+    void add_cur_table(Table* table) { cur_tables_.push_back(table); }
 
-  Table *find_table(const char *table_name) const;
+    Table* find_table_by_field(const char* field_name);
 
-  std::vector<Table *> &query_tables() { return query_tables_; }
-
-  void add_cur_table(Table *table){cur_tables_.push_back(table);}
-
-   Table* find_table_by_field(const char *field_name) const;
+    std::vector<Table*>& cur_tables()
+    {
+        return cur_tables_;
+    }
 
 private:
-  std::vector<Table *> query_tables_;
-  std::vector<Table *> cur_tables_;  // 只存储在当前select出现的table，不存储上方存下来的table。查询时如果为空，查当前table。没查到，查全局table。
-  Db* db_;
+    std::set<Table*> query_tables_;
+    std::vector<Table*> cur_tables_; // 只存储在当前select出现的table，不存储上方存下来的table。查询时如果为空，查当前table。没查到，查全局table。
+    std::unordered_map<std::string,Table*> as_tables_;
+    std::unordered_map<std::string,Table*> as_parent_tables_;
+    std::unordered_map<std::string,const FieldMeta*> as_fields_;
+    Db* db_;
+    bool is_single_ = true;
 
 public:
-  Db* db() const
-  {
-      return db_;
-  }
+    bool is_single() const
+    {
+        return is_single_;
+    }
+    void is_single(bool is_single)
+    {
+        is_single_ = is_single;
+    }
+    Db* db() const
+    {
+        return db_;
+    }
 
-  void db(Db* db)
-  {
-      db_ = db;
-  }
+    void db(Db* db)
+    {
+        db_ = db;
+    }
+    void as_table(std::unordered_map<std::string,Table*> as_tables)
+    {
+        as_tables_=as_tables;
+    }
 };
 
 /**
@@ -85,6 +115,8 @@ private:
       std::unique_ptr<Expression> &aggregate_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
     RC bind_sub_expression(
           std::unique_ptr<Expression> &sub_query_expr, std::vector<std::unique_ptr<Expression>> &bound_expressions);
+  RC bind_function_expression(std::unique_ptr<Expression>& expr,
+                              std::vector<std::unique_ptr<Expression>>& bound_expressions);
 
 private:
   BinderContext &context_;

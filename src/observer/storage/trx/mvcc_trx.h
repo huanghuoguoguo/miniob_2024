@@ -107,6 +107,8 @@ private:
 private:
   static const int32_t MAX_TRX_ID = numeric_limits<int32_t>::max();
 
+  map<int32_t, set<Record*>> trx_update_map_;
+
 private:
   // using OperationSet = unordered_set<Operation, OperationHasher, OperationEqualer>;
   using OperationSet = vector<Operation>;

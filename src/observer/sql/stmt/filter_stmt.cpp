@@ -101,6 +101,7 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_m
   filter_unit->set_right(std::unique_ptr<Expression>(condition.right_expr));
   // condition.right_expr = nullptr;
   filter_unit->set_comp(comp);
+  filter_unit->is_or(condition.is_or);
   // 检查两个类型是否能够比较
   return rc;
 }

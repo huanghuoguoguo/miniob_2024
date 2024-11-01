@@ -136,7 +136,12 @@ IS                                      RETURN_TOKEN(IS);
 NOT                                     RETURN_TOKEN(NOT);
 HAVING                                  RETURN_TOKEN(HAVING);
 IN                                      RETURN_TOKEN(IN);
+AS                                      RETURN_TOKEN(AS);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);
+OR                                      RETURN_TOKEN(OR);
+VIEW                                    RETURN_TOKEN(VIEW);
+LIMIT                                   RETURN_TOKEN(LIMIT);
+WITH                                    RETURN_TOKEN(WITH);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);

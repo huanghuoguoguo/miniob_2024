@@ -49,7 +49,10 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/physical_plan_generator.h"
 
 #include <ranges>
+#include <sql/operator/view_scan_physical_operator.h>
+#include <storage/table/view.h>
 
+class View;
 using namespace std;
 
 RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<PhysicalOperator> &oper)
@@ -134,6 +137,15 @@ RC PhysicalPlanGenerator::create_vec(LogicalOperator &logical_operator, unique_p
 
 RC PhysicalPlanGenerator::create_plan(TableGetLogicalOperator &table_get_oper, unique_ptr<PhysicalOperator> &oper)
 {
+  Table * t = table_get_oper.table();
+  if (View* v = dynamic_cast<View*>(t)) {
+    // 如果转换成功，说明这是一个view
+    // 不做任何下推。
+    auto view_scan_oper = new ViewScanPhysicalOperator(v, table_get_oper.read_write_mode());
+    oper = unique_ptr<PhysicalOperator>(view_scan_oper);
+    return RC::SUCCESS;
+  }
+
   vector<unique_ptr<Expression>> &predicates = table_get_oper.predicates();
   // 看看是否有可以用于索引查找的表达式
   Table *table = table_get_oper.table();
@@ -296,6 +308,7 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   }
 
   auto project_operator = make_unique<ProjectPhysicalOperator>(std::move(project_oper.expressions()));
+  project_operator->limit(project_oper.limit());
   if (child_phy_oper) {
     project_operator->add_child(std::move(child_phy_oper));
   }

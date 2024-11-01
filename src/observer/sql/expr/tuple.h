@@ -194,7 +194,7 @@ public:
     null_list = std::bitset<32>(v);
   }
 
-  void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
+  void set_schema(Table *table, const std::vector<FieldMeta> *fields)
   {
     table_ = table;
     // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
@@ -300,7 +300,7 @@ public:
 
 private:
   Record                  *record_ = nullptr;
-  const Table             *table_  = nullptr;
+  Table             *table_  = nullptr;
   std::vector<FieldExpr *> speces_;
   std::bitset<32>         null_list;
 };
@@ -439,6 +439,30 @@ public:
       value_list.cells_.push_back(cell);
       value_list.specs_.push_back(spec);
     }
+    return RC::SUCCESS;
+  }
+
+  static RC make(const Tuple &tuple,const std::vector<TupleCellSpec>& spec, ValueListTuple &value_list)
+  {
+    const int cell_num = tuple.cell_num();
+    for (int i = 0; i < cell_num; i++) {
+      Value cell;
+      RC    rc = tuple.cell_at(i, cell);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+      TupleCellSpec spec_;
+      rc = tuple.spec_at(i, spec_);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+      value_list.cells_.push_back(cell);
+
+
+      // value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name(), spec[i].alias());
+      value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name(), "");
+    }
+    // 还要加入null_list
     return RC::SUCCESS;
   }
 

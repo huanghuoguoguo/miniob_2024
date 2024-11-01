@@ -53,6 +53,7 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
+  FUNCTION,
 };
 
 /**
@@ -129,6 +130,12 @@ public:
    */
   virtual RC eval(Chunk &chunk, std::vector<uint8_t> &select) { return RC::UNIMPLEMENTED; }
 
+  /**
+   * @brief 表达式的别名
+   */
+  virtual const std::string alias() const { return alias_; }
+  virtual void set_alias(std::string alias) { alias_ = alias; }
+
 protected:
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -140,6 +147,7 @@ protected:
 
 private:
   std::string name_;
+  std::string alias_{};
 };
 
 class StarExpr : public Expression
@@ -234,7 +242,7 @@ public:
   RC get_column(Chunk &chunk, Column &column) override;
   RC try_get_value(Value &value) const override
   {
-    value = *new Value(value_);
+    value = value_;
     return RC::SUCCESS;
   }
 
@@ -583,4 +591,46 @@ public:
   {
     select_sql_node_ = select_sql_node;
   }
+};
+
+class FunctionExpr : public Expression
+{
+public:
+  enum class Type
+  {
+    L2_DISTANCE,
+    COSINE_DISTANCE,
+    INNER_PRODUCT,
+  };
+  FunctionExpr()
+  {
+
+  };
+  FunctionExpr(const char *func_name,std::vector<std::unique_ptr<Expression>>* params_)
+  {
+    this->func_name = func_name;
+    if(params_) {
+      this->params_.swap(*params_);
+    }
+  }
+  virtual ~FunctionExpr() = default;
+
+  ExprType type() const override { return ExprType::FUNCTION; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+  int      value_length() const override { return 0; }
+  RC       get_value(const Tuple &tuple, Value &value) const override;
+  Type func_type() const { return func_type_; }
+  void func_type(Type t){ this->func_type_ = t; }
+  string   get_func_name(){return this->func_name;}
+  std::vector<std::unique_ptr<Expression>>& params()
+  {
+    return this->params_;
+  }
+
+  static RC type_from_string(const char* type_str, Type& type);
+
+private:
+  string func_name;
+  std::vector<std::unique_ptr<Expression>> params_;
+  Type                        func_type_;
 };

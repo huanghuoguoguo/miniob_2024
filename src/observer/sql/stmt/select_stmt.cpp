@@ -40,8 +40,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   if (select_sql.binder_context == nullptr) {
     select_sql.binder_context = new BinderContext();
     select_sql.binder_context->query_tables().clear();
+    select_sql.binder_context->cur_tables().clear();
     select_sql.binder_context->db(db);
   }
+
   BinderContext& binder_context = *select_sql.binder_context;
 
 
@@ -50,12 +52,14 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   unordered_map<string, Table *> table_map;
   // 直接将join的表放入需要查询的表中，如果是*则全部获取，如果是table.field也不影响。并且可以参加后续的检查。
   for (size_t i = 0; i < select_sql.join_list.size(); i++) {
-    auto& table_name = select_sql.join_list[i].relation;
-    select_sql.relations.push_back(table_name);
-  }
+      auto& table_name = select_sql.join_list[i].relation;
+      select_sql.relations.push_back(table_name);
+    }
+
+
 
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
+    const char *table_name = select_sql.relations[i].first.c_str();  //拿到的表名是真实表名
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
       return RC::INVALID_ARGUMENT;
@@ -67,9 +71,22 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return RC::SCHEMA_TABLE_NOT_EXIST;
     }
 
+    binder_context.add_cur_table(table);
     binder_context.add_table(table);
     tables.push_back(table);
     table_map.insert({table_name, table});
+    //在这里维护下 表别名和表指针的关系 放到binder_context的as_table_里
+    const char *as_name = select_sql.relations[i].second.c_str();
+    if (nullptr != as_name && strlen(as_name) > 0) {
+      // 判断别名是否重复
+      if (binder_context.query_as_tables().contains(as_name)  ) {
+        LOG_ERROR("Alias name '%s' is already used. Please use a unique alias.", as_name);
+        return RC::ALIAS_DUPLICATE;
+      }
+      binder_context.add_as_table(as_name,table);
+    }
+
+
   }
 
 
@@ -114,7 +131,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
   std::vector<FilterStmt*> group_by_having;
   FilterStmt *having_filter_stmt = nullptr;
-  // conditions
+  // group by
   rc = expression_binder.bind_condition_expression(select_sql.group_by_having);
   if (OB_FAIL(rc)) {
     LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
@@ -157,7 +174,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       LOG_WARN("cannot construct join stmt");
       return rc;
     }
-    auto& join_table = table_map[select_sql.join_list[i].relation];
+    auto& join_table = table_map[select_sql.join_list[i].relation.first];  //join_list中的relations 直接当作单个pair使用
     join_filter_stmts.emplace_back(join_table,join_filter_stmt);
   }
 
@@ -209,7 +226,9 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->join_filter_stmts_.swap(join_filter_stmts);
   select_stmt->group_by_.swap(group_by_expressions);
   select_stmt->order_by_.swap(order_by_expressions);
-  select_stmt->is_single_ = binder_context.query_tables().size() <= tables.size();
+  select_stmt->is_single_ = binder_context.is_single();
+  select_stmt->limit_ = select_sql.limit;
+  select_stmt->binder_context_ = select_sql.binder_context;
   stmt                    = select_stmt;
   return RC::SUCCESS;
 }

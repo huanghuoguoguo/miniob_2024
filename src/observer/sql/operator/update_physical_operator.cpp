@@ -4,6 +4,8 @@
 
 #include "sql/operator/update_physical_operator.h"
 
+#include <sql/expr/composite_tuple.h>
+
 #include "project_physical_operator.h"
 #include "sql/stmt/update_stmt.h"
 #include "storage/table/table.h"
@@ -44,7 +46,10 @@ RC UpdatePhysicalOperator::open(Trx *trx)
         auto expression = e->right().get();
         if (expression != nullptr && expression->type() == ExprType::SUB_QUERY) {
           auto                        sub_query_expr = static_cast<SubQueryExpr*>(expression);
-          sub_query_expr->open(trx);
+          rc = sub_query_expr->open(trx);
+          if(rc != RC::SUCCESS) {
+            return rc;
+          }
           // 如果返回多个tuple。返回错误。
           if (!sub_query_expr->is_single_tuple()) {
             return RC::SUB_QUERY_NUILTI_VALUE;
@@ -59,7 +64,19 @@ RC UpdatePhysicalOperator::open(Trx *trx)
       return rc;
     }
 
-    RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
+    RowTuple *row_tuple = dynamic_cast<RowTuple *>(tuple);
+    if (row_tuple == nullptr) {
+      CompositeTuple *composite_tuple = dynamic_cast<CompositeTuple *>(tuple);
+      if (composite_tuple) {
+        std::vector<std::unique_ptr<Tuple>>& tuples = composite_tuple->tuples();
+        for (auto &tuple : tuples) {
+          Tuple *sub_tuple = dynamic_cast<Tuple *>(tuple.get());
+          if (dynamic_cast<RowTuple *>(sub_tuple)) {
+            row_tuple = dynamic_cast<RowTuple *>(sub_tuple);
+          }
+        }
+      }
+    }
 
 
     // 找到所有的value

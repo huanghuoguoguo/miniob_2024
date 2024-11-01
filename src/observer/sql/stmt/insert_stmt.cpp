@@ -90,7 +90,7 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   // check field type
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
-    Value           &val        = values_data->at(i);
+    Value&             val        = values_data->at(i);
     const AttrType   field_type = field_meta->type();
     const AttrType   value_type = val.attr_type();
 
@@ -101,6 +101,27 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
           LOG_WARN("TEXT_LENGTH:%d IS TOO LONG, longer than 65535",values_data->at(i).length());
           return RC::INVALID_ARGUMENT;
         }
+      }
+    }
+    if (AttrType::VECTORS == field_type) {
+      if (val.attr_type() == AttrType::VECTORS) {
+        // 如果values不为空，证明直接是[]，保存在了values当中。
+        if (val.length() != field_meta->len()) {
+          return RC::INVALID_ARGUMENT;
+        }
+      } else if (val.attr_type() == AttrType::CHARS) {
+        // char先转vector
+        Value v;
+        DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
+        std::vector<float> vector = v.get_vector();
+        if (vector.size() != field_meta->len() / sizeof(float)) {
+          v.reset();
+          return RC::INVALID_ARGUMENT;
+        }
+        // 直接替换吧？
+        val = v;
+      } else {
+        return RC::INVALID_ARGUMENT;
       } else if (AttrType::VECTORS == field_type) {
         if (val.attr_type() == AttrType::VECTORS) {
           // if (MAX_VECTOR_LENGTH < val.length()) {

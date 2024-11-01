@@ -43,12 +43,13 @@ ArithmeticExpr *create_arithmetic_expression(ArithmeticExpr::Type type,
   return expr;
 }
 
-UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
-                                           Expression *child,
+FunctionExpr *create_aggregate_expression(const char *aggregate_name,
+                                           std::vector<std::unique_ptr<Expression>> * expression_list,
                                            const char *sql_string,
                                            YYLTYPE *llocp)
 {
-  UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, child);
+  // UnboundAggregateExpr *expr = new UnboundAggregateExpr(aggregate_name, child);
+  FunctionExpr *expr = new FunctionExpr(aggregate_name, expression_list);
   expr->set_name(token_name(sql_string, llocp));
   return expr;
 }
@@ -131,6 +132,11 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         HAVING
         IN
         UNIQUE
+        OR
+        AS
+        VIEW
+        LIMIT
+        WITH
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -150,10 +156,12 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   OrderBySqlNode *                           order_unit;
   std::vector<OrderBySqlNode> *              order_unit_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
+  std::vector<pair<std::string, std::string>> *  relation_list;
   char *                                     string;
   int                                        number;
   float                                      floats;
+  bool                                       boolean;
+  std::pair<std::string, std::string> *      relation_type;
 }
 
 %token <number> NUMBER
@@ -168,7 +176,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
-%type <string>              relation
+%type <relation_type>       relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
@@ -179,8 +187,10 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <join_list>           join_list
 %type <join>                join
 %type <condition_list>      condition_list
+%type <condition_list>      with_block
 %type <condition_list>      having_condition
 %type <string>              storage_format
+%type <string>              index_type
 %type <relation_list>       rel_list
 %type <value_list>          value_list
 %type <expression>          expression
@@ -203,15 +213,19 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
 %type <sql_node>            commit_stmt
+%type <sql_node>            create_view_stmt
 %type <sql_node>            rollback_stmt
 %type <sql_node>            load_data_stmt
 %type <sql_node>            explain_stmt
 %type <sql_node>            set_variable_stmt
 %type <sql_node>            help_stmt
+%type <number>              limit_block
 %type <sql_node>            exit_stmt
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
+%type <string>              alias
+%type <boolean>             as_option
 
 %left '+' '-'
 %left '*' '/'
@@ -239,6 +253,7 @@ command_wrapper:
   | drop_index_stmt
   | sync_stmt
   | begin_stmt
+  | create_view_stmt
   | commit_stmt
   | rollback_stmt
   | load_data_stmt
@@ -304,32 +319,92 @@ desc_table_stmt:
     }
     ;
 
-
-create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE expression_list RBRACE
+create_view_stmt:
+    CREATE VIEW ID AS select_stmt
     {
-      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
-      CreateIndexSqlNode &create_index = $$->create_index;
-      create_index.index_name = $3;
-      create_index.relation_name = $5;
-      create_index.unique = false;
-      create_index.columns.swap(*$7);
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+      $$->flag = SCF_CREATE_VIEW;
+      $$->create_view.view_name = $3;
+      $$->create_view.select_sql_node = &$5->selection;
       free($3);
-      free($5);
     }
-    | CREATE UNIQUE INDEX ID ON ID LBRACE expression_list RBRACE
+    | CREATE VIEW ID LBRACE expression_list RBRACE AS select_stmt
      {
-       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
-       CreateIndexSqlNode &create_index = $$->create_index;
-       create_index.index_name = $4;
-       create_index.relation_name = $6;
-       create_index.unique = true;
-       create_index.columns.swap(*$8);
-       free($4);
-       free($6);
+       $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+       $$->flag = SCF_CREATE_VIEW;
+       $$->create_view.expressions.swap(*$5);
+       $$->create_view.view_name = $3;
+       $$->create_view.select_sql_node = &$8->selection;
+       free($3);
      }
     ;
 
+create_index_stmt:    /*create index 语句的语法解析树*/
+    CREATE index_type INDEX ID ON ID LBRACE expression_list RBRACE with_block
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+      CreateIndexSqlNode &create_index = $$->create_index;
+
+      if($2 != nullptr){
+        create_index.index_type = $2;
+      }else{
+        create_index.index_type = "normal";
+      }
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
+      create_index.unique = false;
+      create_index.columns.swap(*$8);
+      if($10 != nullptr){
+        create_index.equal_expression.swap(*$10);
+      }
+      free($4);
+      free($6);
+    }
+    | CREATE UNIQUE index_type INDEX ID ON ID LBRACE expression_list RBRACE with_block
+     {
+       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+       CreateIndexSqlNode &create_index = $$->create_index;
+       if($3 != nullptr){
+         create_index.index_type = $3;
+       }else{
+         create_index.index_type = "normal";
+       }
+       create_index.index_name = $5;
+       create_index.relation_name = $7;
+       create_index.unique = true;
+       create_index.columns.swap(*$9);
+       if($11 != nullptr){
+         create_index.equal_expression.swap(*$11);
+       }
+       free($5);
+       free($7);
+     }
+    ;
+with_block:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | WITH LBRACE condition_list RBRACE {
+      $$ = $3;
+    }
+    ;
+index_type:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | VECTOR_T {
+      std::string str = "vector";
+      // 获取可修改的 char*
+      char* cstr = new char[str.size() + 1]; // +1 for the null terminator
+      strcpy(cstr, str.data()); // 复制内容
+      $$ = cstr;
+    }
+    ;
 drop_index_stmt:      /*drop index 语句的语法解析树*/
     DROP INDEX ID ON ID
     {
@@ -361,6 +436,30 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         create_table.storage_format = $8;
         free($8);
       }
+    }
+    | CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE as_option select_stmt
+    {
+      $$ = $9;
+      $$->flag = SCF_CREATE_TABLE;
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      free($3);
+
+      std::vector<AttrInfoSqlNode> *src_attrs = $6;
+      if (src_attrs != nullptr) {
+        create_table.attr_infos.swap(*src_attrs);
+      }
+      create_table.attr_infos.emplace_back(*$5);
+      std::reverse(create_table.attr_infos.begin(), create_table.attr_infos.end());
+      delete $5;
+    }
+    | CREATE TABLE ID as_option select_stmt
+    {
+      $$ = $5;
+      $$->flag = SCF_CREATE_TABLE;
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      free($3);
     }
     ;
 attr_def_list:
@@ -454,6 +553,16 @@ attr_def:
       free($1);
     }
     ;
+  as_option:
+    /* empty */
+    {
+      $$ = false;
+    }
+    | AS
+    {
+      $$ = false;
+    }
+    ;
 number:
     NUMBER {$$ = $1;}
     ;
@@ -522,9 +631,9 @@ value:
         for (auto &v : *$2) {
             // 获取信息，封装为vector
           if (v->attr_type() == AttrType::INTS) {
-            float_data.push_back(static_cast<float>(v->get_int()));
+            float_data.insert(float_data.begin(), static_cast<float>(v->get_int()));
           }else {
-            float_data.push_back(v->get_float());
+            float_data.insert(float_data.begin(), v->get_float());
           }
         }
         $$->set_vector(float_data);
@@ -582,7 +691,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by having_condition opt_order_by
+    SELECT expression_list FROM rel_list join_list where group_by having_condition opt_order_by limit_block
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -618,6 +727,17 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_unit_list.swap(*$9);
         delete $9;
       }
+
+      $$->selection.limit = $10;
+    }
+    ;
+
+limit_block:
+    {
+      $$ = -1;
+    }
+    | LIMIT NUMBER {
+      $$ = $2;
     }
     ;
 join_list:
@@ -645,8 +765,7 @@ join_list:
 join:
     relation ON condition_list {
       $$ = new JoinSqlNode;
-      $$->relation = $1;
-      free($1);
+      $$->relation = *$1;
       $$->conditions.swap(*$3);
     }
     ;
@@ -661,19 +780,27 @@ calc_stmt:
     ;
 
 expression_list:
-    expression
+    expression alias
     {
       $$ = new std::vector<std::unique_ptr<Expression>>;
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
       $$->emplace_back($1);
+      free($2);
     }
-    | expression COMMA expression_list
+    | expression alias COMMA expression_list
     {
-      if ($3 != nullptr) {
-        $$ = $3;
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
         $$ = new std::vector<std::unique_ptr<Expression>>;
       }
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
       $$->emplace($$->begin(), $1);
+      free($2);
     }
     ;
 aggre_type:
@@ -691,11 +818,7 @@ expression:
     aggre_type LBRACE aggre_list RBRACE {
       $$ = nullptr;
       if ($3 != nullptr) {
-        if($3->size() == 1){
-            $$ = create_aggregate_expression($1, $3->front().release(), sql_string, &@$);
-        } else {
-            $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
-        }
+        $$ = create_aggregate_expression($1, $3, sql_string, &@$);
       }else{
         $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
       }
@@ -754,28 +877,43 @@ rel_attr:
       free($1);
       free($3);
     }
+    | '*' DOT '*' {
+      $$ = new RelAttrSqlNode;
+      $$->relation_name  = "*";
+      $$->attribute_name = "*";
+    }
+    | ID DOT '*' {
+      $$ = new RelAttrSqlNode;
+      $$->relation_name  = $1;
+      $$->attribute_name = "*";
+      free($1);
+    }
     ;
 
 relation:
-    ID {
-      $$ = $1;
+    ID alias {
+      if($2 != nullptr){
+        $$ = new std::pair<std::string, std::string>($1, $2);
+      } else {
+        $$ = new std::pair<std::string, std::string>($1, "");
+      }
     }
     ;
 rel_list:
     relation {
-      $$ = new std::vector<std::string>();
-      $$->push_back($1);
-      free($1);
+      $$ = new std::vector<std::pair<std::string, std::string>>;
+      $$->push_back(*$1);
+      delete $1;
     }
     | relation COMMA rel_list {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
-        $$ = new std::vector<std::string>;
+        $$ = new std::vector<std::pair<std::string, std::string>>;
       }
 
-      $$->insert($$->begin(), $1);
-      free($1);
+      $$->insert($$->begin(), *$1);
+      delete $1;
     }
     ;
 
@@ -800,6 +938,13 @@ condition_list:
     }
     | condition AND condition_list {
       $$ = $3;
+      $1->is_or = false;
+      $$->emplace_back(*$1);
+      delete $1;
+    }
+    | condition OR condition_list {
+      $$ = $3;
+      $1->is_or = true;
       $$->emplace_back(*$1);
       delete $1;
     }
@@ -900,6 +1045,16 @@ opt_order_by:
       std::reverse($$->begin(),$$->end());
 	}
 	;
+alias:
+    /* empty */ {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | AS ID {
+      $$ = $2;
+    }
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
     {
