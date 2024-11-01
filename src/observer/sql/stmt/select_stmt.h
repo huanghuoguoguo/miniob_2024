@@ -74,5 +74,16 @@ public:
   }
 
 private:
+
+  int limit_ = -1;
+
+public:
+  int limit() const
+  {
+    return limit_;
+  }
+
+
+private:
   bool is_single_ = true;
 };

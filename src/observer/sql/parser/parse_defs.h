@@ -120,6 +120,8 @@ struct SelectSqlNode
   std::vector<ConditionSqlNode>            group_by_having;     ///< group by having clause
   std::vector<OrderBySqlNode>              order_unit_list;     ///< order_unit_list
   BinderContext*                           binder_context = nullptr;
+    int limit;
+
 };
 
 struct CreateViewSqlNode
@@ -223,9 +225,11 @@ struct DropTableSqlNode
 struct CreateIndexSqlNode
 {
     std::string index_name; ///< Index name
+    std::string index_type;
     std::string relation_name;   ///< Relation name
     bool unique;
     std::vector<std::unique_ptr<Expression>> columns;
+    std::vector<ConditionSqlNode> equal_expression; ///< 要插入的值
 };
 
 /**

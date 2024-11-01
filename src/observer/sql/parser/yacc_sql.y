@@ -135,6 +135,8 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
         OR
         AS
         VIEW
+        LIMIT
+        WITH
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -185,8 +187,10 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <join_list>           join_list
 %type <join>                join
 %type <condition_list>      condition_list
+%type <condition_list>      with_block
 %type <condition_list>      having_condition
 %type <string>              storage_format
+%type <string>              index_type
 %type <relation_list>       rel_list
 %type <value_list>          value_list
 %type <expression>          expression
@@ -215,6 +219,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            explain_stmt
 %type <sql_node>            set_variable_stmt
 %type <sql_node>            help_stmt
+%type <number>              limit_block
 %type <sql_node>            exit_stmt
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
@@ -335,30 +340,71 @@ create_view_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE expression_list RBRACE
+    CREATE index_type INDEX ID ON ID LBRACE expression_list RBRACE with_block
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
-      create_index.index_name = $3;
-      create_index.relation_name = $5;
+
+      if($2 != nullptr){
+        create_index.index_type = $2;
+      }else{
+        create_index.index_type = "normal";
+      }
+      create_index.index_name = $4;
+      create_index.relation_name = $6;
       create_index.unique = false;
-      create_index.columns.swap(*$7);
-      free($3);
-      free($5);
+      create_index.columns.swap(*$8);
+      if($10 != nullptr){
+        create_index.equal_expression.swap(*$10);
+      }
+      free($4);
+      free($6);
     }
-    | CREATE UNIQUE INDEX ID ON ID LBRACE expression_list RBRACE
+    | CREATE UNIQUE index_type INDEX ID ON ID LBRACE expression_list RBRACE with_block
      {
        $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
        CreateIndexSqlNode &create_index = $$->create_index;
-       create_index.index_name = $4;
-       create_index.relation_name = $6;
+       if($3 != nullptr){
+         create_index.index_type = $3;
+       }else{
+         create_index.index_type = "normal";
+       }
+       create_index.index_name = $5;
+       create_index.relation_name = $7;
        create_index.unique = true;
-       create_index.columns.swap(*$8);
-       free($4);
-       free($6);
+       create_index.columns.swap(*$9);
+       if($11 != nullptr){
+         create_index.equal_expression.swap(*$11);
+       }
+       free($5);
+       free($7);
      }
     ;
-
+with_block:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | WITH LBRACE condition_list RBRACE {
+      $$ = $3;
+    }
+    ;
+index_type:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | VECTOR_T {
+      std::string str = "vector";
+      // 获取可修改的 char*
+      char* cstr = new char[str.size() + 1]; // +1 for the null terminator
+      strcpy(cstr, str.data()); // 复制内容
+      $$ = cstr;
+    }
+    ;
 drop_index_stmt:      /*drop index 语句的语法解析树*/
     DROP INDEX ID ON ID
     {
@@ -645,7 +691,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list join_list where group_by having_condition opt_order_by
+    SELECT expression_list FROM rel_list join_list where group_by having_condition opt_order_by limit_block
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -681,6 +727,17 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_unit_list.swap(*$9);
         delete $9;
       }
+
+      $$->selection.limit = $10;
+    }
+    ;
+
+limit_block:
+    {
+      $$ = -1;
+    }
+    | LIMIT NUMBER {
+      $$ = $2;
     }
     ;
 join_list:

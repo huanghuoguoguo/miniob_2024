@@ -24,25 +24,37 @@ See the Mulan PSL v2 for more details. */
 class ProjectPhysicalOperator : public PhysicalOperator
 {
 public:
-  ProjectPhysicalOperator(std::vector<std::unique_ptr<Expression>> &&expressions);
+    ProjectPhysicalOperator(std::vector<std::unique_ptr<Expression>>&& expressions);
 
-  virtual ~ProjectPhysicalOperator() = default;
+    virtual ~ProjectPhysicalOperator() = default;
 
-  PhysicalOperatorType type() const override { return PhysicalOperatorType::PROJECT; }
+    PhysicalOperatorType type() const override { return PhysicalOperatorType::PROJECT; }
 
-  RC open(Trx *trx) override;
-  RC next() override;
-  RC close() override;
+    RC open(Trx* trx) override;
+    RC next() override;
+    RC close() override;
 
-  int cell_num() const { return tuple_.cell_num(); }
+    int cell_num() const { return tuple_.cell_num(); }
 
-  Tuple *current_tuple() override;
+    Tuple* current_tuple() override;
 
-  RC tuple_schema(TupleSchema &schema) const override;
+    RC tuple_schema(TupleSchema& schema) const override;
 
-  int select_size(){return static_cast<int>(expressions_.size());}
+    int select_size() { return static_cast<int>(expressions_.size()); }
 
 private:
-  std::vector<std::unique_ptr<Expression>>     expressions_;
-  ExpressionTuple<std::unique_ptr<Expression>> tuple_;
+    std::vector<std::unique_ptr<Expression>> expressions_;
+    ExpressionTuple<std::unique_ptr<Expression>> tuple_;
+    int limit_ = -1;
+
+public:
+    int limit() const
+    {
+        return limit_;
+    }
+
+    void limit(int limit)
+    {
+        limit_ = limit;
+    }
 };

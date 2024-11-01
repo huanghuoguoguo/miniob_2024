@@ -139,8 +139,9 @@ IN                                      RETURN_TOKEN(IN);
 AS                                      RETURN_TOKEN(AS);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);
 OR                                      RETURN_TOKEN(OR);
-AS                                      RETURN_TOKEN(AS);
 VIEW                                    RETURN_TOKEN(VIEW);
+LIMIT                                   RETURN_TOKEN(LIMIT);
+WITH                                    RETURN_TOKEN(WITH);
 
 
 {ID}                                    yylval->string=strdup(yytext); RETURN_TOKEN(ID);
