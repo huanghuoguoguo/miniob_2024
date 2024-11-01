@@ -85,6 +85,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   nullable_    = nullable;
   is_high_dim_ = is_high_dim;
   if (AttrType::TEXTS == attr_type) { attr_len_ = TEXT_FIELD_LENGTH; }
+  if (AttrType::VECTORS == attr_type&&is_high_dim==true) { attr_len_ = VECTOR_FIELD_LENGTH; }
   //TODO
   // if (AttrType::VECTORS == attr_type && attr_len/sizeof(float)>1000) {
   //   set_high_dimensional(true); // 设置高纬度标记

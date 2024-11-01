@@ -90,11 +90,10 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       visible = false;
     }
     int attr_len = attr_info.length;
-    bool is_hi = true;
+    bool is_hi = false;
     if (attr_info.type == AttrType::VECTORS) {
       // 判断长度
       if(attr_info.length>1000) {
-        attr_len = 16;
         is_hi = true;
       }else {
         is_hi = false;
