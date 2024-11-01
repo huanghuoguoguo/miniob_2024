@@ -85,8 +85,7 @@ public:
 
 
   RC create_index(Trx* trx, vector<unique_ptr<Expression>>& column_expressions_, const char* index_name,
-                  bool is_unique);
-
+                  bool is_unique, vector<ConditionSqlNode>& with_condition_sql_nodes);
   RC get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode);
 
   RC get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode mode);

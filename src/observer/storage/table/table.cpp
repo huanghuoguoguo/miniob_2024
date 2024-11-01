@@ -508,7 +508,7 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
 
 
 RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressions_, const char *index_name,
-    bool                    is_unique)
+    bool                    is_unique,vector<ConditionSqlNode>& with_condition_sql_nodes)
 {
   // 收集需要创建的索引的列信息。
   std::vector<const FieldMeta *> *field_meta = new vector<const FieldMeta*>();
@@ -532,15 +532,24 @@ RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressi
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s", name(), index_name);
     return rc;
   }
-  // 创建索引相关数据
-  BplusTreeIndex *index      = new BplusTreeIndex();
-  std::string     index_file = table_index_file(base_dir_.c_str(), name(), index_name);
-  rc                         = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
-  if (rc != RC::SUCCESS) {
-    delete index;
-    LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
-    return rc;
+  Index *index;
+  if(with_condition_sql_nodes.empty()) {
+    // 创建索引相关数据
+        index  = new BplusTreeIndex();
+    std::string     index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+    rc                         = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
+    if (rc != RC::SUCCESS) {
+      delete index;
+      LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
+      return rc;
+    }
+  }else {
+    // 创建vector。。。这里还是偷懒了。
+
   }
+
+
+
   // 遍历当前的所有数据，插入这个索引
   RecordFileScanner scanner;
   rc = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY /*readonly*/);
