@@ -92,7 +92,12 @@ RC View::create_view(Db *db, const char *path, const char *base_dir, int32_t tab
   for (auto &table : tables) {
     this->tables.insert(table);
   }
-  this->query_expressions.swap(query_expressions);
+  if(query_expressions.empty()) {
+    std::vector<std::unique_ptr<Expression>>& q_expressions = select_stmt->query_expressions();
+    this->query_expressions.swap(q_expressions);
+  }else {
+    this->query_expressions.swap(query_expressions);
+  }
   rc = init_tuple_spec();
 
   return rc;

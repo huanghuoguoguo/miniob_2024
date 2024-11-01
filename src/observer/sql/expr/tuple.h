@@ -449,8 +449,7 @@ public:
       value_list.cells_.push_back(cell);
 
 
-      // value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name(), spec[i].alias());
-      value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name(), "");
+      value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name());
     }
     // 还要加入null_list
     return RC::SUCCESS;
