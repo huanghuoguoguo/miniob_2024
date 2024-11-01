@@ -49,6 +49,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/physical_plan_generator.h"
 
 #include <ranges>
+#include <sql/operator/limit_physical_operator.h>
 #include <sql/operator/vector_index_scan.h>
 
 using namespace std;
@@ -297,7 +298,15 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   }
 
   auto project_operator = make_unique<ProjectPhysicalOperator>(std::move(project_oper.expressions()));
-  project_operator->limit(project_oper.limit());
+  if (project_oper.limit() > 0) {
+    std::unique_ptr<PhysicalOperator> limit_physical_operator = make_unique<LimitPhysicalOperator>(project_oper.limit());
+    if(child_phy_oper) {
+      limit_physical_operator->add_child(std::move(child_phy_oper));
+    }
+    project_operator->add_child(std::move(limit_physical_operator));
+    oper = std::move(project_operator);
+    return rc;
+  }
   if (child_phy_oper) {
     project_operator->add_child(std::move(child_phy_oper));
   }
