@@ -363,8 +363,8 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
   const int normal_field_start_index = table_meta_->sys_field_num();
   // 复制所有字段的值
-  int   record_size = table_meta_->record_size();
-  char *record_data = (char *)malloc(record_size);
+  int             record_size = table_meta_->record_size();
+  char *          record_data = (char *)malloc(record_size);
   std::bitset<32> null_list;
   memset(record_data, 0, record_size);
 
@@ -378,26 +378,28 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
       Value real_value;
       if (AttrType::TEXTS == field->type() && AttrType::CHARS == value.attr_type()) {
         rc = set_value_to_record(record_data, value, field);
-      }else {
+      } else {
         rc = Value::cast_to(value, field->type(), real_value);
         if (OB_FAIL(rc)) {
           LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-              table_meta_->name(), field->name(), value.to_string().c_str());
+              table_meta_->name(),
+              field->name(),
+              value.to_string().c_str());
           return rc;
         }
       }
       // 妥协之举，字符串转为数字时，取开头的第一个得到的数字，如果没得到数字，认为是0。但是在字符串转数字时要进行插入时，如果不是纯数字，则插入失败。
-      if(field->type() == AttrType::INTS || field->type() == AttrType::FLOATS) {
-        auto isNumber = [](const std::string& str) {
+      if (field->type() == AttrType::INTS || field->type() == AttrType::FLOATS) {
+        auto isNumber = [](const std::string &str) {
           std::regex pattern("^[+-]?([0-9]*[.])?[0-9]+$");
           return std::regex_match(str, pattern);
         };
-        if(!isNumber(value.to_string())) {
+        if (!isNumber(value.to_string())) {
           return RC::INVALID_ARGUMENT;
         }
       }
       rc = set_value_to_record(record_data, real_value, field);
-    } else if(value.is_null()) {
+    } else if (value.is_null()) {
       // 将bitmap对应位置置为true。
       null_list.set(field->field_id());
     } else {
@@ -405,7 +407,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
     }
   }
   const FieldMeta *field = table_meta_->field("null_list");
-  rc = set_value_to_record(record_data, Value(static_cast<int>(null_list.to_ulong())), field);
+  rc                     = set_value_to_record(record_data, Value(static_cast<int>(null_list.to_ulong())), field);
 
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to make record. table name:%s", table_meta_->name());

@@ -195,6 +195,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list
 %type <expression>          expression
 %type <expression_list>     expression_list
+%type <expression_list>     field_columns
 %type <expression_list>     group_by
 %type <order_unit>          order_unit
 %type <order_unit_list>     order_unit_list
@@ -575,18 +576,30 @@ type:
     | TEXT_T   { $$ = static_cast<int>(AttrType::TEXTS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE expression_list RBRACE
+    INSERT INTO ID field_columns VALUES LBRACE expression_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
-      if ($6 != nullptr) {
-        $$->insertion.values.swap(*$6);
-        delete $6;
+      if ($4 != nullptr) {
+        $$->insertion.columns.swap(*$4);
+        delete $4;
+      }
+      if ($7 != nullptr) {
+        $$->insertion.values.swap(*$7);
+        delete $7;
       }
       free($3);
     }
     ;
 
+field_columns:
+    {
+        $$ = nullptr;
+    }
+    | LBRACE expression_list RBRACE{
+        $$ = $2;
+    }
+    ;
 
 value:
     NUMBER {

@@ -50,23 +50,40 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 
   // 只考虑了值的情况。
   BinderContext binder_context;
-  vector<unique_ptr<Expression>> bound_expressions;
+  vector<unique_ptr<Expression>> bound_values_expressions;
+  vector<unique_ptr<Expression>> bound_field_expressions;
   ExpressionBinder expression_binder(binder_context);
 
-  for (unique_ptr<Expression> &expression : inserts.values) {
-    RC rc = expression_binder.bind_expression(expression, bound_expressions);
+  // 开始绑定字段和值
+  for (unique_ptr<Expression> &expression : inserts.columns) {
+    RC rc = expression_binder.bind_expression(expression, bound_field_expressions);
     if(expression) {
-      bound_expressions.emplace_back(std::move(expression));
+      bound_field_expressions.emplace_back(std::move(expression));
     }
     if (OB_FAIL(rc)) {
-      LOG_INFO("bind expression failed. rc=%s", strrc(rc));
+      LOG_INFO("bind field expression failed. rc=%s", strrc(rc));
+      return rc;
+    }
+  }
+  for (unique_ptr<Expression> &expression : inserts.values) {
+    RC rc = expression_binder.bind_expression(expression, bound_values_expressions);
+    if(expression) {
+      bound_values_expressions.emplace_back(std::move(expression));
+    }
+    if (OB_FAIL(rc)) {
+      LOG_INFO("bind value expression failed. rc=%s", strrc(rc));
       return rc;
     }
   }
   inserts.values.clear();
+  inserts.columns.clear();
+
+  // 如果不为空，可能需要将值的位置重新排列，
+
+
 
   std::vector<Value>* values_data = new std::vector<Value>();
-  for(auto& bound_expression : bound_expressions) {
+  for(auto& bound_expression : bound_values_expressions) {
     Value value;
     RC rc = bound_expression->try_get_value(value);
     if (OB_FAIL(rc)) {
