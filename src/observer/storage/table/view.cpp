@@ -273,9 +273,10 @@ RC View::make_record(int value_num, const Value *values, Record &record)
       new_values[field_id - sys_field_num] = values[i];
     } else {
       // 非field_expr，并且其值不为null，报错。
-      if (!values[i].is_null()) {
-        return RC::INVALID_ARGUMENT;
-      }
+      // if (!values[i].is_null()) {
+      //   return RC::INVALID_ARGUMENT;
+      // }
+      return RC::INVALID_ARGUMENT;
     }
     i++;
   }
