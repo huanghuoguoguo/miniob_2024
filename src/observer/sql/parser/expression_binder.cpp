@@ -456,7 +456,7 @@ RC ExpressionBinder::bind_arithmetic_expression(
     }
   }
 
-  bound_expressions.emplace_back(std::move(expr));
+    bound_expressions.emplace_back(std::move(expr));
   return RC::SUCCESS;
 }
 
@@ -548,6 +548,7 @@ RC ExpressionBinder::bind_aggregate_expression(
 
   auto aggregate_expr = make_unique<AggregateExpr>(aggregate_type, std::move(child_expr));
   aggregate_expr->set_name(func_expr->name());
+  aggregate_expr->set_alias(func_expr->alias());
   rc = check_aggregate_expression(*aggregate_expr);
   if (OB_FAIL(rc)) {
     return rc;

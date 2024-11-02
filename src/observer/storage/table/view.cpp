@@ -6,25 +6,16 @@
 
 #include <common/log/log.h>
 #include <sql/parser/expression_binder.h>
-#include "storage/index/bplus_tree_index.h"
-#include <limits.h>
 #include <string.h>
 #include <bitset>
 #include "common/defs.h"
 #include "common/lang/string.h"
 #include "common/lang/span.h"
-#include "common/lang/algorithm.h"
-#include "common/log/log.h"
-#include "common/global_context.h"
 #include "storage/db/db.h"
 #include "storage/buffer/disk_buffer_pool.h"
-#include "storage/common/condition_filter.h"
-#include "storage/common/meta_util.h"
-#include "storage/index/bplus_tree_index.h"
 #include "storage/index/index.h"
 #include "storage/record/record_manager.h"
 #include "storage/table/table.h"
-
 #include <regex>
 #include <sql/expr/expression.h>
 #include <sql/stmt/create_view_stmt.h>
