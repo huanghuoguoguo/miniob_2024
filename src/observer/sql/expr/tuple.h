@@ -515,17 +515,30 @@ public:
     return RC::NOTFOUND;
   }
 
-  RC find_cell(const TupleCellSpec &spec, Value &value) const override
+  RC find_cell(const TupleCellSpec& spec, Value& value) const override
   {
-    RC rc = left_->find_cell(spec, value);
-    if (rc == RC::SUCCESS || rc != RC::NOTFOUND) {
+    i++;
+    RC rc = RC::SUCCESS;
+    if (i % 2 == 0)
+    {
+      rc = left_->find_cell(spec, value);
+      if (rc == RC::SUCCESS || rc != RC::NOTFOUND)
+      {
+        return rc;
+      }
+    }
+    rc = right_->find_cell(spec, value);
+    if (i % 2 == 0 || rc == RC::SUCCESS)
+    {
+      // 没有找左tuple。
       return rc;
     }
-
-    return right_->find_cell(spec, value);
+    // 如果右边找不到并且是跳过了左边的，继续找左边。
+    return left_->find_cell(spec, value);
   }
 
 private:
   Tuple *left_  = nullptr;
   Tuple *right_ = nullptr;
+  mutable int i = -1;
 };
