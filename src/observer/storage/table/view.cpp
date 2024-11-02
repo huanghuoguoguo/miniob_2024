@@ -196,7 +196,6 @@ RC View::init_tuple_spec()
   } else {
     rc = this->init_(this->query_expressions);
   }
-  check();
   return rc;
 }
 
@@ -253,49 +252,43 @@ RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
 RC View::make_record(int value_num, const Value *values, Record &record)
 {
 
-  if (this->tables.size() > 1 || !can_ddl_) {
+  if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  // 如果映射列不为空，根据映射列，把值拿出来，然后将其放在正确的位置
-  if (value_num == this->query_expressions.size()) {
 
-    // 先找到字段在原本位置的index
-    vector<int>                   indices;
-    int                           start       = this->current_table->table_meta().sys_field_num();
-    int                           field_num   = this->current_table->table_meta().field_num();
-    const std::vector<FieldMeta> *field_metas = this->current_table->table_meta().field_metas();
-    // 拿到映射列在原始table中的对应索引。
-    for (auto &query_expression : this->query_expressions) {
-      FieldExpr *field_expr = dynamic_cast<FieldExpr *>(query_expression.get());
-      if (field_expr) {
-        Field &field = field_expr->field();
-        // 循环table的feild，不处理null_list
-        for (int i = start; i < field_num; i++) {
-          if (strcmp(field_metas->at(i).name(), field.field_name()) == 0) {
-            indices.push_back(i - start);
-          }
-        }
-        // 获取到索引后，将数据读取，然后将其放置在正确的位置上。然后再将新的values放进去。
+  // 先找到字段在原本位置的index
+  int                           start       = this->current_table->table_meta().sys_field_num();
+  int                           field_num   = this->current_table->table_meta().field_num();
+  int                           sys_field_num   = this->current_table->table_meta().sys_field_num();
+  // const std::vector<FieldMeta> *field_metas = this->current_table->table_meta().field_metas();
+  vector<Value> new_values(field_num - start, Value());
+  // 拿到映射列在原始table中的对应索引。
+  int i = 0;
+  for (auto &query_expression : this->query_expressions) {
+    FieldExpr *field_expr = dynamic_cast<FieldExpr *>(query_expression.get());
+    if (field_expr) {
+      Field &          field      = field_expr->field();
+      const FieldMeta *field_meta = field.meta();
+      int              field_id   = field_meta->field_id();
+      new_values[field_id - sys_field_num] = values[i];
+    } else {
+      // 非field_expr，并且其值不为null，报错。
+      if (!values[i].is_null()) {
+        return RC::INVALID_ARGUMENT;
       }
-      // 非field_expr不处理。
     }
-
-    // 通过view新增。
-    vector<Value> new_values(field_num - start, Value());
-    for (int i = 0; i < indices.size(); i++) {
-      auto value             = values[i];
-      new_values[indices[i]] = value;
-    }
-    return this->current_table->make_record(new_values.size(), new_values.data(), record);
+    i++;
   }
 
-  return this->current_table->make_record(value_num, values, record);
+
+  return this->current_table->make_record(new_values.size(), new_values.data(), record);
+
 }
 
 RC View::insert_record(Record &record)
 {
 
-  if (this->tables.size() > 1 || !can_ddl_) {
+  if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
@@ -325,7 +318,7 @@ RC View::delete_record(const RID &rid)
 RC View::update_record(const Record &record)
 {
 
-  if (this->tables.size() > 1 || !can_ddl_) {
+  if (this->tables.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
@@ -530,11 +523,3 @@ RC View::init_text_handler(const char *base_dir)
   return this->current_table->init_text_handler(base_dir);
 }
 
-void View::check()
-{
-  for (auto &e : query_expressions) {
-    if (e->type() != ExprType::FIELD) {
-      this->can_ddl_ = false;
-    }
-  }
-}

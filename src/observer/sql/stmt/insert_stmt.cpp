@@ -46,21 +46,22 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     return RC::SCHEMA_TABLE_NOT_EXIST;
   }
 
+  const TableMeta &table_meta = table->table_meta();
+  const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
+  const int sys_field_num     = table_meta.sys_field_num();
+
   // check the fields number
 
   // 只考虑了值的情况。
   BinderContext binder_context;
+  binder_context.add_table(table);
   vector<unique_ptr<Expression>> bound_values_expressions;
   vector<unique_ptr<Expression>> bound_field_expressions;
   ExpressionBinder expression_binder(binder_context);
 
   // 开始绑定字段和值
   for (unique_ptr<Expression> &expression : inserts.columns) {
-    RC rc = expression_binder.bind_expression(expression, bound_field_expressions);
-    if(expression) {
-      bound_field_expressions.emplace_back(std::move(expression));
-    }
-    if (OB_FAIL(rc)) {
+    if (RC rc = expression_binder.bind_expression(expression, bound_field_expressions); OB_FAIL(rc)) {
       LOG_INFO("bind field expression failed. rc=%s", strrc(rc));
       return rc;
     }
@@ -78,27 +79,62 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   inserts.values.clear();
   inserts.columns.clear();
 
-  // 如果不为空，可能需要将值的位置重新排列，
-
-
-
-  std::vector<Value>* values_data = new std::vector<Value>();
-  for(auto& bound_expression : bound_values_expressions) {
-    Value value;
-    RC rc = bound_expression->try_get_value(value);
-    if (OB_FAIL(rc)) {
-      LOG_INFO("try get insert value failed. rc=%s", strrc(rc));
-      delete values_data;
-      return rc;
+  // 如果绑定列不为空，可能需要将值的位置重新排列。其他位置填充null
+  std::vector<Value> *values_data = new std::vector<Value>(field_num,Value());
+  if (bound_field_expressions.empty()) {
+    int i = 0;
+    for (auto &bound_expression : bound_values_expressions) {
+      Value value;
+      RC    rc = bound_expression->try_get_value(value);
+      if (OB_FAIL(rc)) {
+        LOG_INFO("try get insert value failed. rc=%s", strrc(rc));
+        delete values_data;
+        return rc;
+      }
+      (*values_data)[i] = value;
+      i++;
     }
-    values_data->push_back(value);
+  } else {
+    if (bound_field_expressions.size() != bound_values_expressions.size()) {
+      delete values_data;
+      return RC::INVALID_ARGUMENT;
+    }
+    // 将其重排并且填充。
+    // 根据绑定的每个field，找到其在values_data中的位置。
+    int i = 0;
+    for(auto& field_expression : bound_field_expressions) {
+      FieldExpr * field_expr = dynamic_cast<FieldExpr*>(field_expression.get());
+      if(field_expr) {
+        Field&           field      = field_expr->field();
+        const FieldMeta *field_meta = field.meta();
+        int              field_id   = field_meta->field_id();
+        // 将值放到对应的位置上。
+        auto& bound_expression = bound_values_expressions.at(i);
+        Value value;
+        RC    rc = bound_expression->try_get_value(value);
+        if (OB_FAIL(rc)) {
+          LOG_INFO("try get insert value failed. rc=%s", strrc(rc));
+          delete values_data;
+          return rc;
+        }
+        (*values_data)[field_id - sys_field_num] = value;
+        i++;
+      } else {
+        delete values_data;
+        return RC::SCHEMA_FIELD_NOT_EXIST;
+      }
+    }
+
   }
 
 
+
+
+
+
+
   const int        value_num  = static_cast<int>(values_data->size());
-  const TableMeta &table_meta = table->table_meta();
-  const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
-  const int sys_field_num     = table_meta.sys_field_num();
+
 
   if (field_num != value_num) {
     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
@@ -151,6 +187,7 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     Value&           value      = values_data->at(i);
     if (field_meta.nullable() == false && value.is_null()) {
       LOG_WARN("schema mismatch. null field=%d", field_meta.name());
+      delete values_data;
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
   }
