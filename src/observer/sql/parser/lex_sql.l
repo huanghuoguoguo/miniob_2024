@@ -114,7 +114,7 @@ FLOAT                                   RETURN_TOKEN(FLOAT_T);
 TEXT                                    RETURN_TOKEN(TEXT_T);
 VECTOR                                  RETURN_TOKEN(VECTOR_T);
 LOAD                                    RETURN_TOKEN(LOAD);
-DATA                                    RETURN_TOKEN(DATA);
+
 INFILE                                  RETURN_TOKEN(INFILE);
 EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
 GROUP                                   RETURN_TOKEN(GROUP);
@@ -136,8 +136,10 @@ IS                                      RETURN_TOKEN(IS);
 NOT                                     RETURN_TOKEN(NOT);
 HAVING                                  RETURN_TOKEN(HAVING);
 IN                                      RETURN_TOKEN(IN);
+AS                                      RETURN_TOKEN(AS);
 UNIQUE                                  RETURN_TOKEN(UNIQUE);
 OR                                      RETURN_TOKEN(OR);
+VIEW                                    RETURN_TOKEN(VIEW);
 LIMIT                                   RETURN_TOKEN(LIMIT);
 WITH                                    RETURN_TOKEN(WITH);
 

@@ -59,6 +59,7 @@ enum class PhysicalOperatorType
   EXPR_VEC,
   ORDER_BY,
     LIMIT,
+  VIEW_SCAN,
 };
 
 /**

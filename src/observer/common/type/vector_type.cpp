@@ -96,8 +96,11 @@ RC VectorType::to_string(const Value &val, std::string &result) const
 
   oss += "]"; // 添加结尾的方括号
   result = oss.c_str();
+
   return RC::SUCCESS;
 }
+
+
 
 RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const 
 { 

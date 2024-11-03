@@ -72,6 +72,18 @@ enum CompOp
  * 左边和右边理论上都可以是任意的数据，比如是字段（属性，列），也可以是数值常量。
  * 这个结构中记录的仅仅支持字段和值。
  */
+// struct ConditionSqlNode
+// {
+//   int left_is_attr;              ///< TRUE if left-hand side is an attribute
+//                                  ///< 1时，操作符左边是属性名，0时，是属性值
+//   Value          left_value;     ///< left-hand side value if left_is_attr = FALSE
+//   RelAttrSqlNode left_attr;      ///< left-hand side attribute
+//   CompOp         comp;           ///< comparison operator
+//   int            right_is_attr;  ///< TRUE if right-hand side is an attribute
+//                                  ///< 1时，操作符右边是属性名，0时，是属性值
+//   RelAttrSqlNode right_attr;     ///< right-hand side attribute if right_is_attr = TRUE 右边的属性
+//   Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
+// };
 struct ConditionSqlNode
 {
     Expression* left_expr;
@@ -99,17 +111,25 @@ struct OrderBySqlNode
 
 struct SelectSqlNode
 {
-    std::vector<std::unique_ptr<Expression>> expressions; ///< 查询的表达式
-    std::vector<std::string> relations; ///< 查询的表
-    std::vector<ConditionSqlNode> conditions; ///< 查询条件，使用AND串联起来多个条件
-    std::vector<JoinSqlNode> join_list; ///< join节点
-    std::vector<std::unique_ptr<Expression>> group_by; ///< group by clause
-    std::vector<ConditionSqlNode> group_by_having; ///< group by having clause
-    std::vector<OrderBySqlNode> order_unit_list; ///< order_unit_list
+  std::vector<std::unique_ptr<Expression>> expressions;  ///< 查询的表达式
+  // std::vector<std::string>                 relations;    ///< 查询的表
+  std::vector<std::pair<std::string, std::string>>   relations;    ///< 查询的表
+  std::vector<ConditionSqlNode>            conditions;   ///< 查询条件，使用AND串联起来多个条件
+  std::vector<JoinSqlNode>                 join_list;   ///< join节点
+  std::vector<std::unique_ptr<Expression>> group_by;     ///< group by clause
+  std::vector<ConditionSqlNode>            group_by_having;     ///< group by having clause
+  std::vector<OrderBySqlNode>              order_unit_list;     ///< order_unit_list
+  BinderContext*                           binder_context = nullptr;
     int limit;
-    BinderContext* binder_context = nullptr;
+
 };
 
+struct CreateViewSqlNode
+{
+    std::string view_name;
+    std::vector<std::unique_ptr<Expression>> expressions;
+    SelectSqlNode* select_sql_node;   // view列到原始表的映射
+};
 
 /**
  * 表示一个join relation列表
@@ -117,8 +137,9 @@ struct SelectSqlNode
 struct JoinSqlNode
 {
     std::vector<ConditionSqlNode>             conditions;  ///< 查询的表达式 on子句的内容
-    std::string                               relation;    ///< 连接的表 join后的表
-    std::string                                     op;    ///< 连接方式 inner join,left join,right join,join
+    // std::string                               relation;    ///< 连接的表 join后的表
+    std::pair<std::string, std::string>   relation;    ///< 连接的表 join后的表  默认是一个表，直接当pair用
+    std::string                                     op;    ///< 连接方式 inner join,left join,right join,join TODO 暂时只实现join
 };
 /**
  * @brief 算术表达式计算的语法树
@@ -138,6 +159,7 @@ struct InsertSqlNode
 {
   std::string        relation_name;  ///< Relation to insert into
   std::vector<std::unique_ptr<Expression>> values;         ///< 要插入的值
+  std::vector<std::unique_ptr<Expression>> columns;         ///< 要插入的值
 };
 
 /**
@@ -307,6 +329,7 @@ enum SqlCommandFlag
   SCF_HELP,
   SCF_EXIT,
   SCF_EXPLAIN,
+  SCF_CREATE_VIEW,
   SCF_SET_VARIABLE,  ///< 设置变量
 };
 /**
@@ -331,6 +354,7 @@ public:
   LoadDataSqlNode     load_data;
   ExplainSqlNode      explain;
   SetVariableSqlNode  set_variable;
+  CreateViewSqlNode   create_view;
 
 public:
   ParsedSqlNode();

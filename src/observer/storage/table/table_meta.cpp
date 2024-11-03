@@ -90,6 +90,7 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
       visible = false;
     }
     int attr_len = attr_info.length;
+    int dimension= attr_info.length;
     if (attr_info.type == AttrType::VECTORS) {
       attr_len = attr_info.length * sizeof(float);
     }
@@ -100,7 +101,8 @@ RC TableMeta::init(int32_t table_id, const char *name, const std::vector<FieldMe
         attr_len,
         visible /*visible*/,
         i,
-        attr_info.nullable);
+        attr_info.nullable,
+        dimension);
     if (OB_FAIL(rc)) {
       LOG_ERROR("Failed to init field meta. table name=%s, field name: %s", name, attr_info.name.c_str());
       return rc;
@@ -321,7 +323,18 @@ int TableMeta::deserialize(std::istream &is)
   }
 
   auto comparator = [](const FieldMeta &f1, const FieldMeta &f2) { return f1.offset() < f2.offset(); };
+  // bool origin_vector_dim;
+  // for(auto &field : fields) {
+  //   if(field.type()==AttrType::VECTORS) {
+  //     origin_vector_dim = field.is_high_dim();
+  //   }
+  // }
   std::sort(fields.begin(), fields.end(), comparator);
+  // for (auto &field : fields) {
+  //   if(field.type()==AttrType::VECTORS) {
+  //     field.set_high_dimensional(origin_vector_dim);
+  //   }
+  // }
 
   table_id_ = table_id;
   storage_format_ = static_cast<StorageFormat>(storage_format);

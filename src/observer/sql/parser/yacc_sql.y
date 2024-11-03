@@ -113,7 +113,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
         SET
         ON
         LOAD
-        DATA
+        // data
         INFILE
         EXPLAIN
         STORAGE
@@ -133,6 +133,8 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
         IN
         UNIQUE
         OR
+        AS
+        VIEW
         LIMIT
         WITH
 
@@ -154,10 +156,12 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
   OrderBySqlNode *                           order_unit;
   std::vector<OrderBySqlNode> *              order_unit_list;
   std::vector<RelAttrSqlNode> *              rel_attr_list;
-  std::vector<std::string> *                 relation_list;
+  std::vector<pair<std::string, std::string>> *  relation_list;
   char *                                     string;
   int                                        number;
   float                                      floats;
+  bool                                       boolean;
+  std::pair<std::string, std::string> *      relation_type;
 }
 
 %token <number> NUMBER
@@ -172,7 +176,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
-%type <string>              relation
+%type <relation_type>       relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
@@ -191,6 +195,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <value_list>          value_list
 %type <expression>          expression
 %type <expression_list>     expression_list
+%type <expression_list>     field_columns
 %type <expression_list>     group_by
 %type <order_unit>          order_unit
 %type <order_unit_list>     order_unit_list
@@ -209,8 +214,9 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
 %type <sql_node>            commit_stmt
+%type <sql_node>            create_view_stmt
 %type <sql_node>            rollback_stmt
-%type <sql_node>            load_data_stmt
+// %type <sql_node>            load_data_stmt
 %type <sql_node>            explain_stmt
 %type <sql_node>            set_variable_stmt
 %type <sql_node>            help_stmt
@@ -219,6 +225,8 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
+%type <string>              alias
+%type <boolean>             as_option
 
 %left '+' '-'
 %left '*' '/'
@@ -246,9 +254,10 @@ command_wrapper:
   | drop_index_stmt
   | sync_stmt
   | begin_stmt
+  | create_view_stmt
   | commit_stmt
   | rollback_stmt
-  | load_data_stmt
+// | load_data_stmt
   | explain_stmt
   | set_variable_stmt
   | help_stmt
@@ -311,6 +320,25 @@ desc_table_stmt:
     }
     ;
 
+create_view_stmt:
+    CREATE VIEW ID AS select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+      $$->flag = SCF_CREATE_VIEW;
+      $$->create_view.view_name = $3;
+      $$->create_view.select_sql_node = &$5->selection;
+      free($3);
+    }
+    | CREATE VIEW ID LBRACE expression_list RBRACE AS select_stmt
+     {
+       $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+       $$->flag = SCF_CREATE_VIEW;
+       $$->create_view.expressions.swap(*$5);
+       $$->create_view.view_name = $3;
+       $$->create_view.select_sql_node = &$8->selection;
+       free($3);
+     }
+    ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
     CREATE index_type INDEX ID ON ID LBRACE expression_list RBRACE with_block
@@ -410,6 +438,30 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         free($8);
       }
     }
+    | CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE as_option select_stmt
+    {
+      $$ = $9;
+      $$->flag = SCF_CREATE_TABLE;
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      free($3);
+
+      std::vector<AttrInfoSqlNode> *src_attrs = $6;
+      if (src_attrs != nullptr) {
+        create_table.attr_infos.swap(*src_attrs);
+      }
+      create_table.attr_infos.emplace_back(*$5);
+      std::reverse(create_table.attr_infos.begin(), create_table.attr_infos.end());
+      delete $5;
+    }
+    | CREATE TABLE ID as_option select_stmt
+    {
+      $$ = $5;
+      $$->flag = SCF_CREATE_TABLE;
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      free($3);
+    }
     ;
 attr_def_list:
     /* empty */
@@ -502,6 +554,16 @@ attr_def:
       free($1);
     }
     ;
+  as_option:
+    /* empty */
+    {
+      $$ = false;
+    }
+    | AS
+    {
+      $$ = false;
+    }
+    ;
 number:
     NUMBER {$$ = $1;}
     ;
@@ -514,18 +576,30 @@ type:
     | TEXT_T   { $$ = static_cast<int>(AttrType::TEXTS); }
     ;
 insert_stmt:        /*insert   语句的语法解析树*/
-    INSERT INTO ID VALUES LBRACE expression_list RBRACE
+    INSERT INTO ID field_columns VALUES LBRACE expression_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_INSERT);
       $$->insertion.relation_name = $3;
-      if ($6 != nullptr) {
-        $$->insertion.values.swap(*$6);
-        delete $6;
+      if ($4 != nullptr) {
+        $$->insertion.columns.swap(*$4);
+        delete $4;
+      }
+      if ($7 != nullptr) {
+        $$->insertion.values.swap(*$7);
+        delete $7;
       }
       free($3);
     }
     ;
 
+field_columns:
+    {
+        $$ = nullptr;
+    }
+    | LBRACE expression_list RBRACE{
+        $$ = $2;
+    }
+    ;
 
 value:
     NUMBER {
@@ -704,8 +778,7 @@ join_list:
 join:
     relation ON condition_list {
       $$ = new JoinSqlNode;
-      $$->relation = $1;
-      free($1);
+      $$->relation = *$1;
       $$->conditions.swap(*$3);
     }
     ;
@@ -720,19 +793,27 @@ calc_stmt:
     ;
 
 expression_list:
-    expression
+    expression alias
     {
       $$ = new std::vector<std::unique_ptr<Expression>>;
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
       $$->emplace_back($1);
+      free($2);
     }
-    | expression COMMA expression_list
+    | expression alias COMMA expression_list
     {
-      if ($3 != nullptr) {
-        $$ = $3;
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
         $$ = new std::vector<std::unique_ptr<Expression>>;
       }
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
       $$->emplace($$->begin(), $1);
+      free($2);
     }
     ;
 aggre_type:
@@ -809,28 +890,43 @@ rel_attr:
       free($1);
       free($3);
     }
+    | '*' DOT '*' {
+      $$ = new RelAttrSqlNode;
+      $$->relation_name  = "*";
+      $$->attribute_name = "*";
+    }
+    | ID DOT '*' {
+      $$ = new RelAttrSqlNode;
+      $$->relation_name  = $1;
+      $$->attribute_name = "*";
+      free($1);
+    }
     ;
 
 relation:
-    ID {
-      $$ = $1;
+    ID alias {
+      if($2 != nullptr){
+        $$ = new std::pair<std::string, std::string>($1, $2);
+      } else {
+        $$ = new std::pair<std::string, std::string>($1, "");
+      }
     }
     ;
 rel_list:
     relation {
-      $$ = new std::vector<std::string>();
-      $$->push_back($1);
-      free($1);
+      $$ = new std::vector<std::pair<std::string, std::string>>;
+      $$->push_back(*$1);
+      delete $1;
     }
     | relation COMMA rel_list {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
-        $$ = new std::vector<std::string>;
+        $$ = new std::vector<std::pair<std::string, std::string>>;
       }
 
-      $$->insert($$->begin(), $1);
-      free($1);
+      $$->insert($$->begin(), *$1);
+      delete $1;
     }
     ;
 
@@ -962,6 +1058,17 @@ opt_order_by:
       std::reverse($$->begin(),$$->end());
 	}
 	;
+alias:
+    /* empty */ {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | AS ID {
+      $$ = $2;
+    }
+/*
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
     {
@@ -974,7 +1081,7 @@ load_data_stmt:
       free(tmp_file_name);
     }
     ;
-
+*/
 explain_stmt:
     EXPLAIN command_wrapper
     {

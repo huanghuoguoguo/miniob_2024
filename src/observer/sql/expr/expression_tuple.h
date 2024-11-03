@@ -27,7 +27,7 @@ public:
   ExpressionTuple(const std::vector<ExprPointerType> &expressions) : expressions_(expressions) {}
   virtual ~ExpressionTuple() = default;
 
-  void set_tuple(const Tuple *tuple) { child_tuple_ = tuple; }
+  void set_tuple(Tuple *tuple) { child_tuple_ = tuple; }
 
   int cell_num() const override { return static_cast<int>(expressions_.size()); }
 
@@ -90,7 +90,18 @@ private:
     return rc;
   }
 
+public:
+  vector<ExprPointerType> expressions() const
+  {
+    return expressions_;
+  }
+
+  Tuple* child_tuple()
+  {
+    return child_tuple_;
+  }
+
 private:
   const std::vector<ExprPointerType> &expressions_;
-  const Tuple                        *child_tuple_ = nullptr;
+  Tuple                        *child_tuple_ = nullptr;
 };

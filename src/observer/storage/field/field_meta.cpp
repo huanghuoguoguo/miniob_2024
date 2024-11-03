@@ -26,6 +26,8 @@ const static Json::StaticString FIELD_LEN("len");
 const static Json::StaticString FIELD_VISIBLE("visible");
 const static Json::StaticString FIELD_FIELD_ID("FIELD_id");
 const static Json::StaticString FIELD_NULLABLE("nullable");
+const static Json::StaticString FIELD_IS_HIGH_DIM("is_high_dim");
+
 
 FieldMeta::FieldMeta()
   : attr_type_(AttrType::UNDEFINED),
@@ -50,7 +52,7 @@ FieldMeta::FieldMeta(const char *name, AttrType attr_type, int attr_offset, int 
 }
 FieldMeta::FieldMeta(const FieldMeta &other)
 {
-  [[maybe_unused]] RC rc = this->init(other.name_.c_str(), other.attr_type_, other.attr_offset_, other.attr_len_, other.visible_, other.field_id_, other.nullable_);
+  [[maybe_unused]] RC rc = this->init(other.name_.c_str(), other.attr_type_, other.attr_offset_, other.attr_len_, other.visible_, other.field_id_, other.nullable_,other.is_high_dim_);
   ASSERT(rc == RC::SUCCESS, "failed to init field meta. rc=%s", strrc(rc));
 }
 RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id)
@@ -58,7 +60,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   return this->init(name, attr_type, attr_offset, attr_len, visible, field_id, true);
 }
 RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id,
-    bool                       nullable)
+    bool  nullable,int is_high_dim)
 {
   if (common::is_blank(name)) {
     LOG_WARN("Name cannot be empty");
@@ -81,13 +83,21 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   visible_     = visible;
   field_id_    = field_id;
   nullable_    = nullable;
+  is_high_dim_ = is_high_dim;
   if (AttrType::TEXTS == attr_type) { attr_len_ = TEXT_FIELD_LENGTH; }
+  if (AttrType::VECTORS == attr_type&&is_high_dim>1000) { attr_len_ = VECTOR_FIELD_LENGTH; }
 
   // LOG_INFO("Init a field with name=%s", name);
   return RC::SUCCESS;
 }
+RC FieldMeta::init(
+    const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable)
+{
+  return this->init(name, attr_type, attr_offset, attr_len, visible, field_id, nullable, is_high_dim_);
+}
 
 const char *FieldMeta::name() const { return name_.c_str(); }
+
 
 AttrType FieldMeta::type() const { return attr_type_; }
 
@@ -100,6 +110,8 @@ bool FieldMeta::visible() const { return visible_; }
 bool FieldMeta::nullable() const { return nullable_; }
 
 int FieldMeta::field_id() const { return field_id_; }
+
+int FieldMeta::is_high_dim() const { return is_high_dim_; }
 
 void FieldMeta::desc(std::ostream &os) const
 {
@@ -116,6 +128,7 @@ void FieldMeta::to_json(Json::Value &json_value) const
   json_value[FIELD_VISIBLE]  = visible_;
   json_value[FIELD_FIELD_ID] = field_id_;
   json_value[FIELD_NULLABLE] = nullable_;
+  json_value[FIELD_IS_HIGH_DIM] = is_high_dim_;
 }
 
 RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
@@ -132,6 +145,7 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
   const Json::Value &visible_value  = json_value[FIELD_VISIBLE];
   const Json::Value &field_id_value = json_value[FIELD_FIELD_ID];
   const Json::Value &nullable_value = json_value[FIELD_NULLABLE];
+  const Json::Value &is_high_dim_value = json_value[FIELD_IS_HIGH_DIM];
 
   if (!name_value.isString()) {
     LOG_ERROR("Field name is not a string. json value=%s", name_value.toStyledString().c_str());
@@ -164,6 +178,11 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
     return RC::INTERNAL;
   }
 
+  if (!is_high_dim_value.isInt()) {
+    LOG_ERROR("is_high_dim field is not a int value. json value=%s", is_high_dim_value.toStyledString().c_str());
+    return RC::INTERNAL;
+  }
+
   AttrType type = attr_type_from_string(type_value.asCString());
   if (AttrType::UNDEFINED == type) {
     LOG_ERROR("Got invalid field type. type=%d", type);
@@ -176,5 +195,7 @@ RC FieldMeta::from_json(const Json::Value &json_value, FieldMeta &field)
   bool        visible  = visible_value.asBool();
   bool        nullable = nullable_value.asBool();
   int         field_id = field_id_value.asInt();
-  return field.init(name, type, offset, len, visible, field_id, nullable);
+  int        is_high_dim = is_high_dim_value.asInt();
+  RC rc =  field.init(name, type, offset, len, visible, field_id, nullable,is_high_dim);
+  return rc;
 }

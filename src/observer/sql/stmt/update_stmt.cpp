@@ -83,6 +83,13 @@ RC UpdateStmt::create(Db *db, UpdateSqlNode &update_sql, Stmt *&stmt)
           return RC::INVALID_ARGUMENT;
         }
       }
+      // 避免更新的vector维度过高
+      if(AttrType::VECTORS == field_expr->field().meta()->type()&&field_expr->field().meta()->is_high_dimensional()==true) {
+        if(MAX_VECTOR_LENGTH < value_expr->value_length()) {
+          LOG_WARN("VECTOR_LENGTH:%d IS TOO LONG, longer than 16500",value_expr->value_length());
+          return RC::INVALID_ARGUMENT;
+        }
+      }
     } else {
       // 如果是多列值，返回错误。
       SubQueryExpr *sub_query_expr = static_cast<SubQueryExpr *>(node.right_expr);

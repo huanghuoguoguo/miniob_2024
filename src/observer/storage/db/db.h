@@ -14,6 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <sql/stmt/select_stmt.h>
+
 #include "common/rc.h"
 #include "common/lang/vector.h"
 #include "common/lang/string.h"
@@ -47,6 +49,7 @@ public:
   Db() = default;
   ~Db();
 
+  RC open_all_views();
   /**
    * @brief 初始化一个数据库实例
    * @details 从指定的目录下加载指定名称的数据库。这里就会加载dbpath目录下的数据。
@@ -66,6 +69,8 @@ public:
   RC create_table(const char *table_name, span<const AttrInfoSqlNode> attributes,
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
 
+  RC create_view(const char* view_name, SelectStmt* select_stmt, std::string& sql,
+                 std::vector<std::unique_ptr<Expression>>& query_expressions);
   /**
    * @brief 根据表名查找表
    */

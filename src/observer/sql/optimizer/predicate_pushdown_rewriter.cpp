@@ -17,11 +17,14 @@ See the Mulan PSL v2 for more details. */
 #include <sql/operator/join_logical_operator.h>
 #include <sql/operator/physical_operator.h>
 #include <sql/operator/predicate_logical_operator.h>
+#include <storage/table/view.h>
 
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
 #include "sql/operator/logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
+
+class View;
 
 RC PredicatePushdownRewriter::try_rewriter_table_get(
     std::unique_ptr<Expression> &predicate_expr, bool &change_made, std::unique_ptr<LogicalOperator> &child_oper)
@@ -160,7 +163,14 @@ RC PredicatePushdownRewriter::get_exprs_can_pushdown(
     std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &pushdown_exprs,
     TableGetLogicalOperator *    table_get_oper)
 {
-  RC rc = RC::SUCCESS;
+  RC     rc    = RC::SUCCESS;
+  Table *table = table_get_oper->table();
+  if (View *v = dynamic_cast<View *>(table)) {
+    // view不下推。
+    LOG_INFO("view not down:%s",v->name());
+    return rc;
+  }
+
   if (expr->type() == ExprType::CONJUNCTION) {
     ConjunctionExpr *conjunction_expr = static_cast<ConjunctionExpr *>(expr.get());
     // 或 操作的比较，太复杂，现在不考虑

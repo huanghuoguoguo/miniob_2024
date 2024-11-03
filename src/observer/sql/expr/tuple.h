@@ -194,7 +194,7 @@ public:
     null_list = std::bitset<32>(v);
   }
 
-  void set_schema(const Table *table, const std::vector<FieldMeta> *fields)
+  void set_schema(Table *table, const std::vector<FieldMeta> *fields)
   {
     table_ = table;
     // fix:join当中会多次调用右表的open,open当中会调用set_scheme，从而导致tuple当中会存储
@@ -218,9 +218,7 @@ public:
       return RC::INVALID_ARGUMENT;
     }
 
-
-    if (null_list[index])
-    {
+    if (null_list[index]) {
       cell.set_type(AttrType::UNDEFINED);
       return RC::SUCCESS;
     }
@@ -230,9 +228,9 @@ public:
     if (AttrType::TEXTS == field_meta->type()) {
       cell.set_type(AttrType::CHARS);
       int64_t offset   = *(int64_t *)(record_->data() + field_meta->offset());
-      int64_t length = *(int64_t *)(record_->data() + field_meta->offset() + sizeof(int64_t));
-      char   *text   = (char *)malloc(length+2);
-      RC rc = table_->read_text(offset, length, text);
+      int64_t length   = *(int64_t *)(record_->data() + field_meta->offset() + sizeof(int64_t));
+      char   *text     = (char *)malloc(length + 2);
+      RC      rc       = table_->read_text(offset, length, text);
       text[length + 1] = '\0';
       if (RC::SUCCESS != rc) {
         LOG_WARN("Failed to read text from table, rc=%s", strrc(rc));
@@ -240,6 +238,18 @@ public:
       }
       cell.set_data(text, length);
       free(text);
+    } else if (AttrType::VECTORS == field_meta->type() && field_meta->is_high_dimensional()) {
+      int64_t offset       = *(int64_t *)(record_->data() + field_meta->offset());
+      int64_t length       = *(int64_t *)(record_->data() + field_meta->offset() + sizeof(int64_t));
+      char   *hyper_vector = (char *)malloc(length);
+      RC      rc           = table_->read_vector(offset, length, hyper_vector);
+      if (RC::SUCCESS != rc) {
+        LOG_WARN("Failed to read vector from table, rc=%s", strrc(rc));
+        return rc;
+      }
+      cell.set_type(AttrType::VECTORS);
+      cell.set_data(hyper_vector, length);
+      free(hyper_vector);
     } else {
       cell.set_type(field_meta->type());
       cell.set_data(this->record_->data() + field_meta->offset(), field_meta->len());
@@ -290,7 +300,7 @@ public:
 
 private:
   Record                  *record_ = nullptr;
-  const Table             *table_  = nullptr;
+  Table             *table_  = nullptr;
   std::vector<FieldExpr *> speces_;
   std::bitset<32>         null_list;
 };
@@ -432,6 +442,29 @@ public:
     return RC::SUCCESS;
   }
 
+  static RC make(const Tuple &tuple,const std::vector<TupleCellSpec>& spec, ValueListTuple &value_list)
+  {
+    const int cell_num = tuple.cell_num();
+    for (int i = 0; i < cell_num; i++) {
+      Value cell;
+      RC    rc = tuple.cell_at(i, cell);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+      TupleCellSpec spec_;
+      rc = tuple.spec_at(i, spec_);
+      if (OB_FAIL(rc)) {
+        return rc;
+      }
+      value_list.cells_.push_back(cell);
+
+
+      value_list.specs_.emplace_back(spec[i].table_name(), spec[i].field_name());
+    }
+    // 还要加入null_list
+    return RC::SUCCESS;
+  }
+
 private:
   std::vector<Value>         cells_;
   std::vector<TupleCellSpec> specs_;
@@ -482,17 +515,30 @@ public:
     return RC::NOTFOUND;
   }
 
-  RC find_cell(const TupleCellSpec &spec, Value &value) const override
+  RC find_cell(const TupleCellSpec& spec, Value& value) const override
   {
-    RC rc = left_->find_cell(spec, value);
-    if (rc == RC::SUCCESS || rc != RC::NOTFOUND) {
+    i++;
+    RC rc = RC::SUCCESS;
+    if (i % 2 == 0)
+    {
+      rc = left_->find_cell(spec, value);
+      if (rc == RC::SUCCESS || rc != RC::NOTFOUND)
+      {
+        return rc;
+      }
+    }
+    rc = right_->find_cell(spec, value);
+    if (i % 2 == 0 || rc == RC::SUCCESS)
+    {
+      // 没有找左tuple。
       return rc;
     }
-
-    return right_->find_cell(spec, value);
+    // 如果右边找不到并且是跳过了左边的，继续找左边。
+    return left_->find_cell(spec, value);
   }
 
 private:
   Tuple *left_  = nullptr;
   Tuple *right_ = nullptr;
+  mutable int i = -1;
 };

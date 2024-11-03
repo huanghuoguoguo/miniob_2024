@@ -37,6 +37,8 @@ public:
 
   RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id, bool nullable);
   RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id);
+  RC init(const char *name, AttrType attr_type, int attr_offset, int attr_len, bool visible, int field_id,
+      bool nullable, int is_high_dim);
 
 public:
   const char *name() const;
@@ -46,6 +48,7 @@ public:
   bool        visible() const;
   bool        nullable() const;
   int         field_id() const;
+  int        is_high_dim() const;
 
 public:
   void desc(ostream &os) const;
@@ -54,9 +57,19 @@ public:
   void      to_json(Json::Value &json_value) const;
   static RC from_json(const Json::Value &json_value, FieldMeta &field);
 
+
+  // 新增方法：获取是否为高纬度
+  bool is_high_dimensional() const {
+    if(is_high_dim_>1000) return true;
+    return false;
+  }
+
 protected:
   // TEXT类型数据不直接存到Record内部，列中只是记录它在文件中的偏移量、长度
   const static int TEXT_FIELD_LENGTH = 16;
+  // VECTOR类型高维数据和TEXT数据类型类似
+  const static int VECTOR_FIELD_LENGTH = 16;
+
 
 protected:
   string   name_;
@@ -66,4 +79,5 @@ protected:
   bool     visible_;
   int      field_id_;
   bool     nullable_;
+  int    is_high_dim_;
 };
