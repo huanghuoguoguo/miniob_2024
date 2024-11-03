@@ -599,11 +599,11 @@ public:
   {
 
   };
-  FunctionExpr(const char *func_name,std::vector<std::unique_ptr<Expression>>* params_)
+  FunctionExpr(const char *func_name,std::vector<std::unique_ptr<Expression>>* params)
   {
     this->func_name = func_name;
-    if(params_) {
-      this->params_.swap(*params_);
+    if(params) {
+      this->params_.swap(*params);
     }
   }
   virtual ~FunctionExpr() = default;
@@ -621,7 +621,9 @@ public:
   }
 
   static RC type_from_string(const char* type_str, Type& type);
-
+  static void L2_DISTANCE(vector<float>& left, vector<float>& right, Value& value);
+  static void COSINE_DISTANCE(vector<float>& left, vector<float>& right, Value& value);
+  static void INNER_PRODUCT(vector<float>& left, vector<float>& right, Value& value);
 private:
   string func_name;
   std::vector<std::unique_ptr<Expression>> params_;

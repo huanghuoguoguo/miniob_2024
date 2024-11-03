@@ -32,6 +32,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <regex>
 #include <sql/expr/expression.h>
+#include <storage/index/ivfflat_index.h>
 
 #include "storage/trx/trx.h"
 
@@ -533,22 +534,25 @@ RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressi
     return rc;
   }
   Index *index;
-  if(with_condition_sql_nodes.empty()) {
+  if (with_condition_sql_nodes.empty()) {
     // 创建索引相关数据
-        index  = new BplusTreeIndex();
-    std::string     index_file = table_index_file(base_dir_.c_str(), name(), index_name);
-    rc                         = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
-    if (rc != RC::SUCCESS) {
-      delete index;
-      LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
-      return rc;
-    }
-  }else {
-    // 创建vector。。。这里还是偷懒了。
 
+    index = new BplusTreeIndex();
+  } else {
+    // 创建vector。。。这里还是偷懒了。
+    const char *func_name = with_condition_sql_nodes.at(2).right_expr->name();
+    const char *lists     = with_condition_sql_nodes.at(1).right_expr->name();
+    const char *probes    = with_condition_sql_nodes.at(0).right_expr->name();
+    index                 = new IvfflatIndex(std::stoi(lists), std::stoi(probes), func_name);
   }
 
-
+  std::string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+  rc                     = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
+  if (rc != RC::SUCCESS) {
+    delete index;
+    LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
+    return rc;
+  }
 
   // 遍历当前的所有数据，插入这个索引
   RecordFileScanner scanner;

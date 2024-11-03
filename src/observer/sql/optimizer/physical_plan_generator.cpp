@@ -50,7 +50,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <ranges>
 #include <sql/operator/limit_physical_operator.h>
-#include <sql/operator/vector_index_scan.h>
+#include <sql/operator/vector_index_scan_physical_operator.h>
 
 using namespace std;
 
@@ -510,11 +510,14 @@ RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, std:
 
       TableGetLogicalOperator *table_get_logical_operator = static_cast<TableGetLogicalOperator *>(child_oper);
       Table *                  table                      = table_get_logical_operator->table();
-      fields.insert(fields.begin(),"null_list");
-      Index *                  vector_index               = table->find_index_by_field(fields);
+      fields.insert(fields.begin(), "null_list");
+      Index *vector_index = table->find_index_by_field(fields);
       if (vector_index) {
         // 查询是否有以这个字段建立的索引，有的话直接将order by 算子变为vec_index_scan。
-        unique_ptr<VectorIndexScan> vector_index_scan = make_unique<VectorIndexScan>(table,vector_index,ReadWriteMode::READ_WRITE,v);
+        unique_ptr<VectorIndexScan> vector_index_scan = make_unique<VectorIndexScan>(table,
+            vector_index,
+            ReadWriteMode::READ_WRITE,
+            v);
         oper = std::move(vector_index_scan);
         return rc;
       }
