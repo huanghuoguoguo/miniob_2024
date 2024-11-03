@@ -75,19 +75,19 @@ RC View::create_view(Db *db, const char *path, const char *base_dir, int32_t tab
   base_dir_ = base_dir;
   /*                       读取结束                    */
   this->table_id_          = table_id;
-  this->sql                = sql;
+  this->sql_                = sql;
   this->view_name_         = name;
-  this->selectStmt         = select_stmt;
+  this->selectStmt_         = select_stmt;
   this->binderContext_     = select_stmt->binder_context();
   std::set<Table *> tables = this->binderContext_->query_tables();
   for (auto &table : tables) {
-    this->tables.insert(table);
+    this->tables_.insert(table);
   }
   if(query_expressions.empty()) {
     std::vector<std::unique_ptr<Expression>>& q_expressions = select_stmt->query_expressions();
-    this->query_expressions.swap(q_expressions);
+    this->query_expressions_.swap(q_expressions);
   }else {
-    this->query_expressions.swap(query_expressions);
+    this->query_expressions_.swap(query_expressions);
   }
   rc = init_tuple_spec();
 
@@ -98,7 +98,7 @@ SelectStmt *View::select_stmt()
 {
   // 每次都返回一个新的stmt。
   ParsedSqlResult parsed_sql_result;
-  sql_parse(sql.c_str(), &parsed_sql_result);
+  sql_parse(sql_.c_str(), &parsed_sql_result);
   std::unique_ptr<ParsedSqlNode> sql_node        = std::move(parsed_sql_result.sql_nodes().front());
   SelectSqlNode *                select_sql_node = sql_node->create_view.select_sql_node;
   Stmt *                         stmt;
@@ -138,14 +138,14 @@ RC View::open(Db *db, const char *meta_file, const char *base_dir)
   // 拿到stmt之后，绑定。
   this->table_id_          = std::stoi(id);
   this->db_                = db;
-  this->sql                = sql;
+  this->sql_                = sql;
   this->base_dir_          = base_dir;
   this->view_name_         = view_name;
-  this->selectStmt         = static_cast<SelectStmt *>(this->select_stmt());
-  this->binderContext_     = this->selectStmt->binder_context();
+  this->selectStmt_         = static_cast<SelectStmt *>(this->select_stmt());
+  this->binderContext_     = this->selectStmt_->binder_context();
   std::set<Table *> tables = this->binderContext_->query_tables();
   for (auto &table : tables) {
-    this->tables.insert(table);
+    this->tables_.insert(table);
   }
   // 将指定列从sql中解析出来。
   ParsedSqlResult parsed_sql_result;
@@ -155,7 +155,7 @@ RC View::open(Db *db, const char *meta_file, const char *base_dir)
   CreateViewStmt::create(this->db_, sql_node->create_view, stmt);
   CreateViewStmt *                          view_stmt   = static_cast<CreateViewStmt *>(stmt);
   std::vector<std::unique_ptr<Expression>> &expressions = view_stmt->select_stmt()->query_expressions();
-  this->query_expressions.swap(expressions);
+  this->query_expressions_.swap(expressions);
   rc = init_tuple_spec();
   if (rc != RC::SUCCESS) {
     return rc;
@@ -168,13 +168,13 @@ RC View::init_tuple_spec()
 {
   RC rc = RC::SUCCESS;
   // 收集tuple_schame
-  this->current_table = *tables.begin();
-  if (this->query_expressions.empty()) {
+  this->current_table_ = *tables_.begin();
+  if (this->query_expressions_.empty()) {
     // 如果没有指定映射列
-    if (tables.size() == 1) {
+    if (tables_.size() == 1) {
       // 如果只有一个表，默认是该表的所有。
-      this->current_table                       = *tables.begin();
-      this->table_meta_                         = &current_table->table_meta();
+      this->current_table_                       = *tables_.begin();
+      this->table_meta_                         = &current_table_->table_meta();
       const std::vector<FieldMeta> *field_metas = this->table_meta_->field_metas();
       for (auto &field_meta : *field_metas) {
         this->tuple_schemata_.emplace_back(this->view_name_.c_str(), field_meta.name(), "");
@@ -185,7 +185,7 @@ RC View::init_tuple_spec()
       rc = this->init_(this->select_stmt()->query_expressions());
     }
   } else {
-    rc = this->init_(this->query_expressions);
+    rc = this->init_(this->query_expressions_);
   }
   return rc;
 }
@@ -243,19 +243,19 @@ RC View::init_(std::vector<std::unique_ptr<Expression>> &query_expressions)
 RC View::make_record(int value_num, const Value *values, Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
   // 先找到字段在原本位置的index
-  int                           start       = this->current_table->table_meta().sys_field_num();
-  int                           field_num   = this->current_table->table_meta().field_num();
-  int                           sys_field_num   = this->current_table->table_meta().sys_field_num();
+  int                           start       = this->current_table_->table_meta().sys_field_num();
+  int                           field_num   = this->current_table_->table_meta().field_num();
+  int                           sys_field_num   = this->current_table_->table_meta().sys_field_num();
   // const std::vector<FieldMeta> *field_metas = this->current_table->table_meta().field_metas();
   vector<Value> new_values(field_num - start, Value());
   // 拿到映射列在原始table中的对应索引。
   int i = 0;
-  for (auto &query_expression : this->query_expressions) {
+  for (auto &query_expression : this->query_expressions_) {
     FieldExpr *field_expr = dynamic_cast<FieldExpr *>(query_expression.get());
     if (field_expr) {
       Field &          field      = field_expr->field();
@@ -273,58 +273,58 @@ RC View::make_record(int value_num, const Value *values, Record &record)
   }
 
 
-  return this->current_table->make_record(new_values.size(), new_values.data(), record);
+  return this->current_table_->make_record(new_values.size(), new_values.data(), record);
 
 }
 
 RC View::insert_record(Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->insert_record(record);
+  return this->current_table_->insert_record(record);
 }
 
 RC View::delete_record(const Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->delete_record(record);
+  return this->current_table_->delete_record(record);
 }
 
 RC View::delete_record(const RID &rid)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->delete_record(rid);
+  return this->current_table_->delete_record(rid);
 }
 
 RC View::update_record(const Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->update_record(record);
+  return this->current_table_->update_record(record);
 }
 
 RC View::get_record(const RID &rid, Record &record)
 {
 
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->get_record(rid, record);
+  return this->current_table_->get_record(rid, record);
 }
 
 RC View::sync()
@@ -337,11 +337,11 @@ RC View::recover_insert_record(Record &record)
 
   // 假设有一个方法可以恢复插入的记录
   // 这里可以添加具体的恢复逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->recover_insert_record(record);
+  return this->current_table_->recover_insert_record(record);
 }
 
 RC View::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressions_, const char *index_name,
@@ -349,169 +349,169 @@ RC View::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressio
 {
 
   // 创建索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
   // 调用当前表的创建索引方法
-
-  return this->current_table->create_index(trx, column_expressions_, index_name, is_unique);
+  vector<ConditionSqlNode> conditions;
+  return this->current_table_->create_index(trx, column_expressions_, index_name, is_unique,conditions);
 }
 
 RC View::get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode)
 {
 
   // 获取记录扫描器的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->get_record_scanner(scanner, trx, mode);
+  return this->current_table_->get_record_scanner(scanner, trx, mode);
 }
 
 RC View::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode mode)
 {
 
   // 获取块扫描器的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->get_chunk_scanner(scanner, trx, mode);
+  return this->current_table_->get_chunk_scanner(scanner, trx, mode);
 }
 
 RC View::write_text(int64_t &offset, int64_t length, const char *data) const
 {
 
   // 写入文本的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->write_text(offset, length, data);
+  return this->current_table_->write_text(offset, length, data);
 }
 
 RC View::read_text(int64_t offset, int64_t length, char *data) const
 {
 
   // 读取文本的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->read_text(offset, length, data);
+  return this->current_table_->read_text(offset, length, data);
 }
 
 RC View::visit_record(const RID &rid, function<bool(Record &)> visitor)
 {
 
   // 访问记录的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->visit_record(rid, visitor);
+  return this->current_table_->visit_record(rid, visitor);
 }
 
 RC View::insert_entry_of_indexes(const char *record, const RID &rid)
 {
 
   // 插入索引条目的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->insert_entry_of_indexes(record, rid);
+  return this->current_table_->insert_entry_of_indexes(record, rid);
 }
 
 RC View::delete_entry_of_indexes(const char *record, const RID &rid, bool error_on_not_exists)
 {
 
   // 删除索引条目的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->delete_entry_of_indexes(record, rid, error_on_not_exists);
+  return this->current_table_->delete_entry_of_indexes(record, rid, error_on_not_exists);
 }
 
 RC View::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
 
   // 设置记录值的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->set_value_to_record(record_data, value, field);
+  return this->current_table_->set_value_to_record(record_data, value, field);
 }
 
 
 Index *View::find_index(const char *index_name) const
 {
   // 查找索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return nullptr; // 或者返回一个特定的错误索引
   }
-  return this->current_table->find_index(index_name);
+  return this->current_table_->find_index(index_name);
 }
 
 Index *View::find_index_by_field(const char *field_name) const
 {
   // 根据字段查找索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return nullptr;
   }
-  return this->current_table->find_index_by_field(field_name);
+  return this->current_table_->find_index_by_field(field_name);
 }
 
 RC View::init_vector_handler(const char *base_dir)
 {
   // 根据字段查找索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  return this->current_table->init_vector_handler(base_dir);
+  return this->current_table_->init_vector_handler(base_dir);
 
 }
 
 Index *View::find_index_by_field(const std::vector<string> field_names) const
 {
   // 根据字段名列表查找索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return nullptr;
   }
-  return this->current_table->find_index_by_field(field_names);
+  return this->current_table_->find_index_by_field(field_names);
 }
 
 RC View::drop_all_index()
 {
 
   // 删除所有索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->drop_all_index();
+  return this->current_table_->drop_all_index();
 }
 
 RC View::init_record_handler(const char *base_dir)
 {
 
   // 删除所有索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
 
-  return this->current_table->init_record_handler(base_dir);
+  return this->current_table_->init_record_handler(base_dir);
 }
 
 RC View::init_text_handler(const char *base_dir)
 {
 
   // 删除所有索引的逻辑
-  if (this->tables.size() > 1) {
+  if (this->tables_.size() > 1) {
     return RC::INVALID_ARGUMENT;
   }
-  return this->current_table->init_text_handler(base_dir);
+  return this->current_table_->init_text_handler(base_dir);
 }
 
