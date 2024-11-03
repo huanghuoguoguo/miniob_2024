@@ -1099,6 +1099,14 @@ set_variable_stmt:
       free($2);
       delete $4;
     }
+    | SET ID ID
+    {
+      $$ = new ParsedSqlNode(SCF_SET_VARIABLE);
+      $$->set_variable.name  = $2;
+      $$->set_variable.value_ = $3;
+      free($2);
+      free($3);
+    }
     ;
 
 opt_semicolon: /*empty*/

@@ -271,8 +271,9 @@ struct LoadDataSqlNode
  */
 struct SetVariableSqlNode
 {
-  std::string name;
-  Value       value;
+    std::string name;
+    Value value;
+    std::string value_;
 };
 
 class ParsedSqlNode;
