@@ -88,7 +88,7 @@ void IvfflatIndex::initialize_clusters()
   // 创建一个随机数生成器
   std::random_device                    rd;
   std::mt19937                          gen(rd());
-  std::uniform_real_distribution<float> dis(0.0, 10.0); // 随机范围 [0.0, 1.0]
+  std::uniform_real_distribution<float> dis(0.0, static_cast<float>(this->lists_)); // 随机范围 [0.0, 100.0]
 
   // 初始化 datas_
   datas_ = new std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue>>();
@@ -152,8 +152,10 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
   // 找到了距离最近的那个簇，加入进去并且更新簇的权重。
   VectorNode *node = new VectorNode(key, *rid);
   target_->second.value.push_back(node);
-  // 刷新键的质心。
-  refresh_center(*target_);
+  // 如果size > 100 刷新键的质心。
+  if (target_->second.value.size() > this->lists_) {
+    refresh_center(*target_);
+  }
   return rc;
 };
 
