@@ -10,12 +10,12 @@
 /**
 * vctor索引扫描算子。
 */
-class VectorIndexScan : public PhysicalOperator
+class VectorIndexScanPhysicalOperator : public PhysicalOperator
 {
 public:
-    VectorIndexScan(Table* table, Index* index, ReadWriteMode mode, const Value& vector_value);
+    VectorIndexScanPhysicalOperator(Table* table, Index* index, ReadWriteMode mode, const Value& vector_value);
 
-    virtual ~VectorIndexScan() = default;
+    virtual ~VectorIndexScanPhysicalOperator() = default;
 
     PhysicalOperatorType type() const override { return PhysicalOperatorType::VECTOR_INDEX_SCAN; }
 
@@ -26,7 +26,10 @@ public:
     RC close() override;
 
     Tuple* current_tuple() override;
-
+    void set_limit(int limit)
+    {
+        this->limit_ = limit;
+    }
 private:
     Trx* trx_ = nullptr;
     Table* table_ = nullptr;
@@ -37,6 +40,7 @@ private:
     Value vector_value_;
     IndexScanner* index_scanner_ = nullptr;
     RecordFileHandler* record_handler_ = nullptr;
+    int limit_ = -1;
 };
 
 

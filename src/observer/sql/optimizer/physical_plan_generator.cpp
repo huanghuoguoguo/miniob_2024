@@ -298,7 +298,11 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   }
 
   auto project_operator = make_unique<ProjectPhysicalOperator>(std::move(project_oper.expressions()));
-  if (project_oper.limit() > 0) {
+
+  if(auto child_p = dynamic_cast<VectorIndexScanPhysicalOperator *>(child_phy_oper.get())) {
+    // 如果子孩子是vector_index_scan，将limit直接设入，不再另外构造limit
+    child_p->set_limit(project_oper.limit());
+  }else if (project_oper.limit() > 0) {
     std::unique_ptr<PhysicalOperator> limit_physical_operator = make_unique<LimitPhysicalOperator>(project_oper.limit());
     if(child_phy_oper) {
       limit_physical_operator->add_child(std::move(child_phy_oper));
@@ -514,7 +518,7 @@ RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, std:
       Index *vector_index = table->find_index_by_field(fields);
       if (vector_index) {
         // 查询是否有以这个字段建立的索引，有的话直接将order by 算子变为vec_index_scan。
-        unique_ptr<VectorIndexScan> vector_index_scan = make_unique<VectorIndexScan>(table,
+        unique_ptr<VectorIndexScanPhysicalOperator> vector_index_scan = make_unique<VectorIndexScanPhysicalOperator>(table,
             vector_index,
             ReadWriteMode::READ_WRITE,
             v);

@@ -6,7 +6,7 @@
 #include "storage/index/index.h"
 #include "storage/trx/trx.h"
 
-VectorIndexScan::VectorIndexScan(Table *table, Index *index, ReadWriteMode mode, const Value& vector_value)
+VectorIndexScanPhysicalOperator::VectorIndexScanPhysicalOperator(Table *table, Index *index, ReadWriteMode mode, const Value& vector_value)
 
 {
   this->table_        = table;
@@ -15,7 +15,7 @@ VectorIndexScan::VectorIndexScan(Table *table, Index *index, ReadWriteMode mode,
   this->vector_value_ = vector_value;
 }
 
-RC VectorIndexScan::open(Trx *trx)
+RC VectorIndexScanPhysicalOperator::open(Trx *trx)
 {
   if (nullptr == table_ || nullptr == index_) {
     return RC::INTERNAL;
@@ -45,11 +45,14 @@ RC VectorIndexScan::open(Trx *trx)
   return RC::SUCCESS;
 }
 
-RC VectorIndexScan::next()
+RC VectorIndexScanPhysicalOperator::next()
 {
   RID rid;
   RC  rc = RC::SUCCESS;
-
+  if (this->limit_ <= 0) {
+    return RC::RECORD_EOF;
+  }
+  this->limit_--;
 
   while (RC::SUCCESS == (rc = index_scanner_->next_entry(&rid))) {
     rc = record_handler_->get_record(rid, current_record_);
@@ -78,7 +81,7 @@ RC VectorIndexScan::next()
   return rc;
 }
 
-RC VectorIndexScan::close()
+RC VectorIndexScanPhysicalOperator::close()
 {
   if(index_scanner_) {
     index_scanner_->destroy();
@@ -87,14 +90,14 @@ RC VectorIndexScan::close()
   return RC::SUCCESS;
 }
 
-Tuple *VectorIndexScan::current_tuple()
+Tuple *VectorIndexScanPhysicalOperator::current_tuple()
 {
   tuple_.set_record(&current_record_);
   return &tuple_;
 }
 
 
-std::string VectorIndexScan::param() const
+std::string VectorIndexScanPhysicalOperator::param() const
 {
   return std::string(index_->index_meta().name()) + " ON " + table_->name();
 }

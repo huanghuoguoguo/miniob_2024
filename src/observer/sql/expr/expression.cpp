@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include <regex>
 #include <string>
 #include <common/type/list_type.h>
+#include <common/type/list_type.h>
 #include <sql/operator/operator_iterator.h>
 #include <sql/operator/predicate_physical_operator.h>
 #include <sql/operator/project_physical_operator.h>
@@ -959,7 +960,7 @@ RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
     break;
     case Type::COSINE_DISTANCE: {
       COSINE_DISTANCE(left, right, value);
-      if (!value.get_boolean()) {
+      if (value.attr_type() == AttrType::BOOLEANS && !value.get_boolean()) {
         return RC::DIVIDE_ZERO;
       }
     }
