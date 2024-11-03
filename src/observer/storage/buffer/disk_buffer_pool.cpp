@@ -749,7 +749,7 @@ RC DiskBufferPool::allocate_frame(PageNum page_num, Frame **buffer)
     }
 
     LOG_TRACE("frames are all allocated, so we should purge some frames to get one free frame");
-    (void)frame_manager_.purge_frames(1 /*count*/, purger);
+    (void)frame_manager_.purge_frames(1000 /*count*/, purger);
   }
   return RC::BUFFERPOOL_NOBUF;
 }

@@ -78,7 +78,7 @@ RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm
     bpm.close_file(file_name);
     return rc;
   }
-
+  bpm.close_file(file_name);
   LOG_INFO("Successfully create index file %s.", file_name);
   return rc;
 }
