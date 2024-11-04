@@ -82,8 +82,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   }
 
   RC rc = RC::SUCCESS;
-  for(auto  &attribute : attributes) {
-    if(attribute.type==AttrType::VECTORS&&attribute.length>MAX_VECTOR_LENGTH) {
+  for (auto &attribute : attributes) {
+    if (attribute.type == AttrType::VECTORS && attribute.length > MAX_VECTOR_LENGTH) {
       LOG_ERROR("vector dimension is too large ! Show less than %d", MAX_VECTOR_LENGTH);
       return RC::INVALID_ARGUMENT;
     }
@@ -147,7 +147,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
       exist_text_feild = true;
       break;
     }
-    if(AttrType::VECTORS == field.type() && field.is_high_dimensional()==true) {
+    if (AttrType::VECTORS == field.type() && field.is_high_dimensional() == true) {
       LOG_INFO("table.cpp vector size is high dimension: %s", field.is_high_dimensional() ? "true" : "false");
       exist_vector_feild = true;
       break;

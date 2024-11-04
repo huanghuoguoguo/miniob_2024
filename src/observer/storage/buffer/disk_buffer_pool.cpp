@@ -97,7 +97,7 @@ int BPFrameManager::purge_frames(int count, function<RC(Frame *frame)> purger)
                frame->frame_id().to_string().c_str(), strrc(rc));
     }
   }
-  LOG_INFO("purge frame done. number=%d", freed_count);
+  // LOG_INFO("purge frame done. number=%d", freed_count);
   return freed_count;
 }
 

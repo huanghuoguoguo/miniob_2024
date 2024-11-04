@@ -135,12 +135,13 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
   memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
 
   // 检查全部的data，是否有需要分裂的。
-  if (this->count_ > 1 && this->count_ % 2 * this->lists_ == 0) {
+  if (this->count_ > 1 && this->count_ % (2 * this->lists_) == 0) {
     check_data();
   }
 
   float                                     dist_   = numeric_limits<float>::max();
   pair<IvfflatIndexKey, IvfflatIndexValue> *target_ = nullptr;
+
   // O(n)
   for (auto &k : *datas_) {
     float dist = compute_distance(vec, k.first.key); // 假设有个计算距离的函数
@@ -163,12 +164,14 @@ void IvfflatIndex::check_data()
 {
 
   int                                       max_size       = -1;
+  int                                       index          = -1;
+  int                                       i              = 0;
   pair<IvfflatIndexKey, IvfflatIndexValue> *largest_target = nullptr;
 
   // 使用优先队列来找最小的probes个簇
   auto compare = [](const pair<IvfflatIndexKey, IvfflatIndexValue> *a,
       const pair<IvfflatIndexKey, IvfflatIndexValue> *              b) {
-    return a->second.value.size() > b->second.value.size(); // 最小堆，较小的size优先
+    return a->second.value.size() < b->second.value.size(); // 最小堆，较小的size优先
   };
 
   std::priority_queue<pair<IvfflatIndexKey, IvfflatIndexValue> *, std::vector<pair<IvfflatIndexKey, IvfflatIndexValue>
@@ -177,10 +180,11 @@ void IvfflatIndex::check_data()
   // 遍历数据找到大小最大的target和最小的probes个target
   for (auto &k : *datas_) {
     int current_size = k.second.value.size(); // 获取当前簇的大小
-
+    i++;
     // 找到最大目标
     if (current_size > max_size) {
       max_size       = current_size;
+      index = i;
       largest_target = &k; // 记录最大簇
     }
 
@@ -193,17 +197,19 @@ void IvfflatIndex::check_data()
     }
   }
 
-  // 将最小簇从优先队列转移到vector中
-  std::vector<pair<IvfflatIndexKey, IvfflatIndexValue> *> smallest_targets_vector;
-  while (!smallest_targets.empty()) {
-    smallest_targets_vector.push_back(smallest_targets.top());
-    smallest_targets.pop();
-  }
+
 
   // 检查是否需要分配
   if (largest_target && largest_target->second.value.size() > 2 * this->lists_) {
     auto & largest_nodes = largest_target->second.value; // 获取最大簇的节点
     size_t total_nodes   = largest_nodes.size();         // 获取节点总数
+
+    // 将最小簇从优先队列转移到vector中
+    std::vector<pair<IvfflatIndexKey, IvfflatIndexValue> *> smallest_targets_vector;
+    while (!smallest_targets.empty()) {
+      smallest_targets_vector.push_back(smallest_targets.top());
+      smallest_targets.pop();
+    }
 
     size_t num_targets      = smallest_targets_vector.size();  // 获取最小簇的数量
     size_t nodes_per_target = total_nodes / (num_targets + 1); // 计算每个目标应接收的节点数
@@ -225,7 +231,7 @@ void IvfflatIndex::check_data()
     }
 
     // 将已经分配的节点从原来的数组中删除。
-    largest_nodes.erase(largest_nodes.begin(), largest_nodes.begin() + distributed - 1);
+    largest_nodes.erase(largest_nodes.begin(), largest_nodes.begin() + distributed);
 
     // 刷新所有目标的质心
     for (size_t i = 0; i < num_targets; ++i) {
@@ -234,6 +240,15 @@ void IvfflatIndex::check_data()
 
     // 刷新最大目标的质心
     refresh_center(*largest_target);
+
+    vector<int> size(this->lists_);
+    int i = 0;
+    for(auto&k : *datas_) {
+      size[i] = k.second.value.size();
+      i++;
+    }
+    LOG_INFO("refresh:%d",index);
+
   }
 }
 
@@ -331,7 +346,7 @@ void IvfflatIndex::refresh_center(pair<IvfflatIndexKey, IvfflatIndexValue> &data
     new_center[i] /= vectors.size();
   }
 
-  data.first.key = new_center;
+  data.first.key.swap(new_center);
 }
 
 RC IvfflatIndex::delete_entry(const char *record, const RID *rid) { return RC::SUCCESS; };
@@ -369,11 +384,21 @@ RC IvfflatIndexScanner::open(const char *left_key, int left_len, bool left_inclu
   std::priority_queue<VectorNode *, std::vector<VectorNode *>, decltype(comp)> min_heap(comp);
 
   int count = 0;
-  // 将每个簇中的向量插入堆中
-  for (auto &key_value_pair : *key_values) {
+  int weight_percentages[] = {10, 20, 40, 60, 80}; // 扫描比例数组
+
+  // 遍历每个簇
+  for (size_t i = 0; i < key_values->size(); ++i) {
+    auto &key_value_pair = key_values->at(i);
     auto &nodes = key_value_pair->second.value;
-    for (auto &node : nodes) {
+    int node_size = nodes.size();
+
+    // 计算要扫描的向量数量
+    int scan_limit = static_cast<int>(node_size * (weight_percentages[i%5] / 100.0));
+
+    for (int j = 0; j < scan_limit; ++j) {
+      auto &node = nodes[j];
       count++;
+
       if (min_heap.size() < this->limit_) {
         // 如果堆未满，直接插入
         min_heap.push(node);
@@ -384,6 +409,7 @@ RC IvfflatIndexScanner::open(const char *left_key, int left_len, bool left_inclu
       }
     }
   }
+
   LOG_INFO("this query q %d", count);
 
   // 将堆中的元素添加到数据中并按距离排序
