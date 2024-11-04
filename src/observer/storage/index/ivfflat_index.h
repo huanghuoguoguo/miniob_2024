@@ -51,9 +51,10 @@ public:
 
     RC close();
 
+    void check_data();
     RC insert_entry(const char* record, const RID* rid) override;
     RC delete_entry(const char* record, const RID* rid) override;
-    std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue>*>* find(Value& v);
+    std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue>*>* find(const vector<float>& v);
 
     RC sync() override;
 
@@ -68,7 +69,7 @@ public:
     {
         probes_ = probes;
     };
-    float compute_distance(vector<float> left, vector<float> right);
+    float compute_distance(const vector<float> &left, const vector<float> &right);
 private:
     RC create_internal(LogHandler& log_handler, BufferPoolManager& bpm, Table* table, const char* file_name);
     void initialize_clusters();
@@ -86,6 +87,7 @@ private:
     const FieldMeta* key_field_meta_ = nullptr;
     string func_name_;
     FunctionExpr::Type func_type_;
+    int count_ = 0;
 };
 class IvfflatIndexScanner : public IndexScanner
 {
@@ -105,6 +107,13 @@ private:
     IvfflatIndex* index_ = nullptr;
     int pos = -1;
     std::vector<VectorNode*> data_;
+    int limit_ = -1;
+
+public:
+    void limit(int limit)
+    {
+        limit_ = limit;
+    }
 };
 
 struct  IvfflatIndexKey

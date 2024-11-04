@@ -41,8 +41,8 @@ Value::Value(const Value &other)
     } break;
     case AttrType::VECTORS: {
       // TODO 多次拷贝。。。
-      std::vector<float> vector = other.get_vector();
-      set_vector(vector);
+      // std::vector<float> vector = other.get_vector();
+      set_vector(other.data(), other.length());
     } break;
     default: {
       this->value_ = other.value_;
@@ -220,7 +220,7 @@ void Value::set_string(const char *s, int len /*= 0*/)
     value_.pointer_value_[len] = '\0';
   }
 }
-void Value::set_vector(char* s, int len /*= 0*/)
+void Value::set_vector(const char* s, int len /*= 0*/)
 {
   reset();
   attr_type_ = AttrType::VECTORS;
@@ -372,8 +372,9 @@ int64_t Value::get_text() const
 
 vector<float> Value::get_vector() const
 {
-  if(attr_type_ == AttrType::CHARS) {
+  if (attr_type_ == AttrType::CHARS) {
     Value v;
+    v.set_type(AttrType::VECTORS);
     DataType::type_instance(AttrType::CHARS)->cast_to(*this, AttrType::VECTORS, v);
     return v.get_vector();
   }

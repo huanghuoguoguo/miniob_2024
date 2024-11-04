@@ -3,6 +3,7 @@
 //
 #include "storage/index/ivfflat_index.h"
 
+#include <queue>
 #include <random>
 #include <sql/expr/tuple.h>
 #include <storage/db/db.h>
@@ -127,64 +128,152 @@ RC IvfflatIndex::close() { return RC::SUCCESS; }
 RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
 {
   RC rc = RC::SUCCESS;
-  // 取到定义的值
-  Value v;
-  v.set_type(AttrType::VECTORS);
-  int offset = this->key_field_meta_->offset();
-  int len    = this->key_field_meta_->len();
-  v.set_data(record + offset, len);
-  // 获取到值之后，循环所有键，得到list_个键值，然后在这些键值中循环找到距离最小的，插入后调整。
-  vector<float> key = v.get_vector();
-  if (key.size() != dim_) {
-    return RC::INVALID_ARGUMENT;
+  // 将数据 reinterpret_cast 为 float* 并计算 float 数量
+  std::vector<float> vec(this->key_field_meta_->len() / sizeof(float));
+
+  // 使用 float_data 和 float_count 初始化 vector<float>
+  memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
+
+  // 检查全部的data，是否有需要分裂的。
+  if (this->count_ > 1 && this->count_ % 2 * this->lists_ == 0) {
+    check_data();
   }
 
   float                                     dist_   = numeric_limits<float>::max();
   pair<IvfflatIndexKey, IvfflatIndexValue> *target_ = nullptr;
+  // O(n)
   for (auto &k : *datas_) {
-    float dist = compute_distance(key, k.first.key); // 假设有个计算距离的函数
+    float dist = compute_distance(vec, k.first.key); // 假设有个计算距离的函数
     if (dist_ > dist) {
       dist_   = dist;
       target_ = &k;
     }
   }
-  ASSERT(target_ != nullptr, "The key does not exist.");
+
   // 找到了距离最近的那个簇，加入进去并且更新簇的权重。
-  VectorNode *node = new VectorNode(key, *rid);
-  target_->second.value.push_back(node);
-  // 如果size > 100 刷新键的质心。
-  if (target_->second.value.size() > this->lists_) {
-    refresh_center(*target_);
-  }
+  VectorNode *               node         = new VectorNode(vec, *rid);
+  std::vector<VectorNode *> &target_nodes = target_->second.value;
+  target_nodes.push_back(node);
+  this->count_++;
+
   return rc;
 };
 
-std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *> *IvfflatIndex::find(Value &v)
+void IvfflatIndex::check_data()
 {
-  // 获取到值之后，循环所有键，得到list_个键值，然后在这些键值中循环找到距离最小的，插入后调整。
-  vector<float> key = v.get_vector();
-  if (key.size() != dim_) {
-    return nullptr;
+
+  int                                       max_size       = -1;
+  pair<IvfflatIndexKey, IvfflatIndexValue> *largest_target = nullptr;
+
+  // 使用优先队列来找最小的probes个簇
+  auto compare = [](const pair<IvfflatIndexKey, IvfflatIndexValue> *a,
+      const pair<IvfflatIndexKey, IvfflatIndexValue> *              b) {
+    return a->second.value.size() > b->second.value.size(); // 最小堆，较小的size优先
+  };
+
+  std::priority_queue<pair<IvfflatIndexKey, IvfflatIndexValue> *, std::vector<pair<IvfflatIndexKey, IvfflatIndexValue>
+    *>, decltype(compare)> smallest_targets(compare);
+
+  // 遍历数据找到大小最大的target和最小的probes个target
+  for (auto &k : *datas_) {
+    int current_size = k.second.value.size(); // 获取当前簇的大小
+
+    // 找到最大目标
+    if (current_size > max_size) {
+      max_size       = current_size;
+      largest_target = &k; // 记录最大簇
+    }
+
+    // 使用最小堆维护probes个最小的簇
+    if (smallest_targets.size() < this->probes_) {
+      smallest_targets.push(&k); // 如果堆未满，直接加入
+    } else if (current_size < smallest_targets.top()->second.value.size()) {
+      smallest_targets.pop();    // 移除堆顶（最大的最小簇）
+      smallest_targets.push(&k); // 加入当前的簇
+    }
   }
-  // 存储距离与对应的键值对
-  std::vector<std::pair<float, std::pair<IvfflatIndexKey, IvfflatIndexValue> *>> distances;
+
+  // 将最小簇从优先队列转移到vector中
+  std::vector<pair<IvfflatIndexKey, IvfflatIndexValue> *> smallest_targets_vector;
+  while (!smallest_targets.empty()) {
+    smallest_targets_vector.push_back(smallest_targets.top());
+    smallest_targets.pop();
+  }
+
+  // 检查是否需要分配
+  if (largest_target && largest_target->second.value.size() > 2 * this->lists_) {
+    auto & largest_nodes = largest_target->second.value; // 获取最大簇的节点
+    size_t total_nodes   = largest_nodes.size();         // 获取节点总数
+
+    size_t num_targets      = smallest_targets_vector.size();  // 获取最小簇的数量
+    size_t nodes_per_target = total_nodes / (num_targets + 1); // 计算每个目标应接收的节点数
+
+    size_t distributed = 0; // 记录已分配的节点数量
+
+    // 遍历每个最小目标，并将节点分配给它们
+    for (size_t i = 0; i < num_targets; ++i) {
+      auto &target_nodes = smallest_targets_vector[i]->second.value; // 当前目标的节点
+
+      // 分配固定数量的节点
+      for (size_t j = 0; j < nodes_per_target; ++j) {
+        if (distributed < total_nodes) {
+          target_nodes.push_back(largest_nodes[distributed++]); // 将节点添加到当前目标
+        }
+      }
+
+      // 处理余数，确保前几个目标能够接收额外的节点
+    }
+
+    // 将已经分配的节点从原来的数组中删除。
+    largest_nodes.erase(largest_nodes.begin(), largest_nodes.begin() + distributed - 1);
+
+    // 刷新所有目标的质心
+    for (size_t i = 0; i < num_targets; ++i) {
+      refresh_center(*smallest_targets_vector[i]); // 更新每个目标的质心
+    }
+
+    // 刷新最大目标的质心
+    refresh_center(*largest_target);
+  }
+}
+
+std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *> *IvfflatIndex::find(const vector<float> &v)
+{
+
+  // 最小堆，存储距离和对应的键值对
+  auto comp = [](const std::pair<float, std::pair<IvfflatIndexKey, IvfflatIndexValue> *> &a,
+      const std::pair<float, std::pair<IvfflatIndexKey, IvfflatIndexValue> *> &           b) {
+    return a.first < b.first; // 构建最大堆。
+  };
+
+  std::priority_queue<std::pair<float, std::pair<IvfflatIndexKey, IvfflatIndexValue> *>,
+    std::vector<std::pair<float, std::pair<IvfflatIndexKey, IvfflatIndexValue> *>>,
+    decltype(comp)> max_heap(comp);
 
   // 遍历所有键，计算距离
   for (auto &k : *datas_) {
-    float dist = compute_distance(key, k.first.key); // 假设有个计算距离的函数
-    distances.emplace_back(dist, &k);
+    if (k.second.value.empty()) {
+      // 空集合不比较。
+      continue;
+    }
+    float dist = compute_distance(v, k.first.key);
+    max_heap.emplace(dist, &k);
+
+    // 保持堆的大小不超过 probes
+    if (max_heap.size() > probes_) {
+      max_heap.pop(); // 弹出最大的元素
+    }
   }
 
-  // 按距离排序
-  std::sort(distances.begin(),
-      distances.end(),
-      [](const auto &a, const auto &b) { return a.first < b.first; });
-
-  // 获取最近的 probes 个键值对
+  // 存储最近的 probes 个键值对
   auto *closest_keys = new std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *>;
-  for (size_t i = 0; i < std::min(static_cast<size_t>(probes_), distances.size()); ++i) {
-    closest_keys->push_back(distances[i].second);
+
+  // 从最小堆中提取结果
+  while (!max_heap.empty()) {
+    closest_keys->push_back(max_heap.top().second);
+    max_heap.pop();
   }
+
   return closest_keys;
 }
 
@@ -202,7 +291,7 @@ IndexScanner *IvfflatIndex::create_scanner(const char *left_key, int left_len, b
   return index_scanner;
 }
 
-float IvfflatIndex::compute_distance(vector<float> left, vector<float> right)
+float IvfflatIndex::compute_distance(const vector<float> &left, const vector<float> &right)
 {
   Value value;
   switch (func_type_) {
@@ -229,7 +318,7 @@ void IvfflatIndex::refresh_center(pair<IvfflatIndexKey, IvfflatIndexValue> &data
 {
   auto &vectors = data.second.value;
   // 重新计算质心
-  vector<float> new_center(dim_, 0.0f);
+  vector new_center(dim_, 0.0f);
   for (const auto &vector_node : vectors) {
     const auto &vector = vector_node->v();
     for (size_t i = 0; i < dim_; ++i) {
@@ -252,11 +341,15 @@ RC IvfflatIndex::sync() { return RC::SUCCESS; };
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ///
-IvfflatIndexScanner::IvfflatIndexScanner(IvfflatIndex* index)
+IvfflatIndexScanner::IvfflatIndexScanner(IvfflatIndex *index)
 {
   this->index_ = index;
 }
-IvfflatIndexScanner::~IvfflatIndexScanner() noexcept {   }
+
+IvfflatIndexScanner::~IvfflatIndexScanner() noexcept
+{
+}
+
 RC IvfflatIndexScanner::open(const char *left_key, int left_len, bool left_inclusive, const char *right_key,
     int                                  right_len,
     bool                                 right_inclusive)
@@ -266,24 +359,42 @@ RC IvfflatIndexScanner::open(const char *left_key, int left_len, bool left_inclu
   Value v;
   v.set_type(AttrType::VECTORS);
   v.set_data(left_key, left_len);
-  std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *> *key_values = index_->find(v);
+  const std::vector<float> &                                    vector     = v.get_vector();
+  std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *> *key_values = index_->find(vector);
 
-  if (key_values == nullptr) {
-    delete key_values;
-    return RC::SUCCESS;
-  }
-  // 获取所有的值。
-  for (int i = 0; i < key_values->size(); ++i) {
-    auto &nodes = key_values->at(i)->second.value;
-    for (auto &k : nodes) {
-      this->data_.push_back(k);
+  // 使用最小堆来获取最近的向量
+  auto comp = [this, &vector](const auto &a, const auto &b) {
+    return index_->compute_distance(vector, a->v()) > index_->compute_distance(vector, b->v());
+  };
+  std::priority_queue<VectorNode *, std::vector<VectorNode *>, decltype(comp)> min_heap(comp);
+
+  int count = 0;
+  // 将每个簇中的向量插入堆中
+  for (auto &key_value_pair : *key_values) {
+    auto &nodes = key_value_pair->second.value;
+    for (auto &node : nodes) {
+      count++;
+      if (min_heap.size() < this->limit_) {
+        // 如果堆未满，直接插入
+        min_heap.push(node);
+      } else if (comp(node, min_heap.top())) {
+        // 否则替换堆顶元素
+        min_heap.pop();
+        min_heap.push(node);
+      }
     }
   }
-  // 然后将值排序。
-  std::sort(this->data_.begin(),
-      this->data_.end(),
-      [this](const auto &a, const auto &b) { return index_->compute_distance(a->v(), b->v()) < 0; });
-  // 根据v获取到值集合，然后记录位置。
+  LOG_INFO("this query q %d", count);
+
+  // 将堆中的元素添加到数据中并按距离排序
+  this->data_.reserve(min_heap.size());
+  while (!min_heap.empty()) {
+    this->data_.push_back(min_heap.top());
+    min_heap.pop();
+  }
+
+  // 不再需要排序，因为堆已按最近顺序组织
+  delete key_values;
   return rc;
 }
 

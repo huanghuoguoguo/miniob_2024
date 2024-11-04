@@ -171,8 +171,13 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
         return RC::INVALID_ARGUMENT;
       }
       // 此时已经是vector类型，判断维度是否一致。
-      std::vector<float> vector = val.get_vector();
-      if (vector.size() != field_meta->is_high_dim()) {
+      // std::vector<float> vector = val.get_vector();
+      // if (vector.size() != field_meta->is_high_dim()) {
+      //   delete values_data;
+      //   return RC::INVALID_ARGUMENT;
+      // }
+      // 少一次拷贝。
+      if (val.length() / sizeof(float) != field_meta->is_high_dim()) {
         delete values_data;
         return RC::INVALID_ARGUMENT;
       }

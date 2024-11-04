@@ -274,35 +274,37 @@ RC Table::insert_record(Record &record)
     LOG_ERROR("Insert record failed. table name=%s, rc=%s", table_meta_->name(), strrc(rc));
     return rc;
   }
+  // 索引不为空时才插入索引并创建。
+  if(!indexes_.empty()) {
+    std::vector<Index *> temp_indexes;
 
-  std::vector<Index *> temp_indexes;
-  RC rc2 = RC::SUCCESS;
-  for (Index *index : indexes_) {
-    rc = index->insert_entry(record.data(), &record.rid());
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("插入索引失败。");
-      break;
+    for (Index *index : indexes_) {
+      rc = index->insert_entry(record.data(), &record.rid());
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("插入索引失败。");
+        break;
+      }
+      temp_indexes.push_back(index);
     }
-    temp_indexes.push_back(index);
-  }
-
-  if (rc != RC::SUCCESS) {
-    // 插入索引失败，删除原来插入的索引
-    for(Index *index : temp_indexes) {
-      rc2 = index->delete_entry(record.data(), &record.rid());
-      if (rc2 != RC::SUCCESS) {
-        if (rc2 != RC::RECORD_INVALID_KEY) {
-          LOG_WARN("插入索引失败，删除之前插入的索引失败。");
-          break;
+    RC rc2 = RC::SUCCESS;
+    if (rc != RC::SUCCESS) {
+      // 插入索引失败，删除原来插入的索引
+      for(Index *index : temp_indexes) {
+        rc2 = index->delete_entry(record.data(), &record.rid());
+        if (rc2 != RC::SUCCESS) {
+          if (rc2 != RC::RECORD_INVALID_KEY) {
+            LOG_WARN("插入索引失败，删除之前插入的索引失败。");
+            break;
+          }
         }
       }
     }
-  }
-  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    rc2 = record_handler_->delete_record(&record.rid());
-    if (rc2 != RC::SUCCESS) {
-      LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+    if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+      rc2 = record_handler_->delete_record(&record.rid());
+      if (rc2 != RC::SUCCESS) {
+        LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+                  name(), rc2, strrc(rc2));
+      }
     }
   }
   return rc;
@@ -422,7 +424,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
-  if(value.is_null()) {
+  if (value.is_null()) {
     return RC::SUCCESS;
   }
   size_t       copy_len = field->len();
@@ -435,22 +437,22 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   if (field->type() == AttrType::TEXTS) {
     // 对于TEXTS类型字段，将字符串插入到文件中，并将offset和length写入record
     // 目前是将TEXT的放入cell前 将其TYPE 设置为CHARS 所以这里 应该不会运行到
-    int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    int64_t position[2]; // position[0] 是 offset, position[1] 是 length
     position[0] = field->offset();
     position[1] = value.length();
     // 假设 `text_buffer_pool_` 是一个用于存储大文本的缓冲池
     text_buffer_pool_->append_data(position[0], position[1], value.data());
     // 将偏移量和长度写入record
     memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
-  }else if(field->type() == AttrType::VECTORS && field->is_high_dimensional()==true){
+  } else if (field->type() == AttrType::VECTORS && field->is_high_dimensional() == true) {
     // 对于高纬度Vector类型字段，解决思路和TEXTS类型类似
     //TODO 这里放入position的值可能有点问题
-    int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    int64_t position[2]; // position[0] 是 offset, position[1] 是 length
     position[0] = field->offset();
     position[1] = value.length();
     vector_buffer_pool_->append_data(position[0], position[1], value.data());
     memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
-  }else {
+  } else {
     memcpy(record_data + field->offset(), value.data(), copy_len);
   }
   return RC::SUCCESS;

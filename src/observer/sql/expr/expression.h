@@ -628,9 +628,9 @@ public:
   }
 
   static RC type_from_string(const char* type_str, Type& type);
-  static void L2_DISTANCE(vector<float>& left, vector<float>& right, Value& value);
-  static void COSINE_DISTANCE(vector<float>& left, vector<float>& right, Value& value);
-  static void INNER_PRODUCT(vector<float>& left, vector<float>& right, Value& value);
+  static void L2_DISTANCE(const vector<float> &left,const vector<float> &right, Value& value);
+  static void COSINE_DISTANCE(const vector<float> &left,const vector<float> &right, Value& value);
+  static void INNER_PRODUCT(const vector<float> &left,const vector<float> &right, Value& value);
 private:
   string func_name;
   std::vector<std::unique_ptr<Expression>> params_;

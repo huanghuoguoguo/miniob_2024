@@ -56,20 +56,34 @@ RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
     }
     case AttrType::VECTORS: {
       std::vector<float> numbers;
-      auto                  extract_vector = [&](const std::string &input) -> void {
-        std::regex number_regex(R"([-+]?\d*\.?\d+)");
-        auto       begin = std::sregex_iterator(input.begin(), input.end(), number_regex);
-        auto       end   = std::sregex_iterator();
-        for (auto it = begin; it != end; ++it) {
-          numbers.push_back(std::stof(it->str()));
-        }
 
-        return;
+      auto extract_vector = [&](const char* data, int length) -> void {
+        const char* end = data + length;
+        const char* current = data + 1; // 跳过开头的 '['
+
+        while (current < end && *current != ']') {
+          char* next;
+          // 使用 strtof 解析浮点数
+          float num = std::strtof(current, &next);
+
+          if (current == next) {
+            // 如果未解析成功，说明遇到非法字符
+            break;
+          }
+
+          numbers.push_back(num);
+
+          // 更新 current 指针位置，跳过 ',' 或结束
+          current = (*next == ',') ? next + 1 : next;
+        }
       };
-      extract_vector(val.get_string());
+
+      extract_vector(val.data(), val.length());
+
       if (numbers.empty()) {
         return RC::EMPTY;
       }
+
       result.set_vector(numbers);
       break;
     }

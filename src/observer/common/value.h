@@ -101,7 +101,7 @@ public:
   void set_boolean(bool val);
   void set_list(vector<Value*>* list) { this->values_ = list; }
   void set_vector(vector<float>& list);
-  void set_vector(char* s, int len); // len表示多少个元素。vector默认存储float
+  void set_vector(const char* s, int len); // len表示多少个元素。vector默认存储float
   string to_string() const;
 
   int compare(const Value &other) const;

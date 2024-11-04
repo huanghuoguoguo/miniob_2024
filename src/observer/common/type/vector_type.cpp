@@ -13,8 +13,8 @@ int VectorType::compare(const Value &left, const Value &right) const
 { 
     if (left.is_null() || right.is_null()) 
         return INT32_MAX;
-  std::vector<float> left_ = left.get_vector();
-  std::vector<float> right_ = right.get_vector();
+  const std::vector<float>& left_ = left.get_vector();
+  const std::vector<float>& right_ = right.get_vector();
   auto size = left_.size();
   size = std::min(size, right_.size());
 
@@ -33,8 +33,8 @@ int VectorType::compare(const Value &left, const Value &right) const
 
 RC VectorType::add(const Value &left, const Value &right, Value &result) const 
 {
-  std::vector<float> left_ = left.get_vector();
-  std::vector<float> right_ = right.get_vector();
+  const std::vector<float>& left_ = left.get_vector();
+  const std::vector<float>& right_ = right.get_vector();
   if (left_.size() != right_.size()) {
     return RC::INVALID_ARGUMENT;
   }
@@ -48,8 +48,8 @@ RC VectorType::add(const Value &left, const Value &right, Value &result) const
 
 RC VectorType::subtract(const Value &left, const Value &right, Value &result) const {
 
-  std::vector<float> left_ = left.get_vector();
-  std::vector<float> right_ = right.get_vector();
+  const std::vector<float>& left_ = left.get_vector();
+  const std::vector<float>& right_ = right.get_vector();
 
   if (left_.size() != right_.size()) {
     return RC::INVALID_ARGUMENT;
@@ -65,8 +65,8 @@ RC VectorType::subtract(const Value &left, const Value &right, Value &result) co
 }
 
 RC VectorType::multiply(const Value &left, const Value &right, Value &result) const {
-  std::vector<float> left_ = left.get_vector();
-  std::vector<float> right_ = right.get_vector();
+  const std::vector<float>& left_ = left.get_vector();
+  const std::vector<float>& right_ = right.get_vector();
 
   if (left_.size() != right_.size()) {
     return RC::INVALID_ARGUMENT;
@@ -83,7 +83,7 @@ RC VectorType::multiply(const Value &left, const Value &right, Value &result) co
 
 RC VectorType::to_string(const Value &val, std::string &result) const
 {
-  std::vector<float> vec = val.get_vector();
+  const std::vector<float>& vec = val.get_vector();
   string oss;
   oss += "["; // 添加开头的方括号
 
@@ -106,7 +106,7 @@ RC VectorType::cast_to(const Value &val, AttrType type, Value &result) const
 { 
 	switch (type){
       case AttrType::CHARS:{
-        std::vector<float> vec = val.get_vector();
+        const std::vector<float>& vec = val.get_vector();
         string oss;
         oss += "["; // 添加开头的方括号
 

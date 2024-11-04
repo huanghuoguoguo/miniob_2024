@@ -938,7 +938,7 @@ RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
   for (auto &pa : params_) {
     Value v;
     rc                        = pa->get_value(tuple, v);
-    std::vector<float> vector = v.get_vector();
+    const std::vector<float>& vector = v.get_vector();
     if (vc == -1) {
       vc = static_cast<int>(vector.size());
     } else {
@@ -952,8 +952,8 @@ RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
     values.emplace_back(v);
   }
   // 应该将函数变成函数指针，接受参数。这里直接简单化了。
-  auto left  = values[0].get_vector();
-  auto right = values[1].get_vector();
+  const std::vector<float>& left  = values[0].get_vector();
+  const std::vector<float>& right = values[1].get_vector();
   switch (func_type_) {
     case Type::L2_DISTANCE: {
       L2_DISTANCE(left, right, value);
@@ -975,7 +975,7 @@ RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
   return rc;
 }
 
-void FunctionExpr::L2_DISTANCE(vector<float> &left, vector<float> &right, Value &value)
+void FunctionExpr::L2_DISTANCE(const vector<float> &left,const vector<float> &right, Value &value)
 {
   float sum = 0.0f;
   for (size_t i = 0; i < left.size(); ++i) {
@@ -985,7 +985,7 @@ void FunctionExpr::L2_DISTANCE(vector<float> &left, vector<float> &right, Value 
   value      = Value(sqrt);
 }
 
-void FunctionExpr::COSINE_DISTANCE(vector<float> &left, vector<float> &right, Value &value)
+void FunctionExpr::COSINE_DISTANCE(const vector<float> &left,const vector<float> &right, Value &value)
 {
   float dotProduct = 0.0f;
   float leftNorm   = 0.0f;
@@ -1011,7 +1011,7 @@ void FunctionExpr::COSINE_DISTANCE(vector<float> &left, vector<float> &right, Va
   value     = Value(res);
 }
 
-void FunctionExpr::INNER_PRODUCT(vector<float> &left, vector<float> &right, Value &value)
+void FunctionExpr::INNER_PRODUCT(const vector<float> &left,const vector<float> &right, Value &value)
 {
   float dotProduct = std::inner_product(left.begin(), left.end(), right.begin(), 0.0f);
   value            = Value(dotProduct);

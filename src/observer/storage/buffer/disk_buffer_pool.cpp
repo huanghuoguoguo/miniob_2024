@@ -81,7 +81,7 @@ int BPFrameManager::purge_frames(int count, function<RC(Frame *frame)> purger)
   };
 
   frames_.foreach_reverse(purge_finder);
-  LOG_INFO("purge frames find %ld pages total", frames_can_purge.size());
+  // LOG_INFO("purge frames find %ld pages total", frames_can_purge.size());
 
   /// 当前还在frameManager的锁内，而 purger 是一个非常耗时的操作
   /// 他需要把脏页数据刷新到磁盘上去，所以这里会极大地降低并发度
@@ -748,8 +748,8 @@ RC DiskBufferPool::allocate_frame(PageNum page_num, Frame **buffer)
       return RC::SUCCESS;
     }
 
-    LOG_TRACE("frames are all allocated, so we should purge some frames to get one free frame");
-    (void)frame_manager_.purge_frames(30 /*count*/, purger);
+    // LOG_TRACE("frames are all allocated, so we should purge some frames to get one free frame");
+    (void)frame_manager_.purge_frames(300 /*count*/, purger);
   }
   return RC::BUFFERPOOL_NOBUF;
 }
