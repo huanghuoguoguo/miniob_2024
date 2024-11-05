@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <utility>
 #include <unordered_map>
+#include <hnswlib/space_l2.h>
 #include <sql/expr/expression.h>
 
 #include "storage/index/index.h"
@@ -88,6 +89,11 @@ private:
     string func_name_;
     FunctionExpr::Type func_type_;
     int count_ = 0;
+    int max_elements_ = 60000;
+    std::vector<VectorNode*> temp_data_;
+    map<int, VectorNode*> nodes_;
+    hnswlib::L2Space * space_;
+    hnswlib::HierarchicalNSW<float> * alg_hnsw_;
 };
 class IvfflatIndexScanner : public IndexScanner
 {
@@ -107,6 +113,7 @@ private:
     IvfflatIndex* index_ = nullptr;
     int pos = -1;
     std::vector<VectorNode*> data_;
+    std::vector<RID> rids_;
     int limit_ = -1;
 
 public:
@@ -132,8 +139,9 @@ struct IvfflatIndexValue
 class VectorNode
 {
     public:
-    VectorNode(std::vector<float> v,RID rid)
+    VectorNode(std::vector<float>& v,RID rid)
     {
+        v_.resize(v.size());
         v_ = std::move(v);
         rid_ = rid;
     };
@@ -142,7 +150,7 @@ class VectorNode
     {
     };
 
-    std::vector<float> v() const
+    std::vector<float>& v()
     {
       return v_;
     }

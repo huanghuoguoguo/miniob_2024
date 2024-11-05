@@ -20,11 +20,13 @@ RC VectorIndexScanPhysicalOperator::open(Trx *trx)
   if (nullptr == table_ || nullptr == index_) {
     return RC::INTERNAL;
   }
+  Value limit(this->limit_);
+  limit.set_type(AttrType::INTS);
   IndexScanner *index_scanner = index_->create_scanner(vector_value_.data(),
       vector_value_.length(),
       true,
-      vector_value_.data(),
-      vector_value_.length(),
+      limit.data(),
+      limit.length(),
       true);
   if (nullptr == index_scanner) {
     LOG_WARN("failed to create index scanner");

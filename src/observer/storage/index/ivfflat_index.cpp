@@ -8,6 +8,8 @@
 #include <sql/expr/tuple.h>
 #include <storage/db/db.h>
 #include <storage/table/table.h>
+#include "../../hnswlib/hnswlib.h"
+
 
 RC IvfflatIndex::create(Table *           table, const char *file_name, const IndexMeta &index_meta,
     const std::vector<const FieldMeta *> &field_meta)
@@ -38,6 +40,9 @@ RC IvfflatIndex::create(Table *           table, const char *file_name, const In
       index_meta.name());
   return RC::SUCCESS;
 }
+
+
+
 
 RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm, Table *table, const char *file_name
     )
@@ -70,9 +75,17 @@ RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm
   }
   this->dim_ = field_meta->len() / sizeof(float);
   // 随机初始化list_个簇，将其插入datas_中，
-  initialize_clusters();
+  // initialize_clusters();
   // 这个后面构造rowtuple然后获取值。
   FunctionExpr::type_from_string(this->func_name_.c_str(), this->func_type_);
+
+  // Initing index
+  this->space_ = new hnswlib::L2Space(this->dim_);
+  int M = 8;                 // Tightly connected with internal dimensionality of the data
+  // strongly affects the memory consumption
+  int ef_construction = 80;
+  this->alg_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->max_elements_, M, ef_construction);
+
   // 初始化完成。
 
   if (OB_FAIL(rc)) {
@@ -121,7 +134,26 @@ RC IvfflatIndex::open(Table *             table, const char *file_name, const In
 }
 
 
-vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t limit) { return vector<RID>(); }
+vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t limit)
+{
+  if(!temp_data_.empty()) {
+    for (auto &n : temp_data_) {
+      alg_hnsw_->addPoint(n->v().data(), this->count_);
+      this->nodes_.emplace(this->count_,n);
+      this->count_++;
+    }
+    temp_data_.clear();
+  }
+  vector<RID> result;
+  std::priority_queue<std::pair<float, hnswlib::labeltype>> priority_queue = this->alg_hnsw_->searchKnn(base_vector.data(), limit);
+  while(!priority_queue.empty()) {
+    auto value = priority_queue.top();
+    priority_queue.pop();
+    VectorNode * vector_node = this->nodes_[value.second];
+    result.push_back(vector_node->rid());
+  }
+  return result;
+}
 
 RC IvfflatIndex::close() { return RC::SUCCESS; }
 
@@ -134,28 +166,31 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
   // 使用 float_data 和 float_count 初始化 vector<float>
   memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
 
-  // 检查全部的data，是否有需要分裂的。
-  if (this->count_ > 1 && this->count_ % (2 * this->lists_) == 0) {
-    check_data();
-  }
-
-  float                                     dist_   = numeric_limits<float>::max();
-  pair<IvfflatIndexKey, IvfflatIndexValue> *target_ = nullptr;
-
-  // O(n)
-  for (auto &k : *datas_) {
-    float dist = compute_distance(vec, k.first.key); // 假设有个计算距离的函数
-    if (dist_ > dist) {
-      dist_   = dist;
-      target_ = &k;
-    }
-  }
-
-  // 找到了距离最近的那个簇，加入进去并且更新簇的权重。
-  VectorNode *               node         = new VectorNode(vec, *rid);
-  std::vector<VectorNode *> &target_nodes = target_->second.value;
-  target_nodes.push_back(node);
-  this->count_++;
+  // // 检查全部的data，是否有需要分裂的。
+  // if (this->count_ > 1 && this->count_ % (2 * this->lists_) == 0) {
+  //   check_data();
+  // }
+  //
+  //
+  //
+  //
+  // float                                     dist_   = numeric_limits<float>::max();
+  // pair<IvfflatIndexKey, IvfflatIndexValue> *target_ = nullptr;
+  //
+  // // O(n)
+  // for (auto &k : *datas_) {
+  //   float dist = compute_distance(vec, k.first.key); // 假设有个计算距离的函数
+  //   if (dist_ > dist) {
+  //     dist_   = dist;
+  //     target_ = &k;
+  //   }
+  // }
+  //
+  // // 找到了距离最近的那个簇，加入进去并且更新簇的权重。
+  VectorNode *node = new VectorNode(vec, *rid);
+  // std::vector<VectorNode *> &target_nodes = target_->second.value;
+  // target_nodes.push_back(node);
+  this->temp_data_.emplace_back(node);
 
   return rc;
 };
@@ -184,7 +219,7 @@ void IvfflatIndex::check_data()
     // 找到最大目标
     if (current_size > max_size) {
       max_size       = current_size;
-      index = i;
+      index          = i;
       largest_target = &k; // 记录最大簇
     }
 
@@ -196,8 +231,6 @@ void IvfflatIndex::check_data()
       smallest_targets.push(&k); // 加入当前的簇
     }
   }
-
-
 
   // 检查是否需要分配
   if (largest_target && largest_target->second.value.size() > 2 * this->lists_) {
@@ -242,12 +275,12 @@ void IvfflatIndex::check_data()
     refresh_center(*largest_target);
 
     vector<int> size(this->lists_);
-    int i = 0;
-    for(auto&k : *datas_) {
+    int         i = 0;
+    for (auto &k : *datas_) {
       size[i] = k.second.value.size();
       i++;
     }
-    LOG_INFO("refresh:%d",index);
+    LOG_INFO("refresh:%d", index);
 
   }
 }
@@ -374,64 +407,74 @@ RC IvfflatIndexScanner::open(const char *left_key, int left_len, bool left_inclu
   Value v;
   v.set_type(AttrType::VECTORS);
   v.set_data(left_key, left_len);
-  const std::vector<float> &                                    vector     = v.get_vector();
-  std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *> *key_values = index_->find(vector);
 
-  // 使用最小堆来获取最近的向量
-  auto comp = [this, &vector](const auto &a, const auto &b) {
-    return index_->compute_distance(vector, a->v()) > index_->compute_distance(vector, b->v());
-  };
-  std::priority_queue<VectorNode *, std::vector<VectorNode *>, decltype(comp)> min_heap(comp);
+  Value limit;
+  limit.set_type(AttrType::INTS);
+  limit.set_data(right_key, right_len);
 
-  int count = 0;
-  int weight_percentages[] = {10, 20, 40, 60, 80}; // 扫描比例数组
+  this->limit_                     = limit.get_int();
+  const std::vector<float> &vector = v.get_vector();
 
-  // 遍历每个簇
-  for (size_t i = 0; i < key_values->size(); ++i) {
-    auto &key_value_pair = key_values->at(i);
-    auto &nodes = key_value_pair->second.value;
-    int node_size = nodes.size();
-
-    // 计算要扫描的向量数量
-    int scan_limit = static_cast<int>(node_size * (weight_percentages[i%5] / 100.0));
-
-    for (int j = 0; j < scan_limit; ++j) {
-      auto &node = nodes[j];
-      count++;
-
-      if (min_heap.size() < this->limit_) {
-        // 如果堆未满，直接插入
-        min_heap.push(node);
-      } else if (comp(node, min_heap.top())) {
-        // 否则替换堆顶元素
-        min_heap.pop();
-        min_heap.push(node);
-      }
-    }
-  }
-
-  LOG_INFO("this query q %d", count);
-
-  // 将堆中的元素添加到数据中并按距离排序
-  this->data_.reserve(min_heap.size());
-  while (!min_heap.empty()) {
-    this->data_.push_back(min_heap.top());
-    min_heap.pop();
-  }
-
-  // 不再需要排序，因为堆已按最近顺序组织
-  delete key_values;
+  std::vector<RID> res = index_->ann_search(vector, this->limit_);
+  this->rids_.swap(res);
+  // std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *> *key_values = index_->find(vector);
+  //
+  // // 使用最小堆来获取最近的向量
+  // auto comp = [this, &vector](const auto &a, const auto &b) {
+  //   return index_->compute_distance(vector, a->v()) > index_->compute_distance(vector, b->v());
+  // };
+  // std::priority_queue<VectorNode *, std::vector<VectorNode *>, decltype(comp)> min_heap(comp);
+  //
+  // int count                = 0;
+  // int weight_percentages[] = {10, 20, 40, 60, 80}; // 扫描比例数组
+  //
+  // // 遍历每个簇
+  // for (size_t i = 0; i < key_values->size(); ++i) {
+  //   auto &key_value_pair = key_values->at(i);
+  //   auto &nodes          = key_value_pair->second.value;
+  //   int   node_size      = nodes.size();
+  //
+  //   // 计算要扫描的向量数量
+  //   int scan_limit = static_cast<int>(node_size * (weight_percentages[i % 5] / 100.0));
+  //
+  //   for (int j = 0; j < scan_limit; ++j) {
+  //     auto &node = nodes[j];
+  //     count++;
+  //
+  //     if (min_heap.size() < this->limit_) {
+  //       // 如果堆未满，直接插入
+  //       min_heap.push(node);
+  //     } else if (comp(node, min_heap.top())) {
+  //       // 否则替换堆顶元素
+  //       min_heap.pop();
+  //       min_heap.push(node);
+  //     }
+  //   }
+  // }
+  //
+  // LOG_INFO("this query q %d", count);
+  //
+  // // 将堆中的元素添加到数据中并按距离排序
+  // this->data_.reserve(min_heap.size());
+  // while (!min_heap.empty()) {
+  //   this->data_.push_back(min_heap.top());
+  //   min_heap.pop();
+  // }
+  //
+  // // 不再需要排序，因为堆已按最近顺序组织
+  // delete key_values;
   return rc;
 }
 
 RC IvfflatIndexScanner::next_entry(RID *rid)
 {
-  if (this->pos == this->data_.size() - 1) {
+  if (this->pos == this->rids_.size()) {
+    this->pos = -1;
     return RC::RECORD_EOF;
   }
   pos++;
-  VectorNode *data = this->data_.at(pos);
-  *rid             = data->rid();
+  // VectorNode *data = this->data_.at(pos);
+  *rid             = this->rids_[pos];
   return RC::SUCCESS;
 }
 

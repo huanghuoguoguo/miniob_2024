@@ -51,6 +51,8 @@ IF (ENABLE_NOPIE)
     ADD_LINK_OPTIONS(-no-pie)
 ENDIF (ENABLE_NOPIE)
 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-function")
+
 # Requires support for avx2
 IF(USE_SIMD)
     SET(CMAKE_COMMON_FLAGS "${CMAKE_COMMON_FLAGS} -mavx2")
