@@ -10,7 +10,10 @@ FOREACH (F ${ALL_SRC})
     IF (NOT ${F} STREQUAL ${MAIN_SRC})
         SET(LIB_SRC ${LIB_SRC} ${F}
                 common/type/text_type.cpp
-                common/type/text_type.h)
+                common/type/text_type.h
+                sql/operator/create_table_logical_operator.h
+                sql/operator/create_table_physical_operator.cpp
+                sql/operator/create_table_physical_operator.h)
         MESSAGE("Use " ${F})
     ENDIF()
 
