@@ -57,10 +57,9 @@ public:
 
     RC close();
 
-    void check_data();
     RC insert_entry(const char* record, const RID* rid) override;
     RC delete_entry(const char* record, const RID* rid) override;
-    std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue>*>* find(const vector<float>& v);
+
 
     RC sync() override;
 
@@ -78,22 +77,20 @@ public:
     float compute_distance(const vector<float> &left, const vector<float> &right);
 private:
     RC create_internal(LogHandler& log_handler, BufferPoolManager& bpm, Table* table, const char* file_name);
-    void initialize_clusters();
     void kmeans(const Matrix& data, Matrix& centers, std::vector<int>& labels);
-    void refresh_center(pair<IvfflatIndexKey, IvfflatIndexValue>& data);
 private:
     bool inited_ = false;
     Table* table_ = nullptr;
     int lists_ = 1;
     int probes_ = 1;
-    // index_meta在父类已经有了。
-    std::vector<pair<IvfflatIndexKey, IvfflatIndexValue>>* datas_ = nullptr;
+
     unsigned int dim_;
     // 还需要确定维度。
     const FieldMeta* key_field_meta_ = nullptr;
     string func_name_;
     FunctionExpr::Type func_type_;
-    int count_ = 0;
+    bool init_data_ = false;
+
     int max_elements_ = 60000;
     std::vector<VectorNode*> temp_data_;
     map<int, VectorNode*> nodes_;
@@ -131,16 +128,6 @@ public:
     }
 };
 
-struct  IvfflatIndexKey
-{
-public:
-    vector<float> key;
-};
-
-struct IvfflatIndexValue
-{
-    vector<VectorNode*> value;
-};
 /**
  * 这个类被用于保存键和rid
  */
