@@ -82,8 +82,8 @@ RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm
   // Initing index
   this->space_ = new hnswlib::L2Space(this->dim_);
   int M = 8;                 // Tightly connected with internal dimensionality of the data
-  // strongly affects the memory consumption
-  int ef_construction = 80;
+                              // strongly affects the memory consumption
+  int ef_construction = 160;
   this->alg_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->max_elements_, M, ef_construction);
 
   // 初始化完成。
@@ -468,7 +468,7 @@ RC IvfflatIndexScanner::open(const char *left_key, int left_len, bool left_inclu
 
 RC IvfflatIndexScanner::next_entry(RID *rid)
 {
-  if (this->pos == this->rids_.size()) {
+  if (this->pos == this->rids_.size() - 1) {
     this->pos = -1;
     return RC::RECORD_EOF;
   }
