@@ -135,7 +135,19 @@ public:
    */
   virtual const std::string alias() const { return alias_; }
   virtual void set_alias(std::string alias) { alias_ = alias; }
+  virtual void traverse(const std::function<void(Expression*)>& func)
+  {
+    constexpr auto always_true = [](const Expression *) { return true; };
+    this->traverse(func, always_true);
+  }
 
+  // 带条件的 后序遍历 dfs
+  virtual void traverse(const std::function<void(Expression*)>& func, const std::function<bool(Expression*)>& filter)
+  {
+    if (filter(this)) {
+      func(this);
+    }
+  }
 protected:
   /**
    * @brief 表达式在下层算子返回的 chunk 中的位置
@@ -215,6 +227,8 @@ public:
 
   const char *table_name() const { return field_.table_name(); }
   const char *field_name() const { return field_.field_name(); }
+  FieldMeta get_field_meta() const { return *field_.meta(); }
+  FieldMeta get_field_len() const { return *field_.meta(); }
 
   RC get_column(Chunk &chunk, Column &column) override;
 
