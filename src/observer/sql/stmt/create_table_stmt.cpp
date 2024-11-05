@@ -90,9 +90,18 @@ StorageFormat CreateTableStmt::get_storage_format(const char *format_str) {
 // 将字段属性初始化分离成独立函数
 void CreateTableStmt::populateAttrInfo(const std::unique_ptr<Expression> &attr_expr, AttrInfoSqlNode &attr_info){
   // 获取字段名
+  std::string name = attr_expr->name();
+  size_t pos = name.find_last_of('.');
+
+  std::string result;
+  if (pos != std::string::npos && pos + 1 < name.size()) {
+    result = name.substr(pos + 1);  // 提取 `.` 后面的部分
+  } else {
+    result = name; // 如果没有 `.`，返回整个字符串
+  }
   attr_info.name = (attr_expr->alias().length() != 0) ?
-      attr_expr->alias() :
-      attr_expr->name();
+      attr_expr->alias().substr(attr_expr->alias().find('.') + 1) :
+      result;
 
   // 设置字段类型
   attr_info.type = attr_expr->value_type();
