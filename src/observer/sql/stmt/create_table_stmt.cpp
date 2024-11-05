@@ -91,13 +91,22 @@ StorageFormat CreateTableStmt::get_storage_format(const char *format_str) {
 void CreateTableStmt::populateAttrInfo(const std::unique_ptr<Expression> &attr_expr, AttrInfoSqlNode &attr_info){
   // 获取字段名
   attr_info.name = (attr_expr->alias().length() != 0) ?
-      attr_expr->alias().substr(attr_expr->alias().find('.') + 1) :
+      attr_expr->alias() :
       attr_expr->name();
 
   // 设置字段类型
   attr_info.type = attr_expr->value_type();
   // 根据字段类型设置长度
-  attr_info.length =  dynamic_cast<FieldExpr *>(attr_expr.get())->get_field_meta().len();
+  if(attr_expr.get()->type()==ExprType::FIELD) {
+    attr_info.length =  dynamic_cast<FieldExpr *>(attr_expr.get())->get_field_meta().len();
+  }else {
+    if(attr_expr.get()->type()==ExprType::VALUE) {
+      attr_info.length =  dynamic_cast<ValueExpr *>(attr_expr.get())->get_value().length();
+    }
+    else {
+      attr_info.length = 4;
+    }
+  }
   // 检查是否包含可空的子表达式
   // 遍历子表达式，有nullable的FieldExpr时，才允许为NULL
   bool nullable = false;
