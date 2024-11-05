@@ -49,6 +49,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/physical_plan_generator.h"
 
 #include "sql/operator/create_table_logical_operator.h"
+#include "sql/operator/create_table_physical_operator.h"
 
 #include <ranges>
 #include <sql/operator/view_scan_physical_operator.h>
@@ -456,9 +457,22 @@ RC PhysicalPlanGenerator::create_plan(CalcLogicalOperator &logical_oper, std::un
 RC PhysicalPlanGenerator::create_plan(CreateTableLogicalOperator &logical_operator,unique_ptr<PhysicalOperator> &oper)
 {
   RC rc = RC::SUCCESS;
-  oper = std::make_unique<CreateTablePhysicalOperator>(logical_oper.get_db(),
-                                                       std::move(logical_oper.table_name()),
-                                                       std::move(logical_oper.attr_infos()));
+  oper = std::make_unique<CreateTablePhysicalOperator>(logical_operator.get_db(),
+                                                       std::move(logical_operator.table_name()),
+                                                       std::move(logical_operator.attr_infos()));
+
+  // 实现create_table_select
+  unique_ptr<PhysicalOperator> select_operator;
+  vector<unique_ptr<LogicalOperator>> &child_operators = logical_operator.children();
+  if(!child_operators.empty()) {
+    LogicalOperator *child_operator = child_operators[0].get();
+    rc = create(*child_operator, select_operator);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create create_table_select physical operator. rc=%s", strrc(rc));
+      return rc;
+    }
+    oper->add_child(std::move(select_operator));
+  }
   return rc;
 }
 

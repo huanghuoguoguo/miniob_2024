@@ -74,3 +74,25 @@ RC CreateTablePhysicalOperator::open(Trx *trx)
   }
   return rc;
 }
+
+RC CreateTablePhysicalOperator::next()
+{
+  return RC::RECORD_EOF;
+}
+
+RC CreateTablePhysicalOperator::close()
+{
+  RC rc = RC::SUCCESS;
+  if (!children_.empty()) {
+    rc = children_[0]->close();
+    if (RC::SUCCESS != rc) {
+      LOG_WARN("failed to close child_operator, rc= %s", strrc(rc));
+    }
+  }
+  return rc;
+}
+
+Tuple *CreateTablePhysicalOperator::current_tuple()
+{
+  return nullptr;
+}

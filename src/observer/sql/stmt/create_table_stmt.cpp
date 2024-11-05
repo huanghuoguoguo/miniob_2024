@@ -61,14 +61,14 @@ RC CreateTableStmt::create(Db *db, const CreateTableSqlNode &create_table, Stmt 
       }
     }
       // 指定了列属性、带select
-      stmt = new CreateTableStmt(create_table.relation_name, create_table.attr_infos,storage_format, select_stmt);
+      stmt = new CreateTableStmt(db,create_table.relation_name, create_table.attr_infos,storage_format, select_stmt);
     } else {
       // 未指定列属性、带select
-      stmt = new CreateTableStmt(create_table.relation_name, attr_infos, storage_format, select_stmt);
+      stmt = new CreateTableStmt(db,create_table.relation_name, attr_infos, storage_format, select_stmt);
     }
   } else {
     // 指定了列属性、不带select
-    stmt = new CreateTableStmt(create_table.relation_name, create_table.attr_infos, storage_format,nullptr);
+    stmt = new CreateTableStmt(db,create_table.relation_name, create_table.attr_infos, storage_format,nullptr);
 
   }
   sql_debug("create table statement: table name %s", create_table.relation_name.c_str());
