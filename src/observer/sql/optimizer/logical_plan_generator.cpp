@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/calc_logical_operator.h"
 #include "sql/operator/delete_logical_operator.h"
+#include "sql/operator/create_table_logical_operator.h"
 #include "sql/operator/explain_logical_operator.h"
 #include "sql/operator/insert_logical_operator.h"
 #include "sql/operator/join_logical_operator.h"
@@ -34,12 +35,14 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/filter_stmt.h"
 #include "sql/stmt/insert_stmt.h"
 #include "sql/stmt/select_stmt.h"
+#include "sql/stmt/create_table_stmt.h"
 #include "sql/stmt/stmt.h"
 
 #include "sql/expr/expression_iterator.h"
 
 #include <sql/operator/update_logical_operator.h>
 #include <sql/stmt/update_stmt.h>
+#include <storage/db/db.h>
 
 using namespace std;
 using namespace common;
@@ -58,6 +61,12 @@ RC LogicalPlanGenerator::create(Stmt *stmt, unique_ptr<LogicalOperator> &logical
       SelectStmt *select_stmt = static_cast<SelectStmt *>(stmt);
 
       rc = create_plan(select_stmt, logical_operator);
+    } break;
+
+    case StmtType::CREATE_TABLE: {
+      CreateTableStmt *create_table_stmt = static_cast<CreateTableStmt *>(stmt);
+
+      rc = create_plan(create_table_stmt, logical_operator);
     } break;
 
     case StmtType::UPDATE: {
@@ -204,6 +213,33 @@ RC LogicalPlanGenerator::create_plan(SelectStmt *select_stmt, unique_ptr<Logical
 
   logical_operator = std::move(project_oper);
   return RC::SUCCESS;
+}
+
+RC LogicalPlanGenerator::create_plan(CreateTableStmt *create_table_stmt, unique_ptr<LogicalOperator> &logical_operator)
+{
+  RC rc  = RC::SUCCESS;
+  unique_ptr<LogicalOperator> select_operator;
+  Stmt *create_select_stmt = create_table_stmt->get_create_table_select_stmt();
+  if(create_select_stmt!=nullptr) {
+    // 存在select关键字,表明有select子查询，为selectStmt 创建逻辑计划
+    SelectStmt *select_stmt= static_cast<SelectStmt *>(create_select_stmt);
+    rc = create_plan(select_stmt,select_operator);
+    if(RC::SUCCESS != rc) {
+      LOG_WARN("failed to create the create table`s select logical plan: r=%s",strrc(rc));
+      return rc;
+    }
+  }
+  logical_operator = unique_ptr<LogicalOperator>(new CreateTableLogicalOperator(
+      create_table_stmt->get_db(), create_table_stmt->table_name(),
+      create_table_stmt->attr_infos()
+    ));
+
+  //如果select子查询存在  就把该操作符加入logical_operator的孩子中
+  if(select_operator) {
+    logical_operator->add_child(std::move(select_operator));
+  }
+  return rc;
+
 }
 
 RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<LogicalOperator> &logical_operator)

@@ -48,6 +48,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_scan_vec_physical_operator.h"
 #include "sql/optimizer/physical_plan_generator.h"
 
+#include "sql/operator/create_table_logical_operator.h"
+
 #include <ranges>
 #include <sql/operator/view_scan_physical_operator.h>
 #include <storage/table/view.h>
@@ -62,6 +64,10 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
   switch (logical_operator.type()) {
     case LogicalOperatorType::CALC: {
       return create_plan(static_cast<CalcLogicalOperator &>(logical_operator), oper);
+    } break;
+
+    case LogicalOperatorType::CREATE_TABLE: {
+      return create_plan(static_cast<CreateTableLogicalOperator &>(logical_operator), oper);
     } break;
 
     case LogicalOperatorType::TABLE_GET: {
@@ -444,6 +450,15 @@ RC PhysicalPlanGenerator::create_plan(CalcLogicalOperator &logical_oper, std::un
 
   CalcPhysicalOperator *calc_oper = new CalcPhysicalOperator(std::move(logical_oper.expressions()));
   oper.reset(calc_oper);
+  return rc;
+}
+
+RC PhysicalPlanGenerator::create_plan(CreateTableLogicalOperator &logical_operator,unique_ptr<PhysicalOperator> &oper)
+{
+  RC rc = RC::SUCCESS;
+  oper = std::make_unique<CreateTablePhysicalOperator>(logical_oper.get_db(),
+                                                       std::move(logical_oper.table_name()),
+                                                       std::move(logical_oper.attr_infos()));
   return rc;
 }
 
