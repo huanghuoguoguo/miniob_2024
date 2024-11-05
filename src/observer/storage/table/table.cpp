@@ -32,6 +32,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <regex>
 #include <sql/expr/expression.h>
+#include <storage/index/ivfflat_index.h>
 
 #include "storage/trx/trx.h"
 
@@ -81,8 +82,8 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   }
 
   RC rc = RC::SUCCESS;
-  for(auto  &attribute : attributes) {
-    if(attribute.type==AttrType::VECTORS&&attribute.length>MAX_VECTOR_LENGTH) {
+  for (auto &attribute : attributes) {
+    if (attribute.type == AttrType::VECTORS && attribute.length > MAX_VECTOR_LENGTH) {
       LOG_ERROR("vector dimension is too large ! Show less than %d", MAX_VECTOR_LENGTH);
       return RC::INVALID_ARGUMENT;
     }
@@ -146,7 +147,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
       exist_text_feild = true;
       break;
     }
-    if(AttrType::VECTORS == field.type() && field.is_high_dimensional()==true) {
+    if (AttrType::VECTORS == field.type() && field.is_high_dimensional() == true) {
       LOG_INFO("table.cpp vector size is high dimension: %s", field.is_high_dimensional() ? "true" : "false");
       exist_vector_feild = true;
       break;
@@ -273,35 +274,37 @@ RC Table::insert_record(Record &record)
     LOG_ERROR("Insert record failed. table name=%s, rc=%s", table_meta_->name(), strrc(rc));
     return rc;
   }
+  // 索引不为空时才插入索引并创建。
+  if(!indexes_.empty()) {
+    std::vector<Index *> temp_indexes;
 
-  std::vector<Index *> temp_indexes;
-  RC rc2 = RC::SUCCESS;
-  for (Index *index : indexes_) {
-    rc = index->insert_entry(record.data(), &record.rid());
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("插入索引失败。");
-      break;
+    for (Index *index : indexes_) {
+      rc = index->insert_entry(record.data(), &record.rid());
+      if (rc != RC::SUCCESS) {
+        LOG_WARN("插入索引失败。");
+        break;
+      }
+      temp_indexes.push_back(index);
     }
-    temp_indexes.push_back(index);
-  }
-
-  if (rc != RC::SUCCESS) {
-    // 插入索引失败，删除原来插入的索引
-    for(Index *index : temp_indexes) {
-      rc2 = index->delete_entry(record.data(), &record.rid());
-      if (rc2 != RC::SUCCESS) {
-        if (rc2 != RC::RECORD_INVALID_KEY) {
-          LOG_WARN("插入索引失败，删除之前插入的索引失败。");
-          break;
+    RC rc2 = RC::SUCCESS;
+    if (rc != RC::SUCCESS) {
+      // 插入索引失败，删除原来插入的索引
+      for(Index *index : temp_indexes) {
+        rc2 = index->delete_entry(record.data(), &record.rid());
+        if (rc2 != RC::SUCCESS) {
+          if (rc2 != RC::RECORD_INVALID_KEY) {
+            LOG_WARN("插入索引失败，删除之前插入的索引失败。");
+            break;
+          }
         }
       }
     }
-  }
-  if (rc != RC::SUCCESS) {  // 可能出现了键值重复
-    rc2 = record_handler_->delete_record(&record.rid());
-    if (rc2 != RC::SUCCESS) {
-      LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
-                name(), rc2, strrc(rc2));
+    if (rc != RC::SUCCESS) {  // 可能出现了键值重复
+      rc2 = record_handler_->delete_record(&record.rid());
+      if (rc2 != RC::SUCCESS) {
+        LOG_PANIC("Failed to rollback record data when insert index entries failed. table name=%s, rc=%d:%s",
+                  name(), rc2, strrc(rc2));
+      }
     }
   }
   return rc;
@@ -421,7 +424,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
-  if(value.is_null()) {
+  if (value.is_null()) {
     return RC::SUCCESS;
   }
   size_t       copy_len = field->len();
@@ -434,22 +437,22 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
   if (field->type() == AttrType::TEXTS) {
     // 对于TEXTS类型字段，将字符串插入到文件中，并将offset和length写入record
     // 目前是将TEXT的放入cell前 将其TYPE 设置为CHARS 所以这里 应该不会运行到
-    int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    int64_t position[2]; // position[0] 是 offset, position[1] 是 length
     position[0] = field->offset();
     position[1] = value.length();
     // 假设 `text_buffer_pool_` 是一个用于存储大文本的缓冲池
     text_buffer_pool_->append_data(position[0], position[1], value.data());
     // 将偏移量和长度写入record
     memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
-  }else if(field->type() == AttrType::VECTORS && field->is_high_dimensional()==true){
+  } else if (field->type() == AttrType::VECTORS && field->is_high_dimensional() == true) {
     // 对于高纬度Vector类型字段，解决思路和TEXTS类型类似
     //TODO 这里放入position的值可能有点问题
-    int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    int64_t position[2]; // position[0] 是 offset, position[1] 是 length
     position[0] = field->offset();
     position[1] = value.length();
     vector_buffer_pool_->append_data(position[0], position[1], value.data());
     memcpy(record_data + field->offset(), position, 2 * sizeof(int64_t));
-  }else {
+  } else {
     memcpy(record_data + field->offset(), value.data(), copy_len);
   }
   return RC::SUCCESS;
@@ -602,7 +605,7 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
 
 
 RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressions_, const char *index_name,
-    bool                    is_unique)
+    bool                    is_unique,vector<ConditionSqlNode>& with_condition_sql_nodes)
 {
   // 收集需要创建的索引的列信息。
   std::vector<const FieldMeta *> *field_meta = new vector<const FieldMeta*>();
@@ -626,15 +629,27 @@ RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressi
     LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s", name(), index_name);
     return rc;
   }
-  // 创建索引相关数据
-  BplusTreeIndex *index      = new BplusTreeIndex();
-  std::string     index_file = table_index_file(base_dir_.c_str(), name(), index_name);
-  rc                         = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
+  Index *index;
+  if (with_condition_sql_nodes.empty()) {
+    // 创建索引相关数据
+
+    index = new BplusTreeIndex();
+  } else {
+    // 创建vector。。。这里还是偷懒了。
+    const char *func_name = with_condition_sql_nodes.at(2).right_expr->name();
+    const char *lists     = with_condition_sql_nodes.at(1).right_expr->name();
+    const char *probes    = with_condition_sql_nodes.at(0).right_expr->name();
+    index                 = new IvfflatIndex(std::stoi(lists), std::stoi(probes), func_name);
+  }
+
+  std::string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+  rc                     = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));
     return rc;
   }
+
   // 遍历当前的所有数据，插入这个索引
   RecordFileScanner scanner;
   rc = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY /*readonly*/);

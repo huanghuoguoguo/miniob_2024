@@ -77,15 +77,15 @@ private:
 
     string view_name_;
     // 持有真实表的指针。
-    std::set<Table*> tables;
-    Table* current_table;
+    std::set<Table*> tables_;
+    Table* current_table_;
     // select_stmt* 原始创建的select。每次打开这个view，是否类似于一个table_scan?打开一个物理计划？
-    SelectStmt* selectStmt = nullptr;
+    SelectStmt* selectStmt_ = nullptr;
     BinderContext* binderContext_ = nullptr;
     std::vector<TupleCellSpec> tuple_schemata_;
     int table_id_ = 0;
-    std::vector<std::unique_ptr<Expression>> query_expressions;
-    string sql;
+    std::vector<std::unique_ptr<Expression>> query_expressions_;
+    string sql_;
 
 };
 

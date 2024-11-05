@@ -45,10 +45,6 @@ RC ProjectPhysicalOperator::next()
   if (children_.empty()) {
     return RC::RECORD_EOF;
   }
-  if (limit_ == 0) {
-    return RC::RECORD_EOF;
-  }
-  limit_--;
   return children_[0]->next();
 }
 

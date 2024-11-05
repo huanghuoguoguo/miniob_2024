@@ -84,14 +84,12 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   if (bound_field_expressions.empty()) {
     int i = 0;
     for (auto &bound_expression : bound_values_expressions) {
-      Value value;
-      RC    rc = bound_expression->try_get_value(value);
+      RC    rc = bound_expression->try_get_value((*values_data)[i]);
       if (OB_FAIL(rc)) {
         LOG_INFO("try get insert value failed. rc=%s", strrc(rc));
         delete values_data;
         return rc;
       }
-      (*values_data)[i] = value;
       i++;
     }
   } else {
@@ -103,21 +101,18 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     // 根据绑定的每个field，找到其在values_data中的位置。
     int i = 0;
     for(auto& field_expression : bound_field_expressions) {
-      FieldExpr * field_expr = dynamic_cast<FieldExpr*>(field_expression.get());
-      if(field_expr) {
+      if(FieldExpr * field_expr = dynamic_cast<FieldExpr*>(field_expression.get())) {
         Field&           field      = field_expr->field();
         const FieldMeta *field_meta = field.meta();
         int              field_id   = field_meta->field_id();
         // 将值放到对应的位置上。
         auto& bound_expression = bound_values_expressions.at(i);
-        Value value;
-        RC    rc = bound_expression->try_get_value(value);
+        RC    rc = bound_expression->try_get_value((*values_data)[field_id - sys_field_num]);
         if (OB_FAIL(rc)) {
           LOG_INFO("try get insert value failed. rc=%s", strrc(rc));
           delete values_data;
           return rc;
         }
-        (*values_data)[field_id - sys_field_num] = value;
         i++;
       } else {
         delete values_data;
@@ -127,14 +122,7 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 
   }
 
-
-
-
-
-
-
   const int        value_num  = static_cast<int>(values_data->size());
-
 
   if (field_num != value_num) {
     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
@@ -146,8 +134,8 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
   for (int i = 0; i < value_num; i++) {
     const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
     Value&             val        = values_data->at(i);
-    const AttrType   field_type = field_meta->type();
-    const AttrType   value_type = val.attr_type();
+    const AttrType&   field_type = field_meta->type();
+    const AttrType&   value_type = val.attr_type();
 
     // 解决TEXT太长的问题
     if (field_type != value_type) {
@@ -162,35 +150,32 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
     if (AttrType::VECTORS == field_type) {
       if (val.attr_type() == AttrType::CHARS) {
         // char先转vector
-        Value v;
-        DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, v);
-        // 直接将其替换为vector类型。
-        val = v;
+        DataType::type_instance(AttrType::CHARS)->cast_to(val, AttrType::VECTORS, val);
       } else if (val.attr_type() != AttrType::VECTORS) {
         delete values_data;
         return RC::INVALID_ARGUMENT;
       }
       // 此时已经是vector类型，判断维度是否一致。
-      std::vector<float> vector = val.get_vector();
-      if (vector.size() != field_meta->is_high_dim()) {
+      // std::vector<float> vector = val.get_vector();
+      // if (vector.size() != field_meta->is_high_dim()) {
+      //   delete values_data;
+      //   return RC::INVALID_ARGUMENT;
+      // }
+      // 少一次拷贝。
+      if (val.length() / sizeof(float) != field_meta->is_high_dim()) {
         delete values_data;
         return RC::INVALID_ARGUMENT;
       }
     }
-    // 检查结束。
-  }
-
-  // 不能为null的值为null insert into t1 values(null)
-  const std::vector<FieldMeta> *field_metas = table_meta.field_metas();
-  for (unsigned long i = 0; i < field_metas->size() - table_meta.sys_field_num(); ++i) {
-    const FieldMeta &field_meta = field_metas->at(i + table_meta.sys_field_num());
     Value&           value      = values_data->at(i);
-    if (field_meta.nullable() == false && value.is_null()) {
-      LOG_WARN("schema mismatch. null field=%d", field_meta.name());
+    if (field_meta->nullable() == false && value.is_null()) {
+      LOG_WARN("schema mismatch. null field=%d", field_meta->name());
       delete values_data;
       return RC::SCHEMA_FIELD_TYPE_MISMATCH;
     }
+    // 检查结束。
   }
+
 
   // everything alright
 

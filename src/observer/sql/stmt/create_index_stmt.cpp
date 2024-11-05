@@ -71,6 +71,8 @@ RC CreateIndexStmt::create(Db *db, CreateIndexSqlNode &create_index, Stmt *&stmt
 
   CreateIndexStmt * c = new CreateIndexStmt();
   c->index_name_ = create_index.index_name;
+  c->index_type_ = create_index.index_type;
+  c->with_expressions_.swap(create_index.equal_expression);
   c->table_ = table;
   c->column_expressions_.swap(bound_expressions);
   c->unique_ = create_index.unique;

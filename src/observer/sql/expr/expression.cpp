@@ -22,6 +22,7 @@ See the Mulan PSL v2 for more details. */
 #include <regex>
 #include <string>
 #include <common/type/list_type.h>
+#include <common/type/list_type.h>
 #include <sql/operator/operator_iterator.h>
 #include <sql/operator/predicate_physical_operator.h>
 #include <sql/operator/project_physical_operator.h>
@@ -930,14 +931,14 @@ RC FunctionExpr::type_from_string(const char *type_str, FunctionExpr::Type &type
 
 RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
 {
-  RC rc = RC::SUCCESS;
+  RC            rc = RC::SUCCESS;
   vector<Value> values;
   // 同时要求维度一致。
   int vc = -1;
-  for(auto& pa:params_) {
+  for (auto &pa : params_) {
     Value v;
-    rc          = pa->get_value(tuple,v);
-    std::vector<float> vector = v.get_vector();
+    rc                        = pa->get_value(tuple, v);
+    const std::vector<float>& vector = v.get_vector();
     if (vc == -1) {
       vc = static_cast<int>(vector.size());
     } else {
@@ -945,60 +946,74 @@ RC FunctionExpr::get_value(const Tuple &tuple, Value &value) const
         return RC::INVALID_ARGUMENT;
       }
     }
-    if(RC::SUCCESS != rc) {
+    if (RC::SUCCESS != rc) {
       return rc;
     }
     values.emplace_back(v);
   }
   // 应该将函数变成函数指针，接受参数。这里直接简单化了。
-
+  const std::vector<float>& left  = values[0].get_vector();
+  const std::vector<float>& right = values[1].get_vector();
   switch (func_type_) {
     case Type::L2_DISTANCE: {
-      auto left =  values[0].get_vector();
-      auto right = values[1].get_vector();
-      float sum = 0.0f;
-      for (size_t i = 0; i < left.size(); ++i) {
-        sum += std::pow(left[i] - right[i], 2);
-      }
-      float sqrt = std::sqrt(sum);
-      value = Value(sqrt);
+      L2_DISTANCE(left, right, value);
     }
-      break;
+    break;
     case Type::COSINE_DISTANCE: {
-      auto left =  values[0].get_vector();
-      auto right = values[1].get_vector();
-      float dotProduct = 0.0f;
-      float leftNorm = 0.0f;
-      float rightNorm = 0.0f;
-
-      for (size_t i = 0; i < left.size(); ++i) {
-        dotProduct += left[i] * right[i];
-        leftNorm += left[i] * left[i];
-        rightNorm += right[i] * right[i];
+      COSINE_DISTANCE(left, right, value);
+      if (value.attr_type() == AttrType::BOOLEANS && !value.get_boolean()) {
+        return RC::DIVIDE_ZERO;
       }
-
-      // 计算模
-      leftNorm = std::sqrt(leftNorm);
-      rightNorm = std::sqrt(rightNorm);
-
-      // 避免除以零
-      if (leftNorm == 0 || rightNorm == 0) {
-        return RC::DIVIDE_ZERO; // 或者根据需求返回其他值
-      }
-
-      float res = 1.0f - dotProduct / (leftNorm * rightNorm);
-      value = Value(res);
     }
-      break;
+    break;
     case Type::INNER_PRODUCT: {
-      auto left =  values[0].get_vector();
-      auto right = values[1].get_vector();
-      float dotProduct = std::inner_product(left.begin(), left.end(), right.begin(), 0.0f);
-      value = Value(dotProduct);
+      INNER_PRODUCT(left, right, value);
     }
-      break;
-    default:
-      return RC::UNKNOWN_FUNC;
+    break;
+    default: return RC::UNKNOWN_FUNC;
   }
   return rc;
+}
+
+void FunctionExpr::L2_DISTANCE(const vector<float> &left,const vector<float> &right, Value &value)
+{
+  float sum = 0.0f;
+  for (size_t i = 0; i < left.size(); ++i) {
+    float diff = left[i] - right[i];
+    sum += diff * diff;
+  }
+  float sqrt = std::sqrt(sum);
+  value      = Value(sqrt);
+}
+
+void FunctionExpr::COSINE_DISTANCE(const vector<float> &left,const vector<float> &right, Value &value)
+{
+  float dotProduct = 0.0f;
+  float leftNorm   = 0.0f;
+  float rightNorm  = 0.0f;
+
+  for (size_t i = 0; i < left.size(); ++i) {
+    dotProduct += left[i] * right[i];
+    leftNorm += left[i] * left[i];
+    rightNorm += right[i] * right[i];
+  }
+
+  // 计算模
+  leftNorm  = std::sqrt(leftNorm);
+  rightNorm = std::sqrt(rightNorm);
+
+  // 避免除以零
+  if (leftNorm == 0 || rightNorm == 0) {
+    value.set_boolean(false); // 或者根据需求返回其他值
+    return;
+  }
+
+  float res = 1.0f - dotProduct / (leftNorm * rightNorm);
+  value     = Value(res);
+}
+
+void FunctionExpr::INNER_PRODUCT(const vector<float> &left,const vector<float> &right, Value &value)
+{
+  float dotProduct = std::inner_product(left.begin(), left.end(), right.begin(), 0.0f);
+  value            = Value(dotProduct);
 }

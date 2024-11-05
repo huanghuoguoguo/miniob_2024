@@ -87,7 +87,7 @@ RC FieldMeta::init(const char *name, AttrType attr_type, int attr_offset, int at
   if (AttrType::TEXTS == attr_type) { attr_len_ = TEXT_FIELD_LENGTH; }
   if (AttrType::VECTORS == attr_type&&is_high_dim>1000) { attr_len_ = VECTOR_FIELD_LENGTH; }
 
-  LOG_INFO("Init a field with name=%s", name);
+  // LOG_INFO("Init a field with name=%s", name);
   return RC::SUCCESS;
 }
 RC FieldMeta::init(

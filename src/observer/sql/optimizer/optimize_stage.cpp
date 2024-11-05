@@ -82,7 +82,7 @@ RC OptimizeStage::generate_physical_plan(
     session->set_used_chunk_mode(true);
     rc    = physical_plan_generator_.create_vec(*logical_operator, physical_operator);
   } else {
-    LOG_INFO("use tuple iterator");
+    // LOG_INFO("use tuple iterator");
     session->set_used_chunk_mode(false);
     rc = physical_plan_generator_.create(*logical_operator, physical_operator);
   }

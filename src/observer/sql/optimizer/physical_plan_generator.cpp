@@ -52,6 +52,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/create_table_physical_operator.h"
 
 #include <ranges>
+#include <sql/operator/limit_physical_operator.h>
+#include <sql/operator/vector_index_scan_physical_operator.h>
 #include <sql/operator/view_scan_physical_operator.h>
 #include <storage/table/view.h>
 
@@ -315,7 +317,19 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   }
 
   auto project_operator = make_unique<ProjectPhysicalOperator>(std::move(project_oper.expressions()));
-  project_operator->limit(project_oper.limit());
+
+  if(auto child_p = dynamic_cast<VectorIndexScanPhysicalOperator *>(child_phy_oper.get())) {
+    // 如果子孩子是vector_index_scan，将limit直接设入，不再另外构造limit
+    child_p->set_limit(project_oper.limit());
+  }else if (project_oper.limit() > 0) {
+    std::unique_ptr<PhysicalOperator> limit_physical_operator = make_unique<LimitPhysicalOperator>(project_oper.limit());
+    if(child_phy_oper) {
+      limit_physical_operator->add_child(std::move(child_phy_oper));
+    }
+    project_operator->add_child(std::move(limit_physical_operator));
+    oper = std::move(project_operator);
+    return rc;
+  }
   if (child_phy_oper) {
     project_operator->add_child(std::move(child_phy_oper));
   }
@@ -334,6 +348,7 @@ RC PhysicalPlanGenerator::create_plan(InsertLogicalOperator &insert_oper, unique
   oper.reset(insert_phy_oper);
   return RC::SUCCESS;
 }
+
 RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &update_oper, unique_ptr<PhysicalOperator> &oper)
 {
   Table *                              table       = update_oper.table();
@@ -504,13 +519,57 @@ RC PhysicalPlanGenerator::create_plan(GroupByLogicalOperator &logical_oper, std:
   oper = std::move(group_by_oper);
   return rc;
 }
+
 RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper)
 {
   RC rc = RC::SUCCESS;
 
   // 获取 order by 相关的表达式和排序方向
   std::vector<Expression *> &order_by_expressions = logical_oper.order_by_expressions();
-  std::vector<bool> &order_by_directions = logical_oper.order_by_directions();
+  std::vector<bool> &        order_by_directions  = logical_oper.order_by_directions();
+  LogicalOperator *          child_oper           = logical_oper.children().front().get();
+  // 如果子孩子就是table_get，检查是不是vector函数。
+  if (child_oper->type() == LogicalOperatorType::TABLE_GET) {
+    // 检查function
+    bool           is_vector_order = false;
+    vector<string> fields;
+    // 只考虑一个value，这里也偷懒了。
+    Value v;
+    for (auto &order_by_expression : order_by_expressions) {
+      if (order_by_expression->type() == ExprType::FUNCTION) {
+        // 目前Function只有vector函数，偷懒了
+        FunctionExpr *by_expression = static_cast<FunctionExpr *>(order_by_expression);
+        for (auto &p : by_expression->params()) {
+          if (p->type() == ExprType::FIELD) {
+            FieldExpr *field_expr = static_cast<FieldExpr *>(p.get());
+            fields.push_back(field_expr->field().meta()->name());
+            is_vector_order = true;
+          } else if (p->type() == ExprType::VALUE) {
+            ValueExpr *value_expr = static_cast<ValueExpr *>(p.get());
+            v                     = value_expr->get_value();
+          }
+        }
+      }
+    }
+    if (is_vector_order) {
+
+      TableGetLogicalOperator *table_get_logical_operator = static_cast<TableGetLogicalOperator *>(child_oper);
+      Table *                  table                      = table_get_logical_operator->table();
+      fields.insert(fields.begin(), "null_list");
+      Index *vector_index = table->find_index_by_field(fields);
+      if (vector_index) {
+        // 查询是否有以这个字段建立的索引，有的话直接将order by 算子变为vec_index_scan。
+        unique_ptr<VectorIndexScanPhysicalOperator> vector_index_scan = make_unique<VectorIndexScanPhysicalOperator>(table,
+            vector_index,
+            ReadWriteMode::READ_WRITE,
+            v);
+        oper = std::move(vector_index_scan);
+        return rc;
+      }
+
+    }
+  }
+
 
   // 创建 OrderByPhysicalOperator
   unique_ptr<OrderByPhysicalOperator> order_by_oper = make_unique<OrderByPhysicalOperator>(
@@ -520,9 +579,8 @@ RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, std:
   ASSERT(logical_oper.children().size() == 1, "Order by operator should have 1 child");
 
   // 创建子物理操作符
-  LogicalOperator &child_oper = *logical_oper.children().front();
   unique_ptr<PhysicalOperator> child_physical_oper;
-  rc = create(child_oper, child_physical_oper);
+  rc = create(*child_oper, child_physical_oper);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to create child physical operator for order by operator. rc=%s", strrc(rc));
     return rc;

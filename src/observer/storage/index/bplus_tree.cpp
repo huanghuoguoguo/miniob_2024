@@ -793,8 +793,10 @@ RC BplusTreeHandler::sync()
   }
   return disk_buffer_pool_->flush_all_pages();
 }
-RC BplusTreeHandler::create(LogHandler &log_handler,BufferPoolManager &bpm,const char *file_name, std::vector<const FieldMeta *> field_meta,bool is_unique, int internal_max_size,
-    int leaf_max_size)
+
+RC BplusTreeHandler::create(LogHandler &log_handler, BufferPoolManager &bpm, const char *file_name,
+    std::vector<const FieldMeta *>      field_meta, bool                is_unique, int   internal_max_size,
+    int                                 leaf_max_size)
 {
 
   // 创建文件。
@@ -806,7 +808,7 @@ RC BplusTreeHandler::create(LogHandler &log_handler,BufferPoolManager &bpm,const
   LOG_INFO("Successfully create index file:%s", file_name);
 
   DiskBufferPool *bp = nullptr;
-  rc = bpm.open_file(log_handler,file_name, bp);
+  rc                 = bpm.open_file(log_handler, file_name, bp);
   if (rc != RC::SUCCESS) {
     LOG_WARN("Failed to open file. file name=%s, rc=%d:%s", file_name, rc, strrc(rc));
     return rc;
