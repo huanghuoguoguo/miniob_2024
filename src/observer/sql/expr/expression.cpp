@@ -979,7 +979,8 @@ void FunctionExpr::L2_DISTANCE(const vector<float> &left,const vector<float> &ri
 {
   float sum = 0.0f;
   for (size_t i = 0; i < left.size(); ++i) {
-    sum += std::pow(left[i] - right[i], 2);
+    float diff = left[i] - right[i];
+    sum += diff * diff;
   }
   float sqrt = std::sqrt(sum);
   value      = Value(sqrt);

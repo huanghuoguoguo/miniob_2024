@@ -42,8 +42,6 @@ RC IvfflatIndex::create(Table *           table, const char *file_name, const In
 }
 
 
-
-
 RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm, Table *table, const char *file_name
     )
 {
@@ -80,11 +78,8 @@ RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm
   FunctionExpr::type_from_string(this->func_name_.c_str(), this->func_type_);
 
   // Initing index
-  this->space_ = new hnswlib::L2Space(this->dim_);
-  int M = 8;                 // Tightly connected with internal dimensionality of the data
-                              // strongly affects the memory consumption
-  int ef_construction = 160;
-  this->alg_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->max_elements_, M, ef_construction);
+  this->space_    = new hnswlib::L2Space(this->dim_);
+  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, M, ef_construction);
 
   // 初始化完成。
 
@@ -133,25 +128,95 @@ RC IvfflatIndex::open(Table *             table, const char *file_name, const In
   return RC::SUCCESS;
 }
 
+void IvfflatIndex::init_data()
+{
+  Matrix data(temp_data_.size(), nullptr);
+  for (int i = 0; i < temp_data_.size(); ++i) {
+    std::vector<float> &vector = temp_data_[i]->v();
+    data[i]                    = &vector;
+  }
 
+  // 聚类中心和标签
+  Matrix centers(this->lists_);
+  for (auto i = 0; i < this->lists_; ++i) {
+    centers[i] = new Vector(this->dim_);
+  }
+  std::vector<int> labels(temp_data_.size(), -1);
+  kmeans(data, centers, labels);
+  // 经过聚类之后，得到了245个中心位置，以及60000个向量的标签。接下来就是构建245个索引，然后再构建1个索引用于索引245个索引。
+  this->hnsw_node_.resize(this->lists_);
+  for (int i = 0; i < this->lists_; ++i) {
+    this->hnsw_node_[i] = new hnswlib::HierarchicalNSW<float>(this->space_,
+        5 * this->lists_,
+        this->M,
+        this->ef_construction);
+  }
+  // 将所有向量按照标签放入桶中。
+  for (int i = 0; i < this->temp_data_.size(); ++i) {
+    int label = labels[i];
+    this->hnsw_node_[label]->addPoint(temp_data_.at(i)->v().data(), i);
+    this->nodes_.emplace(i, temp_data_.at(i));
+  }
+  // 构建key的桶。标签对应的是hnsw_node_中的桶。
+  for (int i = 0; i < this->lists_; i++) {
+    key_hnsw_->addPoint(centers[i]->data(), i);
+  }
+  temp_data_.clear();
+}
 vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t limit)
 {
-  if(!temp_data_.empty()) {
-    for (auto &n : temp_data_) {
-      alg_hnsw_->addPoint(n->v().data(), this->count_);
-      this->nodes_.emplace(this->count_,n);
-      this->count_++;
-    }
-    temp_data_.clear();
+  if (!temp_data_.empty()) {
+    init_data();
   }
   vector<RID> result;
-  std::priority_queue<std::pair<float, hnswlib::labeltype>> priority_queue = this->alg_hnsw_->searchKnn(base_vector.data(), limit);
-  while(!priority_queue.empty()) {
-    auto value = priority_queue.top();
-    priority_queue.pop();
-    VectorNode * vector_node = this->nodes_[value.second];
-    result.push_back(vector_node->rid());
+  // 找到最近的probes个桶。
+  std::vector<int>                                          keys;
+  std::priority_queue<std::pair<float, hnswlib::labeltype>> key_queue = this->key_hnsw_->searchKnn(base_vector.data(),
+      this->probes_);
+  while (!key_queue.empty()) {
+    auto value = key_queue.top();
+    key_queue.pop();
+    keys.push_back(value.second);
   }
+  // 拿到最近的probes个桶放入keys后，从每个桶中获取到limit个条目。
+  // 维护大小为limit的优先队列，存储<float,int> float是距离，int是到node_中查找rid的索引。
+  auto compare = [](const DistanceRIDPair& a, const DistanceRIDPair& b) {
+    return a.first < b.first; // 最大堆，距离小的优先
+  };
+  std::priority_queue<DistanceRIDPair, std::vector<DistanceRIDPair>, decltype(compare)> max_heap(compare);
+
+  for (auto &kv : keys) {
+    hnswlib::HierarchicalNSW<float> *                         need_search_node = this->hnsw_node_[kv];
+    std::priority_queue<std::pair<float, hnswlib::labeltype>> priority_queue   = need_search_node->searchKnn(
+        base_vector.data(),
+        limit);
+    while (!priority_queue.empty()) {
+      auto value = priority_queue.top();
+      priority_queue.pop();
+      unsigned long rid_index = value.second;
+
+      // 计算当前距离
+      float distance = value.first;
+
+      // 如果堆的大小小于limit，直接插入
+      if (max_heap.size() < limit) {
+        max_heap.emplace(distance, rid_index);
+      } else if (distance < max_heap.top().first) { // 如果当前距离更小，则替换堆顶
+        max_heap.pop();
+        max_heap.emplace(distance, rid_index);
+      }
+    }
+  }
+  // 将结果从最大堆中提取出来
+  while (!max_heap.empty()) {
+    int second = max_heap.top().second;
+    result.push_back(this->nodes_[second]->rid()); // 获取RID
+    max_heap.pop();
+  }
+
+  // 结果可能是反向的，按距离排序
+  std::reverse(result.begin(), result.end());
+  // 维护优先队列，
   return result;
 }
 
@@ -165,31 +230,7 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
 
   // 使用 float_data 和 float_count 初始化 vector<float>
   memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
-
-  // // 检查全部的data，是否有需要分裂的。
-  // if (this->count_ > 1 && this->count_ % (2 * this->lists_) == 0) {
-  //   check_data();
-  // }
-  //
-  //
-  //
-  //
-  // float                                     dist_   = numeric_limits<float>::max();
-  // pair<IvfflatIndexKey, IvfflatIndexValue> *target_ = nullptr;
-  //
-  // // O(n)
-  // for (auto &k : *datas_) {
-  //   float dist = compute_distance(vec, k.first.key); // 假设有个计算距离的函数
-  //   if (dist_ > dist) {
-  //     dist_   = dist;
-  //     target_ = &k;
-  //   }
-  // }
-  //
-  // // 找到了距离最近的那个簇，加入进去并且更新簇的权重。
   VectorNode *node = new VectorNode(vec, *rid);
-  // std::vector<VectorNode *> &target_nodes = target_->second.value;
-  // target_nodes.push_back(node);
   this->temp_data_.emplace_back(node);
 
   return rc;
@@ -362,6 +403,71 @@ float IvfflatIndex::compute_distance(const vector<float> &left, const vector<flo
   return value.get_float();
 }
 
+void IvfflatIndex::kmeans(const Matrix &data, Matrix &centers, std::vector<int> &labels)
+{
+  const int NUM_CLUSTERS = this->lists_;
+
+  int              num_samples    = data.size();
+  int              num_dimensions = data[0]->size();
+  std::vector<int> counts(NUM_CLUSTERS, 0);
+  bool             changed;
+
+  // 初始化聚类中心
+  for (int i = 0; i < NUM_CLUSTERS; ++i) {
+    centers[i] = data[std::rand() % num_samples];
+  }
+
+  for (int iter = 0; iter < 2; ++iter) {
+    changed = false;
+
+    // 分配标签
+    for (int i = 0; i < num_samples; ++i) {
+      int   closest_center = -1;
+      float min_distance   = std::numeric_limits<float>::max();
+
+      for (int j = 0; j < NUM_CLUSTERS; ++j) {
+        float distance = compute_distance(*data[i], *centers[j]);
+        if (distance < min_distance) {
+          min_distance   = distance;
+          closest_center = j;
+        }
+      }
+
+      if (labels[i] != closest_center) {
+        labels[i] = closest_center;
+        changed   = true;
+      }
+    }
+
+    // 更新聚类中心
+    for (int i = 0; i < NUM_CLUSTERS; ++i) {
+      centers.at(i) = new std::vector<float>(num_dimensions, 0.0f);
+    }
+    counts.assign(NUM_CLUSTERS, 0);
+
+    for (int i = 0; i < num_samples; ++i) {
+      int cluster = labels[i];
+      counts[cluster]++;
+      for (int d = 0; d < num_dimensions; ++d) {
+        centers[cluster]->at(d) += data[i]->at(d);
+      }
+    }
+
+    for (int j = 0; j < NUM_CLUSTERS; ++j) {
+      if (counts[j] > 0) {
+        for (int d = 0; d < num_dimensions; ++d) {
+          centers[j]->at(d) /= counts[j];
+        }
+      }
+    }
+
+    // 如果没有改变，停止迭代
+    if (!changed) {
+      break;
+    }
+  }
+}
+
 void IvfflatIndex::refresh_center(pair<IvfflatIndexKey, IvfflatIndexValue> &data)
 {
   auto &vectors = data.second.value;
@@ -417,52 +523,6 @@ RC IvfflatIndexScanner::open(const char *left_key, int left_len, bool left_inclu
 
   std::vector<RID> res = index_->ann_search(vector, this->limit_);
   this->rids_.swap(res);
-  // std::vector<std::pair<IvfflatIndexKey, IvfflatIndexValue> *> *key_values = index_->find(vector);
-  //
-  // // 使用最小堆来获取最近的向量
-  // auto comp = [this, &vector](const auto &a, const auto &b) {
-  //   return index_->compute_distance(vector, a->v()) > index_->compute_distance(vector, b->v());
-  // };
-  // std::priority_queue<VectorNode *, std::vector<VectorNode *>, decltype(comp)> min_heap(comp);
-  //
-  // int count                = 0;
-  // int weight_percentages[] = {10, 20, 40, 60, 80}; // 扫描比例数组
-  //
-  // // 遍历每个簇
-  // for (size_t i = 0; i < key_values->size(); ++i) {
-  //   auto &key_value_pair = key_values->at(i);
-  //   auto &nodes          = key_value_pair->second.value;
-  //   int   node_size      = nodes.size();
-  //
-  //   // 计算要扫描的向量数量
-  //   int scan_limit = static_cast<int>(node_size * (weight_percentages[i % 5] / 100.0));
-  //
-  //   for (int j = 0; j < scan_limit; ++j) {
-  //     auto &node = nodes[j];
-  //     count++;
-  //
-  //     if (min_heap.size() < this->limit_) {
-  //       // 如果堆未满，直接插入
-  //       min_heap.push(node);
-  //     } else if (comp(node, min_heap.top())) {
-  //       // 否则替换堆顶元素
-  //       min_heap.pop();
-  //       min_heap.push(node);
-  //     }
-  //   }
-  // }
-  //
-  // LOG_INFO("this query q %d", count);
-  //
-  // // 将堆中的元素添加到数据中并按距离排序
-  // this->data_.reserve(min_heap.size());
-  // while (!min_heap.empty()) {
-  //   this->data_.push_back(min_heap.top());
-  //   min_heap.pop();
-  // }
-  //
-  // // 不再需要排序，因为堆已按最近顺序组织
-  // delete key_values;
   return rc;
 }
 
@@ -474,7 +534,7 @@ RC IvfflatIndexScanner::next_entry(RID *rid)
   }
   pos++;
   // VectorNode *data = this->data_.at(pos);
-  *rid             = this->rids_[pos];
+  *rid = this->rids_[pos];
   return RC::SUCCESS;
 }
 

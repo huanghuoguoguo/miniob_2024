@@ -22,6 +22,10 @@ See the Mulan PSL v2 for more details. */
 struct IvfflatIndexValue;
 class VectorNode;
 struct IvfflatIndexKey;
+using Vector = std::vector<float>;
+using Matrix = std::vector<Vector*>;
+// 维护大小为limit的优先队列
+using DistanceRIDPair = std::pair<float, int>;
 /**
  * @brief ivfflat 向量索引
  * @ingroup Index
@@ -46,6 +50,7 @@ public:
 
     RC open(Table* table, const char* file_name, const IndexMeta& index_meta,
             const std::vector<const FieldMeta*>& field_meta) override;
+    void init_data();
 
     bool is_vector_index() override { return true; }
     vector<RID> ann_search(const vector<float>& base_vector, size_t limit);
@@ -74,7 +79,7 @@ public:
 private:
     RC create_internal(LogHandler& log_handler, BufferPoolManager& bpm, Table* table, const char* file_name);
     void initialize_clusters();
-
+    void kmeans(const Matrix& data, Matrix& centers, std::vector<int>& labels);
     void refresh_center(pair<IvfflatIndexKey, IvfflatIndexValue>& data);
 private:
     bool inited_ = false;
@@ -93,7 +98,10 @@ private:
     std::vector<VectorNode*> temp_data_;
     map<int, VectorNode*> nodes_;
     hnswlib::L2Space * space_;
-    hnswlib::HierarchicalNSW<float> * alg_hnsw_;
+    hnswlib::HierarchicalNSW<float> * key_hnsw_;
+    vector<hnswlib::HierarchicalNSW<float> *> hnsw_node_;
+    int M = 8;
+    int ef_construction = 160;
 };
 class IvfflatIndexScanner : public IndexScanner
 {
