@@ -144,13 +144,13 @@ void IvfflatIndex::init_data()
     this->key_hnsw_->addPoint(centers[i]->data(), i);
   }
   sql_debug("end init index data");
+  temp_data_.clear();
 }
 
 vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t limit)
 {
   if (!temp_data_.empty()) {
     init_data();
-    temp_data_.clear();
   }
   vector<RID> result;
   // 拿到最近的probes个桶放入keys后，从每个桶中获取到limit个条目。
@@ -167,6 +167,9 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t li
     auto value = key_queue.top();
     key_queue.pop();
     hnswlib::HierarchicalNSW<float> *                         need_search_node = this->hnsw_node_[value.second];
+    if(need_search_node == nullptr) {
+      continue;
+    }
     std::priority_queue<std::pair<float, hnswlib::labeltype>> priority_queue   = need_search_node->searchKnn(
         base_vector.data(),
         limit);

@@ -94,7 +94,6 @@ private:
     FunctionExpr::Type func_type_;
     bool init_data_ = false;
 
-    int max_elements_ = 60000;
     std::vector<VectorNode*> temp_data_;
     vector<RID> nodes_;
     hnswlib::L2Space* space_;

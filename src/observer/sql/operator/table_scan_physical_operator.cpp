@@ -42,13 +42,6 @@ RC TableScanPhysicalOperator::next()
       LOG_TRACE("record filtered failed=%s", strrc(rc));
       return rc;
     }
-
-    if (filter_result) {
-      // sql_debug("get a tuple: %s", tuple_.to_string().c_str());
-      break;
-    } else {
-      sql_debug("a tuple is filtered: %s", tuple_.to_string().c_str());
-    }
   }
   return rc;
 }
