@@ -5,10 +5,12 @@
 
 #include <queue>
 #include <random>
+#include <event/sql_debug.h>
 #include <sql/expr/tuple.h>
 #include <storage/db/db.h>
 #include <storage/table/table.h>
 #include "../../hnswlib/hnswlib.h"
+
 
 
 RC IvfflatIndex::create(Table *           table, const char *file_name, const IndexMeta &index_meta,
@@ -100,9 +102,10 @@ RC IvfflatIndex::open(Table *             table, const char *file_name, const In
 
 void IvfflatIndex::init_data()
 {
+  sql_debug("start init index data");
   // Initing index
   this->space_    = new hnswlib::L2Space(this->dim_);
-  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, M, ef_construction);
+  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, 16, 160);
   Matrix data(temp_data_.size(), nullptr);
   for (int i = 0; i < temp_data_.size(); ++i) {
     std::vector<float> &vector = temp_data_[i]->v();
@@ -116,6 +119,8 @@ void IvfflatIndex::init_data()
   }
   std::vector<int> labels(temp_data_.size(), -1);
   std::vector<int>             count = kmeans(data, centers, labels);
+
+  sql_debug("kmeans finished");
   // 经过聚类之后，得到了245个中心位置，以及60000个向量的标签。接下来就是构建245个索引，然后再构建1个索引用于索引245个索引。
   this->hnsw_node_.resize(this->lists_);
   // 将所有向量按照标签放入桶中。
@@ -138,6 +143,7 @@ void IvfflatIndex::init_data()
   for (int i = 0; i < this->lists_; i++) {
     this->key_hnsw_->addPoint(centers[i]->data(), i);
   }
+  sql_debug("end init index data");
 }
 
 vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t limit)
@@ -208,6 +214,10 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
   memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
   VectorNode *node = new VectorNode(vec, *rid);
   this->temp_data_.push_back(node);
+  if (temp_data_.size() == 60000) {
+    init_data();
+    temp_data_.clear();
+  }
   return rc;
 };
 
@@ -234,7 +244,12 @@ float IvfflatIndex::compute_distance(const vector<float> &left, const vector<flo
   Value value;
   switch (func_type_) {
     case FunctionExpr::Type::L2_DISTANCE: {
-      FunctionExpr::L2_DISTANCE(left, right, value);
+      float sum = 0.0f;
+      for (size_t i = 0; i < left.size(); ++i) {
+        float diff = left[i] - right[i];
+        sum += diff * diff;
+      }
+      return sum;
     }
     break;
     case FunctionExpr::Type::COSINE_DISTANCE: {

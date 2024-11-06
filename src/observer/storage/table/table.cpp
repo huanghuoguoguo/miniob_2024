@@ -31,6 +31,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/table/table.h"
 
 #include <regex>
+#include <event/sql_debug.h>
 #include <sql/expr/expression.h>
 #include <storage/index/ivfflat_index.h>
 
@@ -661,6 +662,7 @@ RC Table::create_index(Trx *trx, vector<unique_ptr<Expression>> &column_expressi
   while (OB_SUCC(rc = scanner.next(record))) {
     rc = index->insert_entry(record.data(), &record.rid());
     if (rc != RC::SUCCESS) {
+      sql_debug("insert entry failed");
       LOG_WARN("failed to insert record into index while creating index. table=%s, index=%s, rc=%s",
           name(),
           index_name,

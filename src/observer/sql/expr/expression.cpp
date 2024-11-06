@@ -982,7 +982,8 @@ void FunctionExpr::L2_DISTANCE(const vector<float> &left,const vector<float> &ri
     float diff = left[i] - right[i];
     sum += diff * diff;
   }
-  value      = Value(sum);
+  float sqrt = std::sqrt(sum);
+  value      = Value(sqrt);
 }
 
 void FunctionExpr::COSINE_DISTANCE(const vector<float> &left,const vector<float> &right, Value &value)

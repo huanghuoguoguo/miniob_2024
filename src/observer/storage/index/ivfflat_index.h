@@ -13,10 +13,8 @@ See the Mulan PSL v2 for more details. */
 #include <storage/db/db.h>
 
 #include <utility>
-#include <unordered_map>
 #include <hnswlib/space_l2.h>
 #include <sql/expr/expression.h>
-
 #include "storage/index/index.h"
 
 struct IvfflatIndexValue;
@@ -33,7 +31,7 @@ using DistanceRIDPair = std::pair<float, int>;
 class IvfflatIndex : public Index
 {
 public:
-    IvfflatIndex(int lists, int probes,string func_name)
+    IvfflatIndex(int lists, int probes, string func_name)
     {
         this->lists_ = lists;
         this->probes_ = probes;
@@ -72,14 +70,17 @@ public:
     {
         lists_ = lists;
     }
+
     void probes(int probes)
     {
         probes_ = probes;
     };
-    float compute_distance(const vector<float> &left, const vector<float> &right);
+    float compute_distance(const vector<float>& left, const vector<float>& right);
+
 private:
     RC create_internal(LogHandler& log_handler, BufferPoolManager& bpm, Table* table, const char* file_name);
     std::vector<int> kmeans(const Matrix& data, Matrix& centers, std::vector<int>& labels);
+
 private:
     bool inited_ = false;
     Table* table_ = nullptr;
@@ -96,24 +97,25 @@ private:
     int max_elements_ = 60000;
     std::vector<VectorNode*> temp_data_;
     vector<RID> nodes_;
-    hnswlib::L2Space * space_;
-    hnswlib::HierarchicalNSW<float> * key_hnsw_;
-    vector<hnswlib::HierarchicalNSW<float> *> hnsw_node_;
-    int M = 8;
-    int ef_construction = 160;
+    hnswlib::L2Space* space_;
+    hnswlib::HierarchicalNSW<float>* key_hnsw_;
+    vector<hnswlib::HierarchicalNSW<float>*> hnsw_node_;
+    int M = 6;
+    int ef_construction = 100;
 };
+
 class IvfflatIndexScanner : public IndexScanner
 {
 public:
     explicit IvfflatIndexScanner(IvfflatIndex* index);
     ~IvfflatIndexScanner() noexcept override;
 
-    RC next_entry(RID *rid) override;
+    RC next_entry(RID* rid) override;
     RC destroy() override;
 
     // open的时候找到所有的值吧应该。
-    RC open(const char *left_key, int left_len, bool left_inclusive, const char *right_key, int right_len,
-        bool right_inclusive);
+    RC open(const char* left_key, int left_len, bool left_inclusive, const char* right_key, int right_len,
+            bool right_inclusive);
 
 private:
     // 记录扫描位置。
@@ -135,8 +137,8 @@ public:
  */
 class VectorNode
 {
-    public:
-    VectorNode(std::vector<float>& v,RID rid)
+public:
+    VectorNode(std::vector<float>& v, RID rid)
     {
         v_ = std::move(v);
         rid_ = rid;
@@ -148,25 +150,25 @@ class VectorNode
 
     std::vector<float>& v()
     {
-      return v_;
+        return v_;
     }
 
-    void v(const std::vector<float> &v)
+    void v(const std::vector<float>& v)
     {
-      v_ = v;
+        v_ = v;
     }
 
     RID& rid()
     {
-      return rid_;
+        return rid_;
     }
 
-    void rid(const RID &rid)
+    void rid(const RID& rid)
     {
-      rid_ = rid;
+        rid_ = rid;
     }
 
-  private:
+private:
     std::vector<float> v_;
     RID rid_;
 };

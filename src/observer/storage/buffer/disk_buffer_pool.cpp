@@ -401,8 +401,8 @@ RC DiskBufferPool::allocate_page(Frame **frame)
     return rc;
   }
 
-  LOG_INFO("allocate new page. file=%s, pageNum=%d, pin=%d",
-           file_name_.c_str(), page_num, allocated_frame->pin_count());
+  // LOG_INFO("allocate new page. file=%s, pageNum=%d, pin=%d",
+  //          file_name_.c_str(), page_num, allocated_frame->pin_count());
 
   file_header_->allocated_pages++;
   file_header_->page_count++;
