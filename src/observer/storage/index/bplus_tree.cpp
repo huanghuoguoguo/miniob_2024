@@ -1305,7 +1305,7 @@ RC BplusTreeHandler::insert_entry_into_leaf_node(BplusTreeMiniTransaction &mtr, 
     // 和比较方式有关，如果比较方式是精确到rid，那么只有rid也相等才会返回真。
     // 在唯一索引中需要找到一个方法，能够不比较rid，只找值比较。就返回存在。
     LOG_TRACE("entry exists");
-    return RC::RECORD_DUPLICATE_KEY;
+    // return RC::RECORD_DUPLICATE_KEY;
   }
 
   if (leaf_node.size() < leaf_node.max_size()) {

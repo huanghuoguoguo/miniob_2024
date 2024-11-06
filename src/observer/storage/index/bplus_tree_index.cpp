@@ -130,7 +130,7 @@ RC BplusTreeIndex::insert_entry(const char *record, const RID *rid)
   execute_real_data(record, rid, total_len, entry_data);
 
   // 如果不是唯一索引，不需要检查唯一性。
-  if (index_meta_.is_unique()) {
+  if (field_meta_[0]->offset() == 0 && index_meta_.is_unique()) {
     list<RID> rids;
     // get_entry,感觉加入rid的比较还是很有必要的，能够确定是否是同一记录，但是现在还需要实现的是，根据键值找到值。
     index_handler_.get_entry(entry_data, total_len, rids);
