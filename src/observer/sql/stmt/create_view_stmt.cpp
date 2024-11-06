@@ -61,7 +61,7 @@ RC CreateViewStmt::create(Db *db, CreateViewSqlNode &create_view, Stmt *&stmt)
   view_stmt->query_expressions_.swap(bound_expressions);
   stmt = view_stmt;
 
-  sql_debug("create view statement: table name %s", create_view.view_name.c_str());
+  // sql_debug("create view statement: table name %s", create_view.view_name.c_str());
 
   return rc;
 }

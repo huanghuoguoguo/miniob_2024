@@ -144,8 +144,7 @@ public:
     };
 
     virtual ~VectorNode() noexcept
-    {
-    };
+    = default;
 
     std::vector<float>& v()
     {

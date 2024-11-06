@@ -2,7 +2,7 @@
 // Created by glwuy on 24-11-1.
 //
 #include "storage/index/ivfflat_index.h"
-
+// #include "memtracer/mt_info.h"
 #include <queue>
 #include <random>
 #include <event/sql_debug.h>
@@ -78,7 +78,9 @@ RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm
   // 这个后面构造rowtuple然后获取值。
   FunctionExpr::type_from_string(this->func_name_.c_str(), this->func_type_);
 
-
+  if(this->lists_>200) {
+    this->lists_ = 60;
+  }
 
   // 初始化完成。
 
@@ -102,10 +104,11 @@ RC IvfflatIndex::open(Table *             table, const char *file_name, const In
 
 void IvfflatIndex::init_data()
 {
+  // LOG_ERROR("parse sql , allocated: %lu\n", memtracer::allocated_memory());
   sql_debug("start init index data");
   // Initing index
   this->space_    = new hnswlib::L2Space(this->dim_);
-  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, 16, 160);
+  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, 6, 120);
   Matrix data(temp_data_.size(), nullptr);
   for (int i = 0; i < temp_data_.size(); ++i) {
     std::vector<float> &vector = temp_data_[i]->v();
@@ -217,6 +220,9 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
   memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
   VectorNode *node = new VectorNode(vec, *rid);
   this->temp_data_.push_back(node);
+  if (temp_data_.size() == 30000) {
+    LOG_INFO("dd");
+  }
   if (temp_data_.size() == 60000) {
     init_data();
     temp_data_.clear();

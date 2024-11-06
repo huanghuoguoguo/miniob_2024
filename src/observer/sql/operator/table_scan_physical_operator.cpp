@@ -42,6 +42,9 @@ RC TableScanPhysicalOperator::next()
       LOG_TRACE("record filtered failed=%s", strrc(rc));
       return rc;
     }
+    if (filter_result) {
+      break;
+    }
   }
   return rc;
 }
