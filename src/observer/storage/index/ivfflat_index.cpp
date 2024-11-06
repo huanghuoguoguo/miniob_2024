@@ -76,9 +76,7 @@ RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm
   // 这个后面构造rowtuple然后获取值。
   FunctionExpr::type_from_string(this->func_name_.c_str(), this->func_type_);
 
-  // Initing index
-  this->space_    = new hnswlib::L2Space(this->dim_);
-  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, M, ef_construction);
+
 
   // 初始化完成。
 
@@ -102,47 +100,51 @@ RC IvfflatIndex::open(Table *             table, const char *file_name, const In
 
 void IvfflatIndex::init_data()
 {
+  // Initing index
+  this->space_    = new hnswlib::L2Space(this->dim_);
+  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, M, ef_construction);
   Matrix data(temp_data_.size(), nullptr);
   for (int i = 0; i < temp_data_.size(); ++i) {
     std::vector<float> &vector = temp_data_[i]->v();
     data[i]                    = &vector;
   }
-
+  this->nodes_.resize(temp_data_.size());
   // 聚类中心和标签
   Matrix centers(this->lists_);
   for (auto i = 0; i < this->lists_; ++i) {
     centers[i] = new Vector(this->dim_);
   }
   std::vector<int> labels(temp_data_.size(), -1);
-  kmeans(data, centers, labels);
+  std::vector<int>             count = kmeans(data, centers, labels);
   // 经过聚类之后，得到了245个中心位置，以及60000个向量的标签。接下来就是构建245个索引，然后再构建1个索引用于索引245个索引。
   this->hnsw_node_.resize(this->lists_);
-  for (int i = 0; i < this->lists_; ++i) {
-    hnswlib::L2Space * l2_space       = new hnswlib::L2Space(this->dim_);
-    this->hnsw_node_[i] = new hnswlib::HierarchicalNSW<float>(l2_space,
-        5 * this->lists_,
-        this->M,
-        this->ef_construction);
-  }
   // 将所有向量按照标签放入桶中。
   for (int i = 0; i < this->temp_data_.size(); ++i) {
-    int         label = labels[i];
-    VectorNode *node  = temp_data_.at(i);
-    this->hnsw_node_[label]->addPoint(node->v().data(), i);
-    this->nodes_.emplace(i, node->rid());
+    int         label            = labels[i];
+    VectorNode *node             = temp_data_.at(i);
+    hnswlib::HierarchicalNSW<float> * &hierarchical_nsw = this->hnsw_node_[label];
+    if(hierarchical_nsw == nullptr) {
+      this->hnsw_node_[label] = new hnswlib::HierarchicalNSW<float>(this->space_,
+        count[label],
+        this->M,
+        this->ef_construction);
+      hierarchical_nsw = this->hnsw_node_[label];
+    }
+    hierarchical_nsw->addPoint(node->v().data(), i);
+    this->nodes_[i] = node->rid();
     delete node;
   }
   // 构建key的桶。标签对应的是hnsw_node_中的桶。
   for (int i = 0; i < this->lists_; i++) {
     this->key_hnsw_->addPoint(centers[i]->data(), i);
   }
-  temp_data_.clear();
 }
 
 vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t limit)
 {
   if (!temp_data_.empty()) {
     init_data();
+    temp_data_.clear();
   }
   vector<RID> result;
   // 拿到最近的probes个桶放入keys后，从每个桶中获取到limit个条目。
@@ -205,11 +207,7 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
   // 使用 float_data 和 float_count 初始化 vector<float>
   memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
   VectorNode *node = new VectorNode(vec, *rid);
-  this->temp_data_.emplace_back(node);
-  if (this->temp_data_.size() == 60000) {
-    init_data();
-    this->init_data_ = true;
-  }
+  this->temp_data_.push_back(node);
   return rc;
 };
 
@@ -254,7 +252,7 @@ float IvfflatIndex::compute_distance(const vector<float> &left, const vector<flo
   return value.get_float();
 }
 
-void IvfflatIndex::kmeans(const Matrix &data, Matrix &centers, std::vector<int> &labels)
+std::vector<int> IvfflatIndex::kmeans(const Matrix &data, Matrix &centers, std::vector<int> &labels)
 {
   const int NUM_CLUSTERS = this->lists_;
 
@@ -268,7 +266,7 @@ void IvfflatIndex::kmeans(const Matrix &data, Matrix &centers, std::vector<int> 
     centers[i] = data[std::rand() % num_samples];
   }
 
-  for (int iter = 0; iter < 1; ++iter) {
+  for (int iter = 0; iter < 2; ++iter) {
     changed = false;
 
     // 分配标签
@@ -317,6 +315,7 @@ void IvfflatIndex::kmeans(const Matrix &data, Matrix &centers, std::vector<int> 
       break;
     }
   }
+  return counts;
 }
 
 

@@ -79,7 +79,7 @@ public:
     float compute_distance(const vector<float> &left, const vector<float> &right);
 private:
     RC create_internal(LogHandler& log_handler, BufferPoolManager& bpm, Table* table, const char* file_name);
-    void kmeans(const Matrix& data, Matrix& centers, std::vector<int>& labels);
+    std::vector<int> kmeans(const Matrix& data, Matrix& centers, std::vector<int>& labels);
 private:
     bool inited_ = false;
     Table* table_ = nullptr;
@@ -95,12 +95,12 @@ private:
 
     int max_elements_ = 60000;
     std::vector<VectorNode*> temp_data_;
-    map<int, RID> nodes_;
+    vector<RID> nodes_;
     hnswlib::L2Space * space_;
     hnswlib::HierarchicalNSW<float> * key_hnsw_;
     vector<hnswlib::HierarchicalNSW<float> *> hnsw_node_;
-    int M = 30;
-    int ef_construction = 200;
+    int M = 8;
+    int ef_construction = 160;
 };
 class IvfflatIndexScanner : public IndexScanner
 {
@@ -138,7 +138,6 @@ class VectorNode
     public:
     VectorNode(std::vector<float>& v,RID rid)
     {
-        v_.resize(v.size());
         v_ = std::move(v);
         rid_ = rid;
     };
