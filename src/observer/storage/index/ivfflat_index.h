@@ -97,7 +97,7 @@ private:
     hnswlib::L2Space * space_;
     hnswlib::HierarchicalNSW<float> * key_hnsw_;
     vector<hnswlib::HierarchicalNSW<float> *> hnsw_node_;
-    int M = 8;
+    int M = 30;
     int ef_construction = 160;
 };
 class IvfflatIndexScanner : public IndexScanner
