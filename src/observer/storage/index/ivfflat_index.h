@@ -17,9 +17,9 @@ See the Mulan PSL v2 for more details. */
 #include <sql/expr/expression.h>
 #include "storage/index/index.h"
 
-struct IvfflatIndexValue;
+
 class VectorNode;
-struct IvfflatIndexKey;
+
 using Vector = std::vector<float>;
 using Matrix = std::vector<Vector*>;
 // 维护大小为limit的优先队列
@@ -99,8 +99,8 @@ private:
     hnswlib::L2Space* space_;
     hnswlib::HierarchicalNSW<float>* key_hnsw_;
     vector<hnswlib::HierarchicalNSW<float>*> hnsw_node_;
-    int M = 6;
-    int ef_construction = 100;
+    int M = 12;
+    int ef_construction = 120;
 };
 
 class IvfflatIndexScanner : public IndexScanner
@@ -120,7 +120,6 @@ private:
     // 记录扫描位置。
     IvfflatIndex* index_ = nullptr;
     int pos = -1;
-    std::vector<VectorNode*> data_;
     std::vector<RID> rids_;
     int limit_ = -1;
 

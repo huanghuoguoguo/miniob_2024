@@ -79,7 +79,7 @@ RC IvfflatIndex::create_internal(LogHandler &log_handler, BufferPoolManager &bpm
   FunctionExpr::type_from_string(this->func_name_.c_str(), this->func_type_);
 
   if(this->lists_>200) {
-    this->lists_ = 60;
+    this->lists_ = 40;
   }
 
   // 初始化完成。
@@ -108,7 +108,7 @@ void IvfflatIndex::init_data()
   sql_debug("start init index data");
   // Initing index
   this->space_    = new hnswlib::L2Space(this->dim_);
-  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, 6, 120);
+  this->key_hnsw_ = new hnswlib::HierarchicalNSW<float>(this->space_, this->lists_, 12, 120);
   Matrix data(temp_data_.size(), nullptr);
   for (int i = 0; i < temp_data_.size(); ++i) {
     std::vector<float> &vector = temp_data_[i]->v();
@@ -215,14 +215,10 @@ RC IvfflatIndex::insert_entry(const char *record, const RID *rid)
   RC rc = RC::SUCCESS;
   // 将数据 reinterpret_cast 为 float* 并计算 float 数量
   std::vector<float> vec(this->key_field_meta_->len() / sizeof(float));
-
   // 使用 float_data 和 float_count 初始化 vector<float>
   memcpy(vec.data(), record + this->key_field_meta_->offset(), this->key_field_meta_->len());
   VectorNode *node = new VectorNode(vec, *rid);
   this->temp_data_.push_back(node);
-  if (temp_data_.size() == 30000) {
-    LOG_INFO("dd");
-  }
   if (temp_data_.size() == 60000) {
     init_data();
     temp_data_.clear();
@@ -387,13 +383,11 @@ RC IvfflatIndexScanner::next_entry(RID *rid)
     return RC::RECORD_EOF;
   }
   pos++;
-  // VectorNode *data = this->data_.at(pos);
   *rid = this->rids_[pos];
   return RC::SUCCESS;
 }
 
 RC IvfflatIndexScanner::destroy()
 {
-  this->data_.clear();
   return RC::SUCCESS;
 }
