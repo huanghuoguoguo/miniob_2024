@@ -21,7 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
-InsertStmt::InsertStmt(Table *table, const Value *values, int value_amount)
+InsertStmt::InsertStmt(Table *table, std::vector<Value>* values, int value_amount)
   : table_(table),
     values_(values),
     value_amount_(value_amount)
@@ -179,6 +179,6 @@ RC InsertStmt::create(Db *db, InsertSqlNode &inserts, Stmt *&stmt)
 
   // everything alright
 
-  stmt = new InsertStmt(table, values_data->data(), value_num);
+  stmt = new InsertStmt(table, values_data, value_num);
   return RC::SUCCESS;
 }

@@ -858,7 +858,7 @@ expression:
     | value {
       $$ = new ValueExpr(*$1);
       $$->set_name(token_name(sql_string, &@$));
-
+      delete $1;
     }
     | rel_attr {
       RelAttrSqlNode *node = $1;

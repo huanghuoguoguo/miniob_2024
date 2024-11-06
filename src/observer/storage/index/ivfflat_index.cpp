@@ -129,7 +129,8 @@ void IvfflatIndex::init_data()
     int         label = labels[i];
     VectorNode *node  = temp_data_.at(i);
     this->hnsw_node_[label]->addPoint(node->v().data(), i);
-    this->nodes_.emplace(i, node);
+    this->nodes_.emplace(i, node->rid());
+    delete node;
   }
   // 构建key的桶。标签对应的是hnsw_node_中的桶。
   for (int i = 0; i < this->lists_; i++) {
@@ -183,7 +184,7 @@ vector<RID> IvfflatIndex::ann_search(const vector<float> &base_vector, size_t li
   // 将结果从最大堆中提取出来
   while (!max_heap.empty()) {
     int second = max_heap.top().second;
-    result.push_back(this->nodes_[second]->rid()); // 获取RID
+    result.push_back(this->nodes_[second]); // 获取RID
     max_heap.pop();
   }
 

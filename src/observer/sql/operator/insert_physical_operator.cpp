@@ -27,6 +27,7 @@ RC InsertPhysicalOperator::open(Trx *trx)
 {
   Record record;
   RC     rc = table_->make_record(static_cast<int>(values_.size()), values_.data(), record);
+
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to make record. rc=%s", strrc(rc));
     return rc;

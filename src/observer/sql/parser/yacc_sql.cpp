@@ -2708,7 +2708,7 @@ yyreduce:
             {
       (yyval.expression) = new ValueExpr(*(yyvsp[0].value));
       (yyval.expression)->set_name(token_name(sql_string, &(yyloc)));
-
+      delete (yyvsp[0].value);
     }
 #line 2714 "yacc_sql.cpp"
     break;

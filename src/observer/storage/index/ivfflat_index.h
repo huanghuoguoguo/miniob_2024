@@ -42,6 +42,8 @@ public:
 
     virtual ~IvfflatIndex() noexcept
     {
+        delete space_;
+        delete key_hnsw_;
     };
 
 
@@ -93,12 +95,12 @@ private:
 
     int max_elements_ = 60000;
     std::vector<VectorNode*> temp_data_;
-    map<int, VectorNode*> nodes_;
+    map<int, RID> nodes_;
     hnswlib::L2Space * space_;
     hnswlib::HierarchicalNSW<float> * key_hnsw_;
     vector<hnswlib::HierarchicalNSW<float> *> hnsw_node_;
     int M = 30;
-    int ef_construction = 160;
+    int ef_construction = 200;
 };
 class IvfflatIndexScanner : public IndexScanner
 {
