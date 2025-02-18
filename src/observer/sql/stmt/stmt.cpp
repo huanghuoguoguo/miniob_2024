@@ -70,11 +70,11 @@ RC Stmt::create_stmt(Db *db, ParsedSqlNode &sql_node, Stmt *&stmt)
     }
 
     case SCF_CREATE_TABLE: {
-      return DropTableStmt::create(db, sql_node.drop_table, stmt);
+      return CreateTableStmt::create(db, sql_node.create_table, stmt);
     }
 
     case SCF_DROP_TABLE: {
-      return CreateTableStmt::create(db, sql_node.create_table, stmt);
+      return DropTableStmt::create(db, sql_node.drop_table, stmt);
     }
 
     case SCF_DESC_TABLE: {
