@@ -161,6 +161,45 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   return RC::SUCCESS;
 }
 
+RC Db::drop_table(const char *table_name)
+{
+  // 检查一下表存不存在
+  if (opened_tables_.count(table_name) == 0) {
+    LOG_WARN("%s do not exist.", table_name);
+    return RC::SCHEMA_TABLE_NOT_EXIST;
+  }
+
+  // 找到要删除的表
+  Table *table = opened_tables_[table_name];
+  // 从opened_tables_删除表
+  opened_tables_.erase(table_name);
+  delete table;
+
+  // 获取表的元数据文件路径
+  string table_meta_path = table_meta_file(path_.c_str(), table_name);
+
+  // 获取表的实际数据文件路径
+  string table_data_path = table_data_file(path_.c_str(), table_name);
+
+  // 删除元数据文件
+  if (std::remove(table_meta_path.c_str()) != 0) {
+    // 如果删除失败，输出错误信息
+    LOG_INFO("Error deleting metadata file for %s .",table_name);
+    return RC::IOERR_UNREMOVE;
+  }
+  LOG_INFO("Metadata file: %s deleted successfully.",table_meta_path.c_str());
+
+  // 删除数据文件
+  if (std::remove(table_data_path.c_str()) != 0) {
+    // 如果删除失败，输出错误信息
+    LOG_INFO("Error deleting data file for %s .",table_name);
+    return RC::IOERR_UNREMOVE;
+  }
+  LOG_INFO("Metadata file: %s deleted successfully.",table_data_path.c_str());
+
+  return RC::SUCCESS;
+}
+
 Table *Db::find_table(const char *table_name) const
 {
   unordered_map<string, Table *>::const_iterator iter = opened_tables_.find(table_name);

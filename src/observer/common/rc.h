@@ -57,6 +57,7 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(IOERR_OPEN)                  \
   DEFINE_RC(IOERR_CLOSE)                 \
   DEFINE_RC(IOERR_SEEK)                  \
+  DEFINE_RC(IOERR_UNREMOVE)              \
   DEFINE_RC(IOERR_TOO_LONG)              \
   DEFINE_RC(IOERR_SYNC)                  \
   DEFINE_RC(LOCKED_UNLOCK)               \
