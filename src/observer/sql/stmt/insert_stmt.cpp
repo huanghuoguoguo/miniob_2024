@@ -47,6 +47,18 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
     return RC::SCHEMA_FIELD_MISSING;
   }
 
+  // 不能为null的值为null insert into t1 values(null)
+  const std::vector<FieldMeta> *field_metas = table_meta.field_metas();
+  for (unsigned long i = 0; i < field_metas->size() - table_meta.sys_field_num(); ++i) {
+    const FieldMeta &field_meta = field_metas->at(i + table_meta.sys_field_num());
+    Value            value      = values[i];
+    if (field_meta.nullable() == false && value.is_null()) {
+      LOG_WARN("schema mismatch. null field=%d", field_meta.name());
+      return RC::SCHEMA_FIELD_TYPE_MISMATCH;
+    }
+  }
+
+
   // everything alright
   stmt = new InsertStmt(table, values, value_num);
   return RC::SUCCESS;
