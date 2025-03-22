@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/value.h"
 
 class Expression;
-
+struct RelationSqlNode;
 /**
  * @defgroup SQLParser SQL Parser
  */
@@ -52,6 +52,13 @@ enum CompOp
   GREAT_THAN,   ///< ">"
   NO_OP
 };
+
+enum JoinOp
+{
+  INNER_JOIN,
+  JOIN_NO_OP
+};
+
 
 /**
  * @brief 表示一个条件比较
@@ -88,9 +95,21 @@ struct ConditionSqlNode
 struct SelectSqlNode
 {
   vector<unique_ptr<Expression>> expressions;  ///< 查询的表达式
-  vector<string>                 relations;    ///< 查询的表
+  vector<RelationSqlNode>        relations;    ///< 查询的表
   vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
   vector<unique_ptr<Expression>> group_by;     ///< group by clause
+};
+
+
+/**
+ * 表示一个join relation列表
+ */
+struct RelationSqlNode
+{
+  std::vector<ConditionSqlNode>             conditions;  ///< 查询的表达式 on子句的内容
+  std::string                               relation;    ///< 连接的表 左表
+  std::string                               join_relation;    ///< 连接的表 右表
+  JoinOp                                    op = JOIN_NO_OP;    ///< 连接方式 inner join,left join,right join,join TODO 暂时只实现 inner join
 };
 
 /**

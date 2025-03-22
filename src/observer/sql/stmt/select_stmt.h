@@ -17,6 +17,8 @@ See the Mulan PSL v2 for more details. */
 #include "common/sys/rc.h"
 #include "sql/stmt/stmt.h"
 #include "storage/field/field.h"
+#include <unordered_map>
+#include <sql/parser/expression_binder.h>
 
 class FieldMeta;
 class FilterStmt;
@@ -31,7 +33,8 @@ class SelectStmt : public Stmt
 {
 public:
   SelectStmt() = default;
-  ~SelectStmt() override;
+  ~           SelectStmt() override;
+
 
   StmtType type() const override { return StmtType::SELECT; }
 
@@ -41,13 +44,18 @@ public:
 public:
   const vector<Table *> &tables() const { return tables_; }
   FilterStmt            *filter_stmt() const { return filter_stmt_; }
-
+  std::vector<std::tuple<Table *, Table *, FilterStmt *>> join_filter_stmts() const {
+    return join_filter_stmts_;
+  }
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
 
 private:
+  static RC check_tabel(Db *db, BinderContext& binder_context, vector<Table *>& tables,
+      std::unordered_map<string, Table *>& table_map, size_t i, const char *table_name);
   vector<unique_ptr<Expression>> query_expressions_;
   vector<Table *>                tables_;
+  std::vector<std::tuple<Table *, Table *, FilterStmt *>> join_filter_stmts_;  // 小数据量，用vector即可。
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<unique_ptr<Expression>> group_by_;
 };

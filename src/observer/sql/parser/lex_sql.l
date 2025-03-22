@@ -118,6 +118,8 @@ INFILE                                  RETURN_TOKEN(INFILE);
 EXPLAIN                                 RETURN_TOKEN(EXPLAIN);
 GROUP                                   RETURN_TOKEN(GROUP);
 BY                                      RETURN_TOKEN(BY);
+JOIN                                    RETURN_TOKEN(JOIN);
+INNER                                   RETURN_TOKEN(INNER);
 STORAGE                                 RETURN_TOKEN(STORAGE);
 FORMAT                                  RETURN_TOKEN(FORMAT);
 {ID}                                    yylval->cstring=strdup(yytext); static_cast<std::vector<char*>*>(yyextra)->push_back(yylval->cstring); RETURN_TOKEN(ID);
@@ -132,6 +134,7 @@ FORMAT                                  RETURN_TOKEN(FORMAT);
 "<"                                     RETURN_TOKEN(LT);
 ">="                                    RETURN_TOKEN(GE);
 ">"                                     RETURN_TOKEN(GT);
+
 
 "+" |
 "-" |

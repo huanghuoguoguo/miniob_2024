@@ -111,6 +111,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LE
         GE
         NE
+        JOIN
+        INNER
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -126,10 +128,12 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
   vector<Value> *                       value_list;
   vector<ConditionSqlNode> *            condition_list;
   vector<RelAttrSqlNode> *              rel_attr_list;
-  vector<string> *                 relation_list;
+  vector<RelationSqlNode> *                 relation_list;
   char *                                     cstring;
   int                                        number;
   float                                      floats;
+  enum JoinOp                                join;
+  RelationSqlNode *                          relation;
 }
 
 %token <number> NUMBER
@@ -143,8 +147,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
-%type <cstring>             relation
+%type <relation>            relation
 %type <comp>                comp_op
+%type <join>                join_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
 %type <attr_info>           attr_def
@@ -455,8 +460,11 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.group_by.swap(*$6);
         delete $6;
       }
+
     }
     ;
+
+
 calc_stmt:
     CALC expression_list
     {
@@ -530,25 +538,37 @@ rel_attr:
       $$->attribute_name = $3;
     }
     ;
+join_op:
+    JOIN {
+      $$ = INNER_JOIN;
+    }
+    | INNER JOIN {
+      $$ = INNER_JOIN;
+    }
+    ;
 
 relation:
     ID {
-      $$ = $1;
+      $$ = new RelationSqlNode;
+      $$->relation = $1;
     }
+    | ID join_op ID ON condition_list {
+       $$ = new RelationSqlNode;
+       $$->relation = $1;
+       $$->join_relation = $3;
+       $$->op = $2;
+       $$->conditions.swap(*$5);
+     }
     ;
+
 rel_list:
     relation {
-      $$ = new vector<string>();
-      $$->push_back($1);
+      $$ = new vector<RelationSqlNode>();
+      $$->push_back(*$1);
     }
-    | relation COMMA rel_list {
-      if ($3 != nullptr) {
-        $$ = $3;
-      } else {
-        $$ = new vector<string>;
-      }
-
-      $$->insert($$->begin(), $1);
+    | rel_list COMMA relation {
+      $$ = $1;
+      $$->push_back(*$3);
     }
     ;
 
