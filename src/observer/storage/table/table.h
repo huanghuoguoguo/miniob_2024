@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/types.h"
 #include "common/lang/span.h"
 #include "common/lang/functional.h"
+#include <bitset>
 
 struct RID;
 class Record;

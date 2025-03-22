@@ -124,7 +124,10 @@ void Value::set_data(char *data, int length)
     case AttrType::BOOLEANS: {
       value_.bool_value_ = *(int *)data != 0;
       length_            = length;
-    } break;
+    }  break;
+    case AttrType::NULL_: {
+
+    }
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -212,15 +215,24 @@ const char *Value::data() const
     case AttrType::CHARS: {
       return value_.pointer_value_;
     } break;
+    case AttrType::NULL_: {
+      return nullptr;
+    } break;
     default: {
       return (const char *)&value_;
     } break;
   }
 }
 
+bool Value::is_null() const { return this->attr_type_ == AttrType::NULL_; }
+
 string Value::to_string() const
 {
   string res;
+  if(this->is_null()) {
+    res = "NULL";
+    return res;
+  }
   RC     rc = DataType::type_instance(this->attr_type_)->to_string(*this, res);
   if (OB_FAIL(rc)) {
     LOG_WARN("failed to convert value to string. type=%s", attr_type_to_string(this->attr_type_));
