@@ -19,6 +19,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
+#include <common/lang/defer.h>
+
 FilterStmt::~FilterStmt()
 {
   for (FilterUnit *unit : filter_units_) {
@@ -78,7 +80,7 @@ RC get_table_and_field(Db *db, Table *default_table, unordered_map<string, Table
   return RC::SUCCESS;
 }
 
-RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<string, Table *> *tables,
+RC FilterStmt::create_filter_unit(Db *db, Table *default_table, std::unordered_map<std::string, Table *> *tables,
     const ConditionSqlNode &condition, FilterUnit *&filter_unit)
 {
   RC rc = RC::SUCCESS;
@@ -89,44 +91,31 @@ RC FilterStmt::create_filter_unit(Db *db, Table *default_table, unordered_map<st
     return RC::INVALID_ARGUMENT;
   }
 
-  filter_unit = new FilterUnit;
-
-  if (condition.left_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.left_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
+  filter_unit = new FilterUnit; //filterUnit 左右应该都是表达式
+  DEFER([&](){
+    if (RC::SUCCESS != rc && nullptr != filter_unit) {
+      delete filter_unit;
+      filter_unit = nullptr;
     }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_left(filter_obj);
-  } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.left_value);
-    filter_unit->set_left(filter_obj);
+  });
+
+  const std::vector<Table *> table_arr; // 因为条件表达式里的 FieldExpr 一定是 t1.c1 所以传入个空的 table vector 就行
+  rc = condition.left_expr->check_field(*tables, table_arr, db, default_table);
+  if(rc != RC::SUCCESS ) {
+    LOG_WARN("filter_stmt check_field lhs expression error");
+    return rc;
+  }
+  rc = condition.right_expr->check_field(*tables, table_arr, db, default_table);
+  if(rc != RC::SUCCESS) {
+    LOG_WARN("filter_stmt check_field rhs expression error");
+    return rc;
   }
 
-  if (condition.right_is_attr) {
-    Table           *table = nullptr;
-    const FieldMeta *field = nullptr;
-    rc                     = get_table_and_field(db, default_table, tables, condition.right_attr, table, field);
-    if (rc != RC::SUCCESS) {
-      LOG_WARN("cannot find attr");
-      return rc;
-    }
-    FilterObj filter_obj;
-    filter_obj.init_attr(Field(table, field));
-    filter_unit->set_right(filter_obj);
-  } else {
-    FilterObj filter_obj;
-    filter_obj.init_value(condition.right_value);
-    filter_unit->set_right(filter_obj);
-  }
-
+  filter_unit->set_left(std::unique_ptr<Expression>(condition.left_expr));
+  // condition.left_expr = nullptr;
+  filter_unit->set_right(std::unique_ptr<Expression>(condition.right_expr));
+  // condition.right_expr = nullptr;
   filter_unit->set_comp(comp);
-
   // 检查两个类型是否能够比较
   return rc;
 }

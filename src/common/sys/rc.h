@@ -27,6 +27,7 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(INTERNAL)                    \
   DEFINE_RC(NOMEM)                       \
   DEFINE_RC(NOTFOUND)                    \
+  DEFINE_RC(DIVIDE_ZERO)                 \
   DEFINE_RC(EMPTY)                       \
   DEFINE_RC(FULL)                        \
   DEFINE_RC(EXIST)                       \
