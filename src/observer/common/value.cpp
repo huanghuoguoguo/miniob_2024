@@ -126,7 +126,7 @@ void Value::set_data(char *data, int length)
       length_            = length;
     } break;
     default: {
-      LOG_WARN("unknown data type: %d", attr_type_);
+      set_type(AttrType::UNDEFINED);
     } break;
   }
 }
@@ -190,9 +190,13 @@ void Value::set_value(const Value &value)
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
-    default: {
-      ASSERT(false, "got an invalid value type");
-    } break;
+    case AttrType::UNDEFINED: {
+      // null
+      set_type(AttrType::UNDEFINED);
+    }default: {
+
+    }
+    break;
   }
 }
 
@@ -288,6 +292,11 @@ float Value::get_float() const
 }
 
 string Value::get_string() const { return this->to_string(); }
+
+vector<Value *> *Value::get_list() const
+{
+  return this->values_;
+}
 
 bool Value::get_boolean() const
 {

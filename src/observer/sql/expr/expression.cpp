@@ -15,6 +15,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/expr/expression.h"
 #include "sql/expr/tuple.h"
 #include "sql/expr/arithmetic_operator.hpp"
+#include <common/type/list_type.h>
+#include <sql/operator/project_physical_operator.h>
 
 using namespace std;
 
@@ -121,8 +123,13 @@ ComparisonExpr::~ComparisonExpr() {}
 RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &result) const
 {
   RC  rc         = RC::SUCCESS;
+  // 子查询的比较右值必须为1个。
+  if(right.get_list() && right.get_list()->size() > 1) {
+    return RC::SUB_QUERY_NUILTI_COLUMN;
+  }
   int cmp_result = left.compare(right);
   result         = false;
+
   switch (comp_) {
     case EQUAL_TO: {
       result = (0 == cmp_result);
@@ -141,6 +148,38 @@ RC ComparisonExpr::compare_value(const Value &left, const Value &right, bool &re
     } break;
     case GREAT_THAN: {
       result = (cmp_result > 0);
+    } break;
+    case IN_: {
+      if (right.attr_type() == AttrType::UNDEFINED && right.get_list()) {
+        std::vector<Value *> *values = right.get_list();
+        for (auto &v : *values) {
+          if (0 == left.compare(*v)) {
+            result = true;
+            return rc;
+          }
+        }
+        // 比较值
+      } else {
+        // right是值，直接比较值是否相等。
+        result = (0 == left.compare(right));
+      }
+    }
+    break;
+    case NOT_IN: {
+      if (right.attr_type() == AttrType::UNDEFINED && right.get_list()) {
+        std::vector<Value *> *values = right.get_list();
+        for (auto &v : *values) {
+          if (0 == left.compare(*v)) {
+            result = false;
+            return rc;
+          }
+        }
+        result = true;
+        // 比较值
+      } else {
+        // right是值，直接比较值是否相等。
+        result = (0 != left.compare(right));
+      }
     } break;
     default: {
       LOG_WARN("unsupported comparison. %d", comp_);
@@ -585,4 +624,35 @@ RC AggregateExpr::type_from_string(const char *type_str, AggregateExpr::Type &ty
     rc = RC::INVALID_ARGUMENT;
   }
   return rc;
+}
+
+RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const
+{
+  RC rc = RC::SUCCESS;
+  // 首次运行将子查询的结果获取。
+  if (list_type_ == nullptr) {
+    this->list_type_                        = new ListType();
+    ProjectPhysicalOperator *project_phy_op = this->project_phy_op_;
+    if (project_phy_op->cell_num() > 1) {
+      project_phy_op->close();
+      return RC::SUB_QUERY_ERROR;
+    }
+    while (OB_SUCC(rc = project_phy_op->next())) {
+      Tuple *tuple = project_phy_op->current_tuple();
+      if (nullptr == tuple) {
+        LOG_WARN("failed to get current record: %s", strrc(rc));
+        return rc;
+      }
+      Value *value = new Value();
+      rc           = tuple->cell_at(0, *value);
+      list_type_->add_value(value);
+    }
+    if (this->list_type_->empty()) {
+      // 如果没有，提供默认null值。
+      this->list_type_->add_value(new Value());
+    }
+    project_phy_op->close();
+  }
+  list_type_->get_value(value);
+  return RC::SUCCESS;
 }

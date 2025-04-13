@@ -39,7 +39,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   }
 
   BinderContext binder_context;
-
+  binder_context.db(db);
   // collect tables in `from` statement
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;

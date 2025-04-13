@@ -111,6 +111,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LE
         GE
         NE
+        IN
+        NOT
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -497,7 +499,12 @@ expression:
     | '*' {
       $$ = new StarExpr();
     }
-    // your code here
+    | select_stmt {
+      $$ = new SubQueryExpr(&($1->selection));
+    }
+    | LBRACE expression_list RBRACE {
+      $$ = new SubQueryExpr($2);
+    }
     ;
 
 rel_attr:
@@ -575,6 +582,8 @@ comp_op:
     | LE { $$ = LESS_EQUAL; }
     | GE { $$ = GREAT_EQUAL; }
     | NE { $$ = NOT_EQUAL; }
+    | IN {  $$ = IN_;}
+    | NOT IN {  $$ = NOT_IN;}
     ;
 
 // your code here
