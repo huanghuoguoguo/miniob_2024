@@ -14,6 +14,8 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
+#include <string>
+
 #include "sql/stmt/stmt.h"
 
 struct CreateIndexSqlNode;
@@ -27,23 +29,31 @@ class FieldMeta;
 class CreateIndexStmt : public Stmt
 {
 public:
-  CreateIndexStmt(Table *table, const FieldMeta *field_meta, const string &index_name)
-      : table_(table), field_meta_(field_meta), index_name_(index_name)
+  CreateIndexStmt()
   {}
 
   virtual ~CreateIndexStmt() = default;
 
   StmtType type() const override { return StmtType::CREATE_INDEX; }
 
-  Table           *table() const { return table_; }
-  const FieldMeta *field_meta() const { return field_meta_; }
-  const string    &index_name() const { return index_name_; }
+  Table             *table() const { return table_; }
+  const std::string &index_name() const { return index_name_; }
 
-public:
-  static RC create(Db *db, const CreateIndexSqlNode &create_index, Stmt *&stmt);
+  vector<unique_ptr<Expression>>& column_expressions()
+  {
+    return column_expressions_;
+  }
+
+  bool unique() const
+  {
+    return unique_;
+  }
+
+  static RC create(Db *db, CreateIndexSqlNode &create_index, Stmt *&stmt);
 
 private:
   Table           *table_      = nullptr;
-  const FieldMeta *field_meta_ = nullptr;
-  string           index_name_;
+  vector<unique_ptr<Expression>> column_expressions_;
+  std::string      index_name_;
+  bool unique_ = false;
 };

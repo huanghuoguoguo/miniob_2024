@@ -179,9 +179,10 @@ struct DropTableSqlNode
  */
 struct CreateIndexSqlNode
 {
-  string index_name;      ///< Index name
-  string relation_name;   ///< Relation name
-  string attribute_name;  ///< Attribute name
+  std::string index_name; ///< Index name
+  std::string relation_name;   ///< Relation name
+  bool unique;
+  std::vector<std::unique_ptr<Expression>> columns;
 };
 
 /**

@@ -115,6 +115,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NOT
         NULL_
         NULLABLE
+        UNIQUE
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -274,14 +275,24 @@ desc_table_stmt:
     ;
 
 create_index_stmt:    /*create index 语句的语法解析树*/
-    CREATE INDEX ID ON ID LBRACE ID RBRACE
+    CREATE INDEX ID ON ID LBRACE expression_list RBRACE
     {
       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
       CreateIndexSqlNode &create_index = $$->create_index;
       create_index.index_name = $3;
       create_index.relation_name = $5;
-      create_index.attribute_name = $7;
+      create_index.unique = false;
+      create_index.columns.swap(*$7);
     }
+    | CREATE UNIQUE INDEX ID ON ID LBRACE expression_list RBRACE
+     {
+       $$ = new ParsedSqlNode(SCF_CREATE_INDEX);
+       CreateIndexSqlNode &create_index = $$->create_index;
+       create_index.index_name = $4;
+       create_index.relation_name = $6;
+       create_index.unique = true;
+       create_index.columns.swap(*$8);
+     }
     ;
 
 drop_index_stmt:      /*drop index 语句的语法解析树*/
