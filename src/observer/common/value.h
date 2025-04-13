@@ -35,6 +35,7 @@ public:
   friend class BooleanType;
   friend class CharType;
   friend class VectorType;
+  friend class ListType;
 
   Value()
   {
@@ -93,6 +94,7 @@ public:
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
+  void set_list(vector<Value*>* list) { this->values_ = list; }
 
   string to_string() const;
 
@@ -112,6 +114,7 @@ public:
   float  get_float() const;
   string get_string() const;
   bool   get_boolean() const;
+  vector<Value*> *get_list() const;
   bool   is_null() const;
 
 private:
@@ -123,6 +126,8 @@ private:
 private:
   AttrType attr_type_ = AttrType::UNDEFINED;
   int      length_    = 0;
+  vector<Value*> *values_;
+
 
   union Val
   {

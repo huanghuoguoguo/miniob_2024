@@ -34,7 +34,9 @@ RC FilterStmt::create(Db *db, Table *default_table, unordered_map<string, Table 
 {
   RC rc = RC::SUCCESS;
   stmt  = nullptr;
-
+  if (conditions == NULL || (conditions->left_expr == NULL && conditions->right_expr == NULL)) {
+    return rc;
+  }
   FilterStmt *tmp_stmt = new FilterStmt();
   for (int i = 0; i < condition_num; i++) {
     FilterUnit *filter_unit = nullptr;
