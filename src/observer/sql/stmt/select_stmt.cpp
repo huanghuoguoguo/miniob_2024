@@ -73,6 +73,12 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     }
   }
 
+  RC rc = expression_binder.bind_condition_expression(select_sql.conditions);
+  if (OB_FAIL(rc)) {
+    LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+    return rc;
+  }
+
   vector<unique_ptr<Expression>> group_by_expressions;
   for (unique_ptr<Expression> &expression : select_sql.group_by) {
     RC rc = expression_binder.bind_expression(expression, group_by_expressions);
@@ -89,7 +95,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
 
   // create filter statement in `where` statement
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(db,
+  rc          = FilterStmt::create(db,
       default_table,
       &table_map,
       select_sql.conditions.data(),

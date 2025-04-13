@@ -18,6 +18,8 @@ See the Mulan PSL v2 for more details. */
 #include "storage/db/db.h"
 #include "storage/table/table.h"
 
+#include <sql/parser/expression_binder.h>
+
 DeleteStmt::DeleteStmt(Table *table, FilterStmt *filter_stmt) : table_(table), filter_stmt_(filter_stmt) {}
 
 DeleteStmt::~DeleteStmt()
@@ -28,7 +30,7 @@ DeleteStmt::~DeleteStmt()
   }
 }
 
-RC DeleteStmt::create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt)
+RC DeleteStmt::create(Db *db, DeleteSqlNode &delete_sql, Stmt *&stmt)
 {
   const char *table_name = delete_sql.relation_name.c_str();
   if (nullptr == db || nullptr == table_name) {
@@ -46,8 +48,17 @@ RC DeleteStmt::create(Db *db, const DeleteSqlNode &delete_sql, Stmt *&stmt)
   unordered_map<string, Table *> table_map;
   table_map.insert(pair<string, Table *>(string(table_name), table));
 
+  BinderContext binder_context;
+  binder_context.add_table(table);
+  ExpressionBinder expression_binder(binder_context);
+
+  RC rc = expression_binder.bind_condition_expression(delete_sql.conditions);
+  if (OB_FAIL(rc)) {
+    LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+    return rc;
+  }
   FilterStmt *filter_stmt = nullptr;
-  RC          rc          = FilterStmt::create(
+  rc          = FilterStmt::create(
       db, table, &table_map, delete_sql.conditions.data(), static_cast<int>(delete_sql.conditions.size()), filter_stmt);
   if (rc != RC::SUCCESS) {
     LOG_WARN("failed to create filter statement. rc=%d:%s", rc, strrc(rc));

@@ -43,7 +43,7 @@ public:
   virtual ~ExpressionBinder() = default;
 
   RC bind_expression(unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions);
-
+  RC bind_condition_expression(std::vector<ConditionSqlNode>& condition_sql_nodes);
 private:
   RC bind_star_expression(unique_ptr<Expression> &star_expr, vector<unique_ptr<Expression>> &bound_expressions);
   RC bind_unbound_field_expression(

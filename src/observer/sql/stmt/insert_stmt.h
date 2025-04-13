@@ -16,7 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "common/sys/rc.h"
 #include "sql/stmt/stmt.h"
-
+#include <sql/parser/expression_binder.h>
 class Table;
 class Db;
 
@@ -33,7 +33,7 @@ public:
   StmtType type() const override { return StmtType::INSERT; }
 
 public:
-  static RC create(Db *db, const InsertSqlNode &insert_sql, Stmt *&stmt);
+  static RC create(Db *db, InsertSqlNode &insert_sql, Stmt *&stmt);
 
 public:
   Table       *table() const { return table_; }

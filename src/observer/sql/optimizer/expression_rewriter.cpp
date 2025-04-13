@@ -15,12 +15,14 @@ See the Mulan PSL v2 for more details. */
 #include "sql/optimizer/expression_rewriter.h"
 #include "common/log/log.h"
 #include "sql/optimizer/comparison_simplification_rule.h"
+#include "sql/optimizer/arithmetic_simplification_rule.h"
 #include "sql/optimizer/conjunction_simplification_rule.h"
 
 using namespace std;
 
 ExpressionRewriter::ExpressionRewriter()
 {
+  expr_rewrite_rules_.emplace_back(new ArithmeticSimplificationRule);
   expr_rewrite_rules_.emplace_back(new ComparisonSimplificationRule);
   expr_rewrite_rules_.emplace_back(new ConjunctionSimplificationRule);
 }
