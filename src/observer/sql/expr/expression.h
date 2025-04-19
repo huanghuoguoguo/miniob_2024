@@ -14,16 +14,17 @@ See the Mulan PSL v2 for more details. */
 
 #pragma once
 
-#include "common/lang/string.h"
-#include "common/lang/memory.h"
+#include <memory>
+#include <string>
+#include <common/type/list_type.h>
+#include <sql/stmt/select_stmt.h>
+
+
 #include "common/value.h"
 #include "storage/field/field.h"
 #include "sql/expr/aggregator.h"
 #include "storage/common/chunk.h"
 
-#include <common/type/list_type.h>
-
-class SelectStmt;
 class ProjectPhysicalOperator;
 class ProjectLogicalOperator;
 class Tuple;
@@ -503,7 +504,16 @@ public:
   AttrType value_type() const override { return AttrType::UNDEFINED; }
   int      value_length() const override { return 0; }
   RC       get_value(const Tuple &tuple, Value &value) const override;
-  void     add_value(Value* v)
+  RC open(Trx* trx);
+  // RC next();
+
+  RC close();
+  RC check(CompOp op);
+  bool check_single();
+
+  bool is_single_tuple() const;
+
+  void add_value(Value* v) const
   {
     if (list_type_ == nullptr)
     {
@@ -521,8 +531,10 @@ private:
   ProjectPhysicalOperator* project_phy_op_ = nullptr;
 
   mutable ListType* list_type_ = nullptr;
+  // 这个values是保存如in{}一个集合的情况，如果存在的话会将valueExpr的值获取，然后存入list_type中。
   std::vector<std::unique_ptr<Expression>>* values_ = nullptr;
-
+  std::vector<const Tuple*>  tuples_;
+  Trx* trx_ = nullptr;
 public:
   std::vector<std::unique_ptr<Expression>>* values() const
   {

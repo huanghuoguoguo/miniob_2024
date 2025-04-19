@@ -34,17 +34,22 @@ Table *BinderContext::find_table(const char *table_name) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions)
+static void wildcard_fields(Table *table, vector<unique_ptr<Expression>> &expressions,bool is_muti)
 {
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num();
   for (int i = table_meta.sys_field_num(); i < field_num; i++) {
     Field      field(table, table_meta.field(i));
     FieldExpr *field_expr = new FieldExpr(field);
-    field_expr->set_name(field.field_name());
+    string      field_name = field.field_name();
+    if(is_muti) {
+      field_name = string(table->table_meta().name())+"."+field_name;
+    }
+    field_expr->set_name(field_name.c_str());
     expressions.emplace_back(field_expr);
   }
 }
+
 
 RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
 {
@@ -129,11 +134,30 @@ RC ExpressionBinder::bind_star_expression(
   }
 
   for (Table *table : tables_to_wildcard) {
-    wildcard_fields(table, bound_expressions);
+    wildcard_fields(table, bound_expressions, tables_to_wildcard.size() > 1);
   }
 
   return RC::SUCCESS;
 }
+
+Table *BinderContext::find_table_by_field(const char *field_name) const
+{
+  // 先查询cur的。
+  for(auto& table : cur_tables_) {
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    if (nullptr != field_meta) {
+      return table;
+    }
+  }
+  for(auto& table : query_tables_) {
+    const FieldMeta *field_meta = table->table_meta().field(field_name);
+    if (nullptr != field_meta) {
+      return table;
+    }
+  }
+  return nullptr;
+}
+
 
 RC ExpressionBinder::bind_unbound_field_expression(
     unique_ptr<Expression> &expr, vector<unique_ptr<Expression>> &bound_expressions)
@@ -149,12 +173,20 @@ RC ExpressionBinder::bind_unbound_field_expression(
 
   Table *table = nullptr;
   if (is_blank(table_name)) {
-    if (context_.query_tables().size() != 1) {
-      LOG_INFO("cannot determine table for field: %s", field_name);
-      return RC::SCHEMA_TABLE_NOT_EXIST;
+    // if (context_.query_tables().size() != 1) {
+    //   LOG_INFO("cannot determine table for field: %s", field_name);
+    //   return RC::SCHEMA_TABLE_NOT_EXIST;
+    // }
+    // 循环table。应该只能找到当前table，暂时先找全部的table。
+
+    Table *find_table_by_field = context_.find_table_by_field(field_name);
+    if (find_table_by_field != nullptr) {
+      table = find_table_by_field;
+    } else {
+      table = context_.query_tables()[0];
     }
 
-    table = context_.query_tables()[0];
+
   } else {
     table = context_.find_table(table_name);
     if (nullptr == table) {
@@ -164,7 +196,7 @@ RC ExpressionBinder::bind_unbound_field_expression(
   }
 
   if (0 == strcmp(field_name, "*")) {
-    wildcard_fields(table, bound_expressions);
+    wildcard_fields(table, bound_expressions, false);
   } else {
     const FieldMeta *field_meta = table->table_meta().field(field_name);
     if (nullptr == field_meta) {
@@ -179,13 +211,13 @@ RC ExpressionBinder::bind_unbound_field_expression(
       name = string(field.field_name());
     }
 
-
-    field_expr->set_name(field_name);
+    field_expr->set_name(name);
     bound_expressions.emplace_back(field_expr);
   }
 
   return RC::SUCCESS;
 }
+
 
 RC ExpressionBinder::bind_field_expression(
     unique_ptr<Expression> &field_expr, vector<unique_ptr<Expression>> &bound_expressions)

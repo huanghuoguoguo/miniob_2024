@@ -38,8 +38,13 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     return RC::INVALID_ARGUMENT;
   }
 
-  BinderContext binder_context;
-  binder_context.db(db);
+  if (select_sql.binder_context == nullptr) {
+    select_sql.binder_context = new BinderContext();
+    select_sql.binder_context->query_tables().clear();
+    select_sql.binder_context->db(db);
+  }
+  BinderContext& binder_context = *select_sql.binder_context;
+
   // collect tables in `from` statement
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
