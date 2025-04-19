@@ -33,6 +33,8 @@ See the Mulan PSL v2 for more details. */
   DEFINE_RC(EXIST)                       \
   DEFINE_RC(SUB_QUERY_ERROR)             \
   DEFINE_RC(SUB_QUERY_NUILTI_COLUMN)     \
+  DEFINE_RC(SUB_QUERY_NUILTI_VALUE)      \
+  DEFINE_RC(SUB_QUERY_NUILTI_TUPLE)      \
   DEFINE_RC(NOT_EXIST)                   \
   DEFINE_RC(BUFFERPOOL_OPEN)             \
   DEFINE_RC(BUFFERPOOL_NOBUF)            \
