@@ -118,6 +118,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
+  select_stmt->binder_context_ = select_sql.binder_context;
   stmt                      = select_stmt;
   return RC::SUCCESS;
 }

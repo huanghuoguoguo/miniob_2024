@@ -147,6 +147,13 @@ struct UpdateSqlNode
   vector<ConditionSqlNode> conditions;
 };
 
+struct CreateViewSqlNode
+{
+  std::string view_name;
+  std::vector<std::unique_ptr<Expression>> expressions;
+  SelectSqlNode* select_sql_node;   // view列到原始表的映射
+};
+
 /**
  * @brief 描述一个属性
  * @ingroup SQLParser
@@ -278,6 +285,7 @@ enum SqlCommandFlag
   SCF_DROP_TABLE,
   SCF_CREATE_INDEX,
   SCF_DROP_INDEX,
+  SCF_CREATE_VIEW,
   SCF_SYNC,
   SCF_SHOW_TABLES,
   SCF_DESC_TABLE,
@@ -313,7 +321,7 @@ public:
   LoadDataSqlNode     load_data;
   ExplainSqlNode      explain;
   SetVariableSqlNode  set_variable;
-
+  CreateViewSqlNode   create_view;
 public:
   ParsedSqlNode();
   explicit ParsedSqlNode(SqlCommandFlag flag);

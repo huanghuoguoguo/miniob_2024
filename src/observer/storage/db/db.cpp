@@ -27,6 +27,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/trx/trx.h"
 #include "storage/clog/disk_log_handler.h"
 #include "storage/clog/integrated_log_replayer.h"
+#include <storage/table/view.h>
 
 using namespace common;
 
@@ -110,6 +111,7 @@ RC Db::init(const char *name, const char *dbpath, const char *trx_kit_name, cons
     return rc;
   }
 
+  rc = open_all_views();
   // 打开所有表
   // 在实际生产数据库中，直接打开所有表，可能耗时会比较长
   rc = open_all_tables();
@@ -157,6 +159,36 @@ RC Db::create_table(const char *table_name, span<const AttrInfoSqlNode> attribut
   opened_tables_[table_name] = table;
   LOG_INFO("Create table success. table name=%s, table_id:%d", table_name, table_id);
   return RC::SUCCESS;
+}
+
+RC Db::create_view(const char *view_name, SelectStmt *select_stmt, std::string& sql,std::vector<std::unique_ptr<Expression>>& query_expressions)
+{
+  RC rc = RC::SUCCESS;
+  // check table_name
+  if (opened_tables_.count(view_name) != 0) {
+    // opened_tables_是一个map容器，里面存放了 数据库中作用的表名
+    LOG_WARN("%s has been opened before.", view_name); // 检查将要创建的表名是否存在
+    return RC::SCHEMA_TABLE_EXIST;
+  }
+  // 文件路径可以移到Table模块
+  string  table_file_path = view_meta_file(path_.c_str(), view_name);
+  Table * view            = new View();
+  int32_t table_id        = next_table_id_++; // 给每一个table都分配一个id 用来记录日志
+  rc                      = view->create_view(this,
+      table_file_path.c_str(),
+      path_.c_str(),
+      table_id,
+      view_name,
+      select_stmt,
+      sql,
+      query_expressions);
+  if (rc != RC::SUCCESS) {
+    delete view;
+    return rc;
+  }
+
+  opened_tables_[view_name] = view; // 将创建的view加入到map容器中
+  return rc;
 }
 
 Table *Db::find_table(const char *table_name) const
@@ -224,6 +256,48 @@ void Db::all_tables(vector<string> &table_names) const
   for (const auto &table_item : opened_tables_) {
     table_names.emplace_back(table_item.first);
   }
+}
+
+RC Db::open_all_views()
+{
+  vector<string> view_meta_files;
+
+  int ret = list_file(path_.c_str(), VIEW_META_FILE_PATTERN, view_meta_files);
+  if (ret < 0) {
+    LOG_ERROR("Failed to list table meta files under %s.", path_.c_str());
+    return RC::IOERR_READ;
+  }
+
+  RC rc = RC::SUCCESS;
+  for (const string &filename : view_meta_files) {
+    View *table = new View();
+    rc           = table->open(this, filename.c_str(), path_.c_str());
+    if (rc != RC::SUCCESS) {
+      delete table;
+      LOG_ERROR("Failed to open table. filename=%s", filename.c_str());
+      return rc;
+    }
+
+
+    if (opened_tables_.count(table->name()) != 0) {
+      LOG_ERROR("Duplicate table with difference file name. table=%s, the other filename=%s",
+          table->name(),
+          filename.c_str());
+      // 在这里原本先删除table后调用table->name()方法，犯了use-after-free的错误
+      delete table;
+      return RC::INTERNAL;
+    }
+
+    if (table->table_id() >= next_table_id_) {
+      next_table_id_ = table->table_id() + 1;
+    }
+    opened_tables_[table->name()] = table;
+    LOG_INFO("Open table: %s, file: %s", table->name(), filename.c_str());
+  }
+
+
+  LOG_INFO("All view have been opened. num=%d", opened_tables_.size());
+  return rc;
 }
 
 RC Db::sync()

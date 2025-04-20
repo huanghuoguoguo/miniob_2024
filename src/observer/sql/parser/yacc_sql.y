@@ -111,6 +111,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         LE
         GE
         NE
+        AS
+        VIEW
         IS
         NOT
         NULL_
@@ -175,6 +177,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            sync_stmt
 %type <sql_node>            begin_stmt
 %type <sql_node>            commit_stmt
+%type <sql_node>            create_view_stmt
 %type <sql_node>            rollback_stmt
 %type <sql_node>            load_data_stmt
 %type <sql_node>            explain_stmt
@@ -211,6 +214,7 @@ command_wrapper:
   | drop_index_stmt
   | sync_stmt
   | begin_stmt
+  | create_view_stmt
   | commit_stmt
   | rollback_stmt
   | load_data_stmt
@@ -284,7 +288,25 @@ create_index_stmt:    /*create index 语句的语法解析树*/
       create_index.attribute_name = $7;
     }
     ;
-
+create_view_stmt:
+    CREATE VIEW ID AS select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+      $$->flag = SCF_CREATE_VIEW;
+      $$->create_view.view_name = $3;
+      $$->create_view.select_sql_node = &$5->selection;
+      free($3);
+    }
+    | CREATE VIEW ID LBRACE expression_list RBRACE AS select_stmt
+    {
+      $$ = new ParsedSqlNode(SCF_CREATE_VIEW);;
+      $$->flag = SCF_CREATE_VIEW;
+      $$->create_view.expressions.swap(*$5);
+      $$->create_view.view_name = $3;
+      $$->create_view.select_sql_node = &$8->selection;
+      free($3);
+    }
+    ;
 drop_index_stmt:      /*drop index 语句的语法解析树*/
     DROP INDEX ID ON ID
     {

@@ -24,6 +24,7 @@ See the Mulan PSL v2 for more details. */
 #include "storage/buffer/disk_buffer_pool.h"
 #include "storage/clog/disk_log_handler.h"
 #include "storage/buffer/double_write_buffer.h"
+#include <sql/stmt/select_stmt.h>
 
 class Table;
 class LogHandler;
@@ -47,6 +48,8 @@ public:
   Db() = default;
   ~Db();
 
+ RC open_all_views();
+
   /**
    * @brief 初始化一个数据库实例
    * @details 从指定的目录下加载指定名称的数据库。这里就会加载dbpath目录下的数据。
@@ -65,6 +68,9 @@ public:
    */
   RC create_table(const char *table_name, span<const AttrInfoSqlNode> attributes,
       const StorageFormat storage_format = StorageFormat::ROW_FORMAT);
+
+ RC create_view(const char* view_name, SelectStmt* select_stmt, std::string& sql,
+                  std::vector<std::unique_ptr<Expression>>& query_expressions);
 
   /**
    * @brief 根据表名查找表

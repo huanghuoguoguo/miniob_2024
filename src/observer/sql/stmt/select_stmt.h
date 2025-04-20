@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/stmt/stmt.h"
 #include "storage/field/field.h"
 
+class BinderContext;
 class FieldMeta;
 class FilterStmt;
 class Db;
@@ -44,6 +45,14 @@ public:
 
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
+  BinderContext*                  binder_context_;
+
+public:
+  BinderContext* binder_context()
+  {
+    return binder_context_;
+  }
+
   bool is_single()
   {
     return is_single_;

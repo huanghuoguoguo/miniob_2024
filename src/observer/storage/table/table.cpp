@@ -89,7 +89,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
 
   // 创建文件
   const vector<FieldMeta> *trx_fields = db->trx_kit().trx_fields();
-  if ((rc = table_meta_.init(table_id, name, trx_fields, attributes, storage_format)) != RC::SUCCESS) {
+  if ((rc = table_meta_->init(table_id, name, trx_fields, attributes, storage_format)) != RC::SUCCESS) {
     LOG_ERROR("Failed to init table meta. name:%s, ret:%d", name, rc);
     return rc;  // delete table file
   }
@@ -102,7 +102,7 @@ RC Table::create(Db *db, int32_t table_id, const char *path, const char *name, c
   }
 
   // 记录元数据到文件中
-  table_meta_.serialize(fs);
+  table_meta_->serialize(fs);
   fs.close();
 
   db_       = db;
@@ -137,7 +137,7 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     LOG_ERROR("Failed to open meta file for read. file name=%s, errmsg=%s", meta_file_path.c_str(), strerror(errno));
     return RC::IOERR_OPEN;
   }
-  if (table_meta_.deserialize(fs) < 0) {
+  if (table_meta_->deserialize(fs) < 0) {
     LOG_ERROR("Failed to deserialize table meta. file name=%s", meta_file_path.c_str());
     fs.close();
     return RC::INTERNAL;
@@ -155,10 +155,10 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
     return rc;
   }
 
-  const int index_num = table_meta_.index_num();
+  const int index_num = table_meta_->index_num();
   for (int i = 0; i < index_num; i++) {
-    const IndexMeta *index_meta = table_meta_.index(i);
-    const FieldMeta *field_meta = table_meta_.field(index_meta->field());
+    const IndexMeta *index_meta = table_meta_->index(i);
+    const FieldMeta *field_meta = table_meta_->field(index_meta->field());
     if (field_meta == nullptr) {
       LOG_ERROR("Found invalid index meta info which has a non-exists field. table=%s, index=%s, field=%s",
                 name(), index_meta->name(), index_meta->field());
@@ -188,9 +188,9 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
 RC Table::insert_record(Record &record)
 {
   RC rc = RC::SUCCESS;
-  rc    = record_handler_->insert_record(record.data(), table_meta_.record_size(), &record.rid());
+  rc    = record_handler_->insert_record(record.data(), table_meta_->record_size(), &record.rid());
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Insert record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
+    LOG_ERROR("Insert record failed. table name=%s, rc=%s", table_meta_->name(), strrc(rc));
     return rc;
   }
 
@@ -229,9 +229,9 @@ RC Table::get_record(const RID &rid, Record &record)
 RC Table::recover_insert_record(Record &record)
 {
   RC rc = RC::SUCCESS;
-  rc    = record_handler_->recover_insert_record(record.data(), table_meta_.record_size(), record.rid());
+  rc    = record_handler_->recover_insert_record(record.data(), table_meta_->record_size(), record.rid());
   if (rc != RC::SUCCESS) {
-    LOG_ERROR("Insert record failed. table name=%s, rc=%s", table_meta_.name(), strrc(rc));
+    LOG_ERROR("Insert record failed. table name=%s, rc=%s", table_meta_->name(), strrc(rc));
     return rc;
   }
 
@@ -251,35 +251,35 @@ RC Table::recover_insert_record(Record &record)
   return rc;
 }
 
-const char *Table::name() const { return table_meta_.name(); }
+const char *Table::name() const { return table_meta_->name(); }
 
-const TableMeta &Table::table_meta() const { return table_meta_; }
+const TableMeta &Table::table_meta() const { return *table_meta_; }
 
 RC Table::make_record(int value_num, const Value *values, Record &record)
 {
   RC rc = RC::SUCCESS;
   // 检查字段类型是否一致
-  if (value_num + table_meta_.sys_field_num() != table_meta_.field_num()) {
-    LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_.name());
+  if (value_num + table_meta_->sys_field_num() != table_meta_->field_num()) {
+    LOG_WARN("Input values don't match the table's schema, table name:%s", table_meta_->name());
     return RC::SCHEMA_FIELD_MISSING;
   }
 
-  const int normal_field_start_index = table_meta_.sys_field_num();
+  const int normal_field_start_index = table_meta_->sys_field_num();
   // 复制所有字段的值
-  int   record_size = table_meta_.record_size();
+  int   record_size = table_meta_->record_size();
   char *record_data = (char *)malloc(record_size);
   std::bitset<32> null_list;
   memset(record_data, 0, record_size);
 
   for (int i = 0; i < value_num && OB_SUCC(rc); i++) {
-    const FieldMeta *field = table_meta_.field(i + normal_field_start_index);
+    const FieldMeta *field = table_meta_->field(i + normal_field_start_index);
     const Value &    value = values[i];
     if (field->type() != value.attr_type() && !value.is_null()) {
       Value real_value;
       rc = Value::cast_to(value, field->type(), real_value);
       if (OB_FAIL(rc)) {
         LOG_WARN("failed to cast value. table name:%s,field name:%s,value:%s ",
-            table_meta_.name(), field->name(), value.to_string().c_str());
+            table_meta_->name(), field->name(), value.to_string().c_str());
         break;
       }
       rc = set_value_to_record(record_data, real_value, field);
@@ -295,7 +295,7 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
   rc = set_value_to_record(record_data, Value(static_cast<int>(null_list.to_ulong())), field);
 
   if (OB_FAIL(rc)) {
-    LOG_WARN("failed to make record. table name:%s", table_meta_.name());
+    LOG_WARN("failed to make record. table name:%s", table_meta_->name());
     free(record_data);
     return rc;
   }
@@ -322,7 +322,7 @@ RC Table::set_value_to_record(char *record_data, const Value &value, const Field
 
 RC Table::init_record_handler(const char *base_dir)
 {
-  string data_file = table_data_file(base_dir, table_meta_.name());
+  string data_file = table_data_file(base_dir, table_meta_->name());
 
   BufferPoolManager &bpm = db_->buffer_pool_manager();
   RC                 rc  = bpm.open_file(db_->log_handler(), data_file.c_str(), data_buffer_pool_);
@@ -331,9 +331,9 @@ RC Table::init_record_handler(const char *base_dir)
     return rc;
   }
 
-  record_handler_ = new RecordFileHandler(table_meta_.storage_format());
+  record_handler_ = new RecordFileHandler(table_meta_->storage_format());
 
-  rc = record_handler_->init(*data_buffer_pool_, db_->log_handler(), &table_meta_);
+  rc = record_handler_->init(*data_buffer_pool_, db_->log_handler(), table_meta_);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to init record handler. rc=%s", strrc(rc));
     data_buffer_pool_->close_file();
@@ -375,7 +375,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
 
   RC rc = new_index_meta.init(index_name, *field_meta);
   if (rc != RC::SUCCESS) {
-    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s", 
+    LOG_INFO("Failed to init IndexMeta in table:%s, index_name:%s, field_name:%s",
              name(), index_name, field_meta->name());
     return rc;
   }
@@ -395,7 +395,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   RecordFileScanner scanner;
   rc = get_record_scanner(scanner, trx, ReadWriteMode::READ_ONLY);
   if (rc != RC::SUCCESS) {
-    LOG_WARN("failed to create scanner while creating index. table=%s, index=%s, rc=%s", 
+    LOG_WARN("failed to create scanner while creating index. table=%s, index=%s, rc=%s",
              name(), index_name, strrc(rc));
     return rc;
   }
@@ -422,7 +422,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
   indexes_.push_back(index);
 
   /// 接下来将这个索引放到表的元数据中
-  TableMeta new_table_meta(table_meta_);
+  TableMeta new_table_meta(*table_meta_);
   rc = new_table_meta.add_index(new_index_meta);
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to add index (%s) on table (%s). error=%d:%s", index_name, name(), rc, strrc(rc));
@@ -456,7 +456,7 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
     return RC::IOERR_WRITE;
   }
 
-  table_meta_.swap(new_table_meta);
+  table_meta_->swap(new_table_meta);
 
   LOG_INFO("Successfully added a new index (%s) on the table (%s)", index_name, name());
   return rc;
@@ -524,7 +524,7 @@ Index *Table::find_index(const char *index_name) const
 }
 Index *Table::find_index_by_field(const char *field_name) const
 {
-  const TableMeta &table_meta = this->table_meta();
+  TableMeta table_meta = this->table_meta();
   const IndexMeta *index_meta = table_meta.find_index_by_field(field_name);
   if (index_meta != nullptr) {
     return this->find_index(index_meta->name());

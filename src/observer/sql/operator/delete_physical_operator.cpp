@@ -14,9 +14,11 @@ See the Mulan PSL v2 for more details. */
 
 #include "sql/operator/delete_physical_operator.h"
 #include "common/log/log.h"
+
+#include <sql/expr/composite_tuple.h>
 #include "storage/table/table.h"
 #include "storage/trx/trx.h"
-
+class CompositeTuple;
 RC DeletePhysicalOperator::open(Trx *trx)
 {
   if (children_.empty()) {
@@ -40,7 +42,21 @@ RC DeletePhysicalOperator::open(Trx *trx)
       return rc;
     }
 
-    RowTuple *row_tuple = static_cast<RowTuple *>(tuple);
+    RowTuple *row_tuple = dynamic_cast<RowTuple *>(tuple);
+    if (row_tuple == nullptr) {
+      CompositeTuple *composite_tuple = dynamic_cast<CompositeTuple *>(tuple);
+      if (composite_tuple) {
+        std::vector<std::unique_ptr<Tuple>>& tuples = composite_tuple->tuples();
+        for (auto &tuple : tuples) {
+          Tuple *sub_tuple = dynamic_cast<Tuple *>(tuple.get());
+          if (dynamic_cast<RowTuple *>(sub_tuple)) {
+            row_tuple = dynamic_cast<RowTuple *>(sub_tuple);
+          }
+        }
+      }
+    }
+
+
     Record   &record    = row_tuple->record();
     records_.emplace_back(std::move(record));
   }
