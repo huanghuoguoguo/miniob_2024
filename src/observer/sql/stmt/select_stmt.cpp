@@ -87,6 +87,29 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
       return rc;
     }
   }
+  // having和group by只能一起出现，如果没有group by，则不能有having
+  if(!select_sql.group_by_having.empty() && group_by_expressions.empty()) {
+    return RC::UNSUPPORTED;
+  }
+  std::vector<FilterStmt*> group_by_having;
+  FilterStmt *having_filter_stmt = nullptr;
+  // conditions
+  rc = expression_binder.bind_condition_expression(select_sql.group_by_having);
+  if (OB_FAIL(rc)) {
+    LOG_INFO("bind condition expression failed. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  rc         = FilterStmt::create(db,
+      default_table,
+      &table_map,
+      select_sql.group_by_having.data(),
+      static_cast<int>(select_sql.group_by_having.size()),
+      having_filter_stmt);
+  if (rc != RC::SUCCESS) {
+    LOG_WARN("cannot construct having filter stmt");
+    return rc;
+  }
 
   Table *default_table = nullptr;
   if (tables.size() == 1) {
@@ -113,6 +136,7 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   select_stmt->query_expressions_.swap(bound_expressions);
   select_stmt->filter_stmt_ = filter_stmt;
   select_stmt->group_by_.swap(group_by_expressions);
+  select_stmt->group_by_having_ = having_filter_stmt;
   stmt                      = select_stmt;
   return RC::SUCCESS;
 }

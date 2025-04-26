@@ -113,6 +113,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         IN
         NOT
+        HAVING
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -152,7 +153,9 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <attr_info>           attr_def
 %type <condition_list>      where
 %type <condition_list>      condition_list
+%type <condition_list>      having_condition
 %type <cstring>             storage_format
+%type <expression_list>     aggre_list
 %type <relation_list>       rel_list
 %type <expression>          expression
 %type <expression_list>     expression_list
@@ -416,7 +419,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by
+    SELECT expression_list FROM rel_list where group_by having_condition
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -437,6 +440,10 @@ select_stmt:        /*  select 语句的语法解析树*/
       if ($6 != nullptr) {
         $$->selection.group_by.swap(*$6);
         delete $6;
+      }
+      if ($7 != nullptr) {
+        $$->selection.group_by_having.swap(*$7);
+        delete $7;
       }
     }
     ;
@@ -465,7 +472,27 @@ expression_list:
       $$->emplace($$->begin(), $1);
     }
     ;
+aggre_list:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | expression_list {
+        $$ = $1;
+    }
 expression:
+    aggre_type LBRACE aggre_list RBRACE {
+      $$ = nullptr;
+      if ($3 != nullptr) {
+        if($3->size() == 1){
+            $$ = create_aggregate_expression($1, $3->front().release(), sql_string, &@$);
+        } else {
+            $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+        }
+      }else{
+        $$ = create_aggregate_expression("unsupport", nullptr, sql_string, &@$);
+      }
+    }
     expression '+' expression {
       $$ = create_arithmetic_expression(ArithmeticExpr::Type::ADD, $1, $3, sql_string, &@$);
     }
@@ -591,6 +618,17 @@ group_by:
     /* empty */
     {
       $$ = nullptr;
+    }
+    | GROUP BY expression_list {
+      $$ = $3;
+    }
+having_condition:
+    /* empty */
+    {
+      $$ = nullptr;
+    }
+    | HAVING condition_list {
+      $$ = $2;
     }
     ;
 load_data_stmt:
