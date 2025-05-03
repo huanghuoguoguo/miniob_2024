@@ -27,6 +27,7 @@ class ExplainLogicalOperator;
 class JoinLogicalOperator;
 class CalcLogicalOperator;
 class GroupByLogicalOperator;
+class OrderByLogicalOperator;
 
 /**
  * @brief 物理计划生成器

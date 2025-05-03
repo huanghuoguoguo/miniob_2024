@@ -18,7 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "common/lang/vector.h"
 #include "common/lang/memory.h"
 #include "common/value.h"
-
+struct OrderBySqlNode;
 class Expression;
 
 /**
@@ -76,6 +76,13 @@ struct ConditionSqlNode
   Value          right_value;    ///< right-hand side value if right_is_attr = FALSE
 };
 
+
+
+struct OrderBySqlNode
+{
+    Expression * expr = nullptr;
+    bool is_asc;// true 为升序
+};
 /**
  * @brief 描述一个select语句
  * @ingroup SQLParser
@@ -93,6 +100,7 @@ struct SelectSqlNode
   vector<string>                 relations;    ///< 查询的表
   vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
   vector<unique_ptr<Expression>> group_by;     ///< group by clause
+  vector<OrderBySqlNode>         order_by_list;     ///< order_by_list
 };
 
 /**

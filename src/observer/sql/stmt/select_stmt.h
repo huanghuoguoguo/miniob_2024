@@ -44,10 +44,12 @@ public:
 
   vector<unique_ptr<Expression>> &query_expressions() { return query_expressions_; }
   vector<unique_ptr<Expression>> &group_by() { return group_by_; }
+  std::vector<std::unique_ptr<OrderBySqlNode>> &order_by() { return order_by_; }
 
 private:
   vector<unique_ptr<Expression>> query_expressions_;
   vector<Table *>                tables_;
   FilterStmt                    *filter_stmt_ = nullptr;
   vector<unique_ptr<Expression>> group_by_;
+  std::vector<std::unique_ptr<OrderBySqlNode>> order_by_;
 };
