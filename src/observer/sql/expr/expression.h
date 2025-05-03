@@ -135,6 +135,11 @@ public:
     const std::vector<Table *> &tables, Db *db, Table* default_table = nullptr) {
     return RC::SUCCESS;
   }
+  /**
+ * @brief 表达式的别名
+ */
+  virtual std::string alias() const { return alias_; }
+  virtual void set_alias(std::string alias) { alias_ = alias; }
 
 protected:
   /**
@@ -147,6 +152,7 @@ protected:
 
 private:
   string name_;
+  std::string alias_{};
 };
 
 class StarExpr : public Expression

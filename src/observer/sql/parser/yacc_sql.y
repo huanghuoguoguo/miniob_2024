@@ -113,6 +113,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         NE
         IN
         NOT
+        AS
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -145,7 +146,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <condition>           condition
 %type <value>               value
 %type <number>              number
-%type <cstring>             relation
+%type <relation_type>       relation
 %type <comp>                comp_op
 %type <rel_attr>            rel_attr
 %type <attr_infos>          attr_def_list
@@ -180,7 +181,8 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
-
+%type <string>              alias
+%type <boolean>             as_option
 %left '+' '-'
 %left '*' '/'
 %nonassoc UMINUS
@@ -310,6 +312,30 @@ create_table_stmt:    /*create table 语句的语法解析树*/
         create_table.storage_format = $8;
       }
     }
+    | CREATE TABLE ID LBRACE attr_def attr_def_list RBRACE as_option select_stmt
+    {
+      $$ = $9;
+      $$->flag = SCF_CREATE_TABLE;
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      free($3);
+
+      std::vector<AttrInfoSqlNode> *src_attrs = $6;
+      if (src_attrs != nullptr) {
+        create_table.attr_infos.swap(*src_attrs);
+      }
+      create_table.attr_infos.emplace_back(*$5);
+      std::reverse(create_table.attr_infos.begin(), create_table.attr_infos.end());
+      delete $5;
+    }
+    | CREATE TABLE ID as_option select_stmt
+    {
+      $$ = $5;
+      $$->flag = SCF_CREATE_TABLE;
+      CreateTableSqlNode &create_table = $$->create_table;
+      create_table.relation_name = $3;
+      free($3);
+    }
     ;
 attr_def_list:
     /* empty */
@@ -342,6 +368,16 @@ attr_def:
       $$->type = (AttrType)$2;
       $$->name = $1;
       $$->length = 4;
+    }
+    ;
+  as_option:
+    /* empty */
+    {
+      $$ = false;
+    }
+    | AS
+    {
+      $$ = false;
     }
     ;
 number:
@@ -450,19 +486,27 @@ calc_stmt:
     ;
 
 expression_list:
-    expression
+    expression alias
     {
       $$ = new vector<unique_ptr<Expression>>;
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
       $$->emplace_back($1);
+      free($2);
     }
-    | expression COMMA expression_list
+    | expression alias COMMA expression_list
     {
-      if ($3 != nullptr) {
-        $$ = $3;
+      if ($4 != nullptr) {
+        $$ = $4;
       } else {
         $$ = new vector<unique_ptr<Expression>>;
       }
+      if (nullptr != $2) {
+        $1->set_alias($2);
+      }
       $$->emplace($$->begin(), $1);
+      free($2);
     }
     ;
 expression:
@@ -520,23 +564,29 @@ rel_attr:
     ;
 
 relation:
-    ID {
-      $$ = $1;
+    ID alias {
+      if($2 != nullptr){
+        $$ = new std::pair<std::string, std::string>($1, $2);
+      } else {
+        $$ = new std::pair<std::string, std::string>($1, $1);
+      }
     }
     ;
 rel_list:
     relation {
-      $$ = new vector<string>();
-      $$->push_back($1);
+      $$ = new std::vector<std::pair<std::string, std::string>>;
+      $$->push_back(*$1);
+      delete $1;
     }
     | relation COMMA rel_list {
       if ($3 != nullptr) {
         $$ = $3;
       } else {
-        $$ = new vector<string>;
+        $$ = new std::vector<std::pair<std::string, std::string>>;
       }
 
-      $$->insert($$->begin(), $1);
+      $$->insert($$->begin(), *$1);
+      delete $1;
     }
     ;
 
@@ -593,6 +643,16 @@ group_by:
       $$ = nullptr;
     }
     ;
+alias:
+    /* empty */ {
+      $$ = nullptr;
+    }
+    | ID {
+      $$ = $1;
+    }
+    | AS ID {
+      $$ = $2;
+    }
 load_data_stmt:
     LOAD DATA INFILE SSS INTO TABLE ID 
     {

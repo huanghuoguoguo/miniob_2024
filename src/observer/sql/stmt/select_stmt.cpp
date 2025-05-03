@@ -44,9 +44,15 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
   vector<Table *>                tables;
   unordered_map<string, Table *> table_map;
   for (size_t i = 0; i < select_sql.relations.size(); i++) {
-    const char *table_name = select_sql.relations[i].c_str();
+    const char *table_name = select_sql.relations[i].first.c_str();////拿到的表名是真实表名
     if (nullptr == table_name) {
       LOG_WARN("invalid argument. relation name is null. index=%d", i);
+      return RC::INVALID_ARGUMENT;
+    }
+    const char *as_table_name = select_sql.relations[i].second.c_str();  //拿到的表名是表别名
+    Table *as_table = db->find_table(as_table_name);
+    if (nullptr != as_table) {
+      LOG_WARN("invalid argument. relation name is not match.");
       return RC::INVALID_ARGUMENT;
     }
 
@@ -59,6 +65,10 @@ RC SelectStmt::create(Db *db, SelectSqlNode &select_sql, Stmt *&stmt)
     binder_context.add_table(table);
     tables.push_back(table);
     table_map.insert({table_name, table});
+
+    //在这里维护下 表别名和表指针的关系 放到binder_context的as_table_里
+    const char *as_name = select_sql.relations[i].second.c_str();
+    binder_context.add_as_table(as_name,table_map.find(table_name)->second);
   }
 
   // collect query fields in `select` statement
