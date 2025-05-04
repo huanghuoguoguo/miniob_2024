@@ -26,6 +26,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
+#include <sql/operator/update_logical_operator.h>
 
 #include "sql/stmt/calc_stmt.h"
 #include "sql/stmt/delete_stmt.h"
@@ -184,13 +185,14 @@ RC LogicalPlanGenerator::create_plan(UpdateStmt *update_stmt, unique_ptr<Logical
     }
     last_oper = &predicate_oper;
   }
+  std::unique_ptr<ComparisonExpr>& expression = update_stmt->getComparisonExpr();
 
-  auto project_oper = make_unique<ProjectLogicalOperator>(std::move(update_stmt->bound_expressions()));
+  auto update_oper = make_unique<UpdateLogicalOperator>(table,expression);
   if (*last_oper) {
-    project_oper->add_child(std::move(*last_oper));
+    update_oper->add_child(std::move(*last_oper));
   }
 
-  logical_operator = std::move(project_oper);
+  logical_operator = std::move(update_oper);
   return RC::SUCCESS;
 }
 
