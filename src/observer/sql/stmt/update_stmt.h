@@ -40,10 +40,12 @@ public:
   const std::string &attribute_name() const { return attribute_name_; }
   const Value &value() const { return value_; }
   FilterStmt *filter_stmt() const { return filter_stmt_; }
+  std::vector<std::unique_ptr<Expression>> &bound_expressions() { return bound_expressions_; } // 返回select语句的查询表达式
 
 private:
   Table      *table_ = nullptr; // 返回的是需要update的表
   std::string attribute_name_;  // 返回的是需要update的字段名
   Value       value_;           // 返回的是需要update的值
   FilterStmt *filter_stmt_ = nullptr; // 返回由where条件生成的FilterStmt指针
+  vector<unique_ptr<Expression>> bound_expressions_;
 };
