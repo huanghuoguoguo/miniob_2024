@@ -26,6 +26,7 @@ class DeleteLogicalOperator;
 class ExplainLogicalOperator;
 class JoinLogicalOperator;
 class CalcLogicalOperator;
+class UpdateLogicalOperator;
 class GroupByLogicalOperator;
 
 /**
@@ -44,17 +45,18 @@ public:
   RC create_vec(LogicalOperator &logical_operator, unique_ptr<PhysicalOperator> &oper);
 
 private:
-  RC create_plan(TableGetLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(PredicateLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(ProjectLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(InsertLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(DeleteLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(ExplainLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(JoinLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(CalcLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_plan(GroupByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_vec_plan(ProjectLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_vec_plan(TableGetLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_vec_plan(GroupByLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
-  RC create_vec_plan(ExplainLogicalOperator &logical_oper, unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(TableGetLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(PredicateLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(ProjectLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(UpdateLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(InsertLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(DeleteLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(ExplainLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(JoinLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(CalcLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_plan(GroupByLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_vec_plan(ProjectLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_vec_plan(TableGetLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_vec_plan(GroupByLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
+  RC create_vec_plan(ExplainLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper);
 };
