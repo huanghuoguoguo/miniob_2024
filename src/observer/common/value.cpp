@@ -319,6 +319,11 @@ string Value::get_string() const { return this->to_string(); }
 
 vector<float> Value::get_vector() const
 {
+  if(attr_type_ == AttrType::CHARS) {
+    Value v;
+    DataType::type_instance(AttrType::CHARS)->cast_to(*this, AttrType::VECTORS, v);
+    return v.get_vector();
+  }
   int size = length_/sizeof(float);
   vector<float> res(size);
   if (value_.pointer_value_ != nullptr) {
