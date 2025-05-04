@@ -93,6 +93,8 @@ public:
   void set_data(const char *data, int length) { this->set_data(const_cast<char *>(data), length); }
   void set_value(const Value &value);
   void set_boolean(bool val);
+  void set_vector(vector<float>& list);
+  void set_vector(char* s, int len); // len表示多少个元素。vector默认存储float
 
   string to_string() const;
 
@@ -113,6 +115,7 @@ public:
   string get_string() const;
   bool   get_boolean() const;
   bool   is_null() const;
+  vector<float> get_vector() const;
 
 private:
   void set_int(int val);

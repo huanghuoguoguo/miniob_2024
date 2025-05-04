@@ -8,6 +8,7 @@ EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
+#include <regex>
 #include "common/lang/comparator.h"
 #include "common/log/log.h"
 #include "common/type/char_type.h"
@@ -30,7 +31,48 @@ RC CharType::set_value_from_str(Value &val, const string &data) const
 
 RC CharType::cast_to(const Value &val, AttrType type, Value &result) const
 {
+
   switch (type) {
+    case AttrType::INTS:
+    case AttrType::FLOATS: {
+      auto extract_number = [](const std::string &str) -> std::string {
+        std::regex  re("^([0-9]+\\.?[0-9]*)");
+        std::smatch match;
+        if (std::regex_search(str, match, re)) {
+          return match.str(0); // 返回匹配到的第一个数字部分
+        }
+        return "error"; // 如果没有找到数字部分，返回 0
+      };
+      auto str = extract_number(val.get_string());
+      if (str == "error") {
+        str = "0";
+      }
+      if (type == AttrType::INTS) {
+        result.set_int(std::stoi(str));
+      } else if (type == AttrType::FLOATS) {
+        result.set_float(std::stof(str));
+      }
+      break;
+    }
+    case AttrType::VECTORS: {
+      std::vector<float> numbers;
+      auto                  extract_vector = [&](const std::string &input) -> void {
+        std::regex number_regex(R"([-+]?\d*\.?\d+)");
+        auto       begin = std::sregex_iterator(input.begin(), input.end(), number_regex);
+        auto       end   = std::sregex_iterator();
+        for (auto it = begin; it != end; ++it) {
+          numbers.push_back(std::stof(it->str()));
+        }
+
+        return;
+      };
+      extract_vector(val.get_string());
+      if (numbers.empty()) {
+        return RC::EMPTY;
+      }
+      result.set_vector(numbers);
+      break;
+    }
     default: return RC::UNIMPLEMENTED;
   }
   return RC::SUCCESS;
@@ -40,6 +82,10 @@ int CharType::cast_cost(AttrType type)
 {
   if (type == AttrType::CHARS) {
     return 0;
+  } else if (type == AttrType::INTS || type == AttrType::FLOATS) {
+    return 1;
+  } else if (type == AttrType::VECTORS) {
+    return 2;
   }
   return INT32_MAX;
 }

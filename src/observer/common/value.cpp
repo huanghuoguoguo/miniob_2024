@@ -93,6 +93,7 @@ Value &Value::operator=(Value &&other)
 void Value::reset()
 {
   switch (attr_type_) {
+    case AttrType::VECTORS:
     case AttrType::CHARS:
       if (own_data_ && value_.pointer_value_ != nullptr) {
         delete[] value_.pointer_value_;
@@ -128,6 +129,10 @@ void Value::set_data(char *data, int length)
     case AttrType::NULL_: {
 
     }
+    } break;
+    case AttrType::VECTORS: {
+      set_vector(data, length);
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
@@ -178,6 +183,29 @@ void Value::set_string(const char *s, int len /*= 0*/)
   }
 }
 
+void Value::set_vector(vector<float> &list)
+{
+  int size         = static_cast<int>(list.size());
+  this->attr_type_ = AttrType::VECTORS;
+  this->length_    = size * sizeof(float);
+  set_vector(reinterpret_cast<char *>(list.data())  , size * sizeof(float));
+}
+
+void Value::set_vector(char* s, int len /*= 0*/)
+{
+  reset();
+  attr_type_ = AttrType::VECTORS;
+  if (s == nullptr) {
+    value_.pointer_value_ = nullptr;
+    length_               = 0;
+  } else {
+    own_data_             = true;
+    value_.pointer_value_ = new char[len];
+    length_               = len;
+    memcpy(value_.pointer_value_, s, len);
+  }
+}
+
 void Value::set_value(const Value &value)
 {
   switch (value.attr_type_) {
@@ -212,6 +240,7 @@ void Value::set_string_from_other(const Value &other)
 const char *Value::data() const
 {
   switch (attr_type_) {
+    case AttrType::VECTORS:
     case AttrType::CHARS: {
       return value_.pointer_value_;
     } break;
@@ -300,6 +329,16 @@ float Value::get_float() const
 }
 
 string Value::get_string() const { return this->to_string(); }
+
+vector<float> Value::get_vector() const
+{
+  int size = length_/sizeof(float);
+  vector<float> res(size);
+  if (value_.pointer_value_ != nullptr) {
+    std::memcpy(res.data(), value_.pointer_value_, length_);
+  }
+  return res;
+}
 
 bool Value::get_boolean() const
 {
