@@ -11,6 +11,8 @@ See the Mulan PSL v2 for more details. */
 //
 // Created by Wangyunlai on 2024/05/29.
 //
+#include <cmath>
+#include <numeric>
 
 #include "common/log/log.h"
 #include "common/lang/string.h"
@@ -89,7 +91,9 @@ RC ExpressionBinder::bind_expression(unique_ptr<Expression> &expr, vector<unique
     case ExprType::AGGREGATION: {
       ASSERT(false, "shouldn't be here");
     } break;
-
+    case ExprType::FUNCTION: {
+      return bind_function_expression(expr, bound_expressions);
+    } break;
     default: {
       LOG_WARN("unknown expression type: %d", static_cast<int>(expr->type()));
       return RC::INTERNAL;
@@ -405,17 +409,21 @@ RC ExpressionBinder::bind_aggregate_expression(
   if (nullptr == expr) {
     return RC::SUCCESS;
   }
+  auto func_expr = static_cast<FunctionExpr *>(expr.get());
 
-  auto unbound_aggregate_expr = static_cast<UnboundAggregateExpr *>(expr.get());
-  const char *aggregate_name = unbound_aggregate_expr->aggregate_name();
+  string              func_name = func_expr->get_func_name();
   AggregateExpr::Type aggregate_type;
-  RC rc = AggregateExpr::type_from_string(aggregate_name, aggregate_type);
+  RC                  rc = AggregateExpr::type_from_string(func_name.c_str(), aggregate_type);
   if (OB_FAIL(rc)) {
-    LOG_WARN("invalid aggregate name: %s", aggregate_name);
+    LOG_WARN("invalid aggregate name: %s", func_name);
     return rc;
   }
+  // 到这里能够确定他是聚合函数了，判断是不是只有一个字段。
+  if (func_expr->params().size() != 1) {
+    return RC::INVALID_ARGUMENT;
+  }
 
-  unique_ptr<Expression>        &child_expr = unbound_aggregate_expr->child();
+  unique_ptr<Expression> &       child_expr = func_expr->params().front();
   vector<unique_ptr<Expression>> child_bound_expressions;
 
   if (child_expr->type() == ExprType::STAR && aggregate_type == AggregateExpr::Type::COUNT) {
@@ -438,7 +446,7 @@ RC ExpressionBinder::bind_aggregate_expression(
   }
 
   auto aggregate_expr = make_unique<AggregateExpr>(aggregate_type, std::move(child_expr));
-  aggregate_expr->set_name(unbound_aggregate_expr->name());
+  aggregate_expr->set_name(func_expr->name());
   rc = check_aggregate_expression(*aggregate_expr);
   if (OB_FAIL(rc)) {
     return rc;
@@ -446,4 +454,72 @@ RC ExpressionBinder::bind_aggregate_expression(
 
   bound_expressions.emplace_back(std::move(aggregate_expr));
   return RC::SUCCESS;
+}
+
+RC ExpressionBinder::bind_function_expression(
+    std::unique_ptr<Expression> &expr, std::vector<std::unique_ptr<Expression>> &bound_expressions)
+{
+  // 传输进来的是类似于func(params...)的类型。在这里进行一个分类，如果是聚合函数，直接调用绑定聚合函数。
+  RC rc = RC::SUCCESS;
+  // 优先绑定聚合函数。
+  rc = bind_aggregate_expression(expr, bound_expressions);
+  if (rc == RC::SUCCESS) {
+    return rc;
+  }
+  if (rc != RC::UNKNOWN_FUNC) {
+    return rc;
+  }
+  // 绑定其他函数。
+  auto func_expr = static_cast<FunctionExpr *>(expr.get());
+
+  string              func_name = func_expr->get_func_name();
+  FunctionExpr::Type func_type;
+  rc = FunctionExpr::type_from_string(func_name.c_str(), func_type);
+  if (rc != RC::SUCCESS) {
+    return rc;
+  }
+  // 这里粗糙的设定参数只能为两个。
+  if(func_expr->params().size() != 2) {
+    return RC::INVALID_ARGUMENT;
+  }
+  // 绑定函数类型
+  func_expr->func_type(func_type);
+  // 将param都绑定
+  vector<unique_ptr<Expression>> child_bound_expressions;
+  for(auto& param : func_expr->params()) {
+    rc = bind_expression(param, child_bound_expressions);
+  }
+  func_expr->params().swap(child_bound_expressions);
+  // 对每个params检查，这里偷懒，必须是vector的，如果是char的，转为vector。
+  for(auto& param : func_expr->params()) {
+    // 如果是字段，检查是不是vector
+    if(param->type()==ExprType::FIELD) {
+      FieldExpr * field_expr = static_cast<FieldExpr*>(param.get());
+      if(field_expr->field().meta()->type()!=AttrType::VECTORS) {
+        return RC::INVALID_ARGUMENT;
+      }
+    }else if(param->type()==ExprType::VALUE) {
+      ValueExpr * value_expr = static_cast<ValueExpr*>(param.get());
+      if(value_expr->value_type()==AttrType::CHARS) {
+        // 直接将其转为vector
+        Value v;
+        DataType::type_instance(AttrType::CHARS)->cast_to(value_expr->get_value(), AttrType::VECTORS, v);
+
+        unique_ptr<Expression> e = make_unique<ValueExpr>(v);
+        param.swap(e);
+      }
+      if (param->value_type() != AttrType::VECTORS) {
+        return RC::INVALID_ARGUMENT;
+      }
+    }else {
+      // 可能是表达式？
+      if(param->value_type()!=AttrType::VECTORS) {
+        return RC::INVALID_ARGUMENT;
+      }
+    }
+  }
+
+  bound_expressions.emplace_back(std::move(expr));
+
+  return rc;
 }

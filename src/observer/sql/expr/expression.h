@@ -46,6 +46,7 @@ enum class ExprType
   CONJUNCTION,  ///< 多个表达式使用同一种关系(AND或OR)来联结
   ARITHMETIC,   ///< 算术运算
   AGGREGATION,  ///< 聚合运算
+  FUNCTION,
 };
 
 /**
@@ -466,4 +467,40 @@ public:
 private:
   Type                   aggregate_type_;
   unique_ptr<Expression> child_;
+};
+
+class FunctionExpr : public Expression
+{
+public:
+  enum class Type
+  {
+    L2_DISTANCE,
+    COSINE_DISTANCE,
+    INNER_PRODUCT,
+  };
+  FunctionExpr()
+  {
+
+  };
+  FunctionExpr(const char *func_name,std::vector<std::unique_ptr<Expression>>* params_)
+  {
+    this->func_name = func_name;
+    if(params_) {
+      this->params_.swap(*params_);
+    }
+  }
+  virtual ~FunctionExpr() = default;
+
+  ExprType type() const override { return ExprType::FUNCTION; }
+  AttrType value_type() const override { return AttrType::UNDEFINED; }
+  int      value_length() const override { return 0; }
+  RC       get_value(const Tuple &tuple, Value &value) const override{return RC::SUCCESS;}
+  string   get_func_name(){return this->func_name;}
+  std::vector<std::unique_ptr<Expression>>& params()
+  {
+    return this->params_;
+  }
+private:
+  string func_name;
+  std::vector<std::unique_ptr<Expression>> params_;
 };
