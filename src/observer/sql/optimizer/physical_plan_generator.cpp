@@ -13,6 +13,7 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include <utility>
+#include <ranges>
 
 #include "common/log/log.h"
 #include "sql/expr/expression.h"
@@ -35,6 +36,8 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/project_logical_operator.h"
 #include "sql/operator/project_physical_operator.h"
 #include "sql/operator/project_vec_physical_operator.h"
+#include "sql/operator/update_logical_operator.h"
+#include "sql/operator/update_physical_operator.h"
 #include "sql/operator/table_get_logical_operator.h"
 #include "sql/operator/table_scan_physical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
@@ -65,6 +68,10 @@ RC PhysicalPlanGenerator::create(LogicalOperator &logical_operator, unique_ptr<P
 
     case LogicalOperatorType::PROJECTION: {
       return create_plan(static_cast<ProjectLogicalOperator &>(logical_operator), oper);
+    } break;
+
+    case LogicalOperatorType::UPDATE: {
+      return create_plan(static_cast<UpdateLogicalOperator &>(logical_operator), oper);
     } break;
 
     case LogicalOperatorType::INSERT: {
@@ -242,6 +249,32 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
   LOG_TRACE("create a project physical operator");
   return rc;
 }
+
+RC PhysicalPlanGenerator::create_plan(UpdateLogicalOperator &update_oper, unique_ptr<PhysicalOperator> &oper)
+{
+  Table                               *table       = update_oper.table();
+  ComparisonExpr                      *expression  = update_oper.get_expression();
+  vector<unique_ptr<LogicalOperator>> &child_opers = update_oper.children();
+
+  RC                           rc = RC::SUCCESS;
+  unique_ptr<PhysicalOperator> update_physical_oper(
+      new UpdatePhysicalOperator(table, unique_ptr<ComparisonExpr>(expression)));
+
+  for (unique_ptr<LogicalOperator> &child_oper : child_opers) {
+    unique_ptr<PhysicalOperator> child_physical_oper;
+    rc = create(*child_oper, child_physical_oper);
+    if (rc != RC::SUCCESS) {
+      LOG_WARN("failed to create child physical operator. rc=%s", strrc(rc));
+      return rc;
+    }
+
+    update_physical_oper->add_child(std::move(child_physical_oper));
+  }
+
+  oper = std::move(update_physical_oper);
+  return rc;
+}
+
 
 RC PhysicalPlanGenerator::create_plan(InsertLogicalOperator &insert_oper, unique_ptr<PhysicalOperator> &oper)
 {
