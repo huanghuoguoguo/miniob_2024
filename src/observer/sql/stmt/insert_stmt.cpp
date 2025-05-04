@@ -13,6 +13,10 @@ See the Mulan PSL v2 for more details. */
 //
 
 #include "sql/stmt/insert_stmt.h"
+
+#include <common/type/vector_type.h>
+#include <sql/parser/expression_binder.h>
+
 #include "common/log/log.h"
 #include "storage/db/db.h"
 #include "storage/table/table.h"
@@ -42,12 +46,39 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
   const int        value_num  = static_cast<int>(inserts.values.size());
   const TableMeta &table_meta = table->table_meta();
   const int        field_num  = table_meta.field_num() - table_meta.sys_field_num();
+  const int sys_field_num     = table_meta.sys_field_num();
+
   if (field_num != value_num) {
     LOG_WARN("schema mismatch. value num=%d, field num in schema=%d", value_num, field_num);
     return RC::SCHEMA_FIELD_MISSING;
   }
 
+  // check field type
+  for (int i = 0; i < value_num; i++) {
+    const FieldMeta *field_meta = table_meta.field(i + sys_field_num);
+    const AttrType   field_type = field_meta->type();
+    const AttrType   value_type = values_data->at(i).attr_type();
+
+    // 解决TEXT太长的问题
+    if(field_type != value_type) {
+      if (AttrType::VECTORS == field_type) {
+        if (value_type == AttrType::VECTORS) {
+          // TODO 直接比较。
+        } else {
+          // char先转vector
+          Value v;
+          DataType::type_instance(AttrType::CHARS)->cast_to(values_data->at(i), AttrType::VECTORS, v);
+          std::vector<float> vector = v.get_vector();
+          if (vector.size() != field_meta->len() / sizeof(float)) {
+            v.reset();
+            return RC::INVALID_ARGUMENT;
+          }
+        }
+      }
+    }
+  }
+
   // everything alright
-  stmt = new InsertStmt(table, values, value_num);
+  stmt = new InsertStmt(table, values_data->data(), value_num);
   return RC::SUCCESS;
 }
