@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 
 #include "filter_stmt.h"
 #include "common/sys/rc.h"
+#include "filter_stmt.h"
 #include "sql/stmt/stmt.h"
 
 class Table;
