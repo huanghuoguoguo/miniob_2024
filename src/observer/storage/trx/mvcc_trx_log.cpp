@@ -119,6 +119,12 @@ RC MvccTrxLogHandler::commit(int32_t trx_id, int32_t commit_trx_id)
   return log_handler_.wait_lsn(lsn);
 }
 
+RC MvccTrxLogHandler::update_record(int32_t trx_id, Table *table, const RID &rid)
+{
+  return RC::SUCCESS;
+}
+
+
 RC MvccTrxLogHandler::rollback(int32_t trx_id)
 {
   ASSERT(trx_id > 0, "invalid trx_id:%d", trx_id);
