@@ -73,6 +73,29 @@ SELECT * FROM employees e1
 WHERE salary > (SELECT AVG(salary) FROM employees e2 WHERE e2.dept = e1.dept);
 ```
 
+```mermaid
+graph TD
+    A[子查询分类] --> B[按返回结果分类]
+    A --> C[按执行方式分类]
+    
+    B --> D[标量子查询<br/>Scalar Subquery]
+    B --> E[列表子查询<br/>List Subquery]
+    
+    C --> F[独立子查询<br/>Independent Subquery]
+    C --> G[相关子查询<br/>Correlated Subquery]
+    
+    D --> D1[返回：单个值<br/>用于：=, >, < 等比较]
+    E --> E1[返回：多个值<br/>用于：IN, NOT IN]
+    
+    F --> F1[特点：可提前执行<br/>优化：结果缓存]
+    G --> G1[特点：依赖外层数据<br/>执行：每行重新计算]
+    
+    style D fill:#e1f5fe
+    style E fill:#f3e5f5
+    style F fill:#e8f5e8
+    style G fill:#fff3e0
+```
+
 ## 第二章：miniob的设计思考
 
 ### 2.1 面临的挑战
@@ -127,6 +150,26 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
 ```
 **理由**：提高性能，避免不必要的计算。
 
+```mermaid
+graph LR
+    A[SQL解析<br/>Parse] --> B[表达式绑定<br/>Bind]
+    B --> C[逻辑计划<br/>Logical Plan]
+    C --> D[物理计划<br/>Physical Plan]
+    D --> E[执行<br/>Execute]
+    
+    A1[SelectSqlNode] --> A
+    B1[SubQueryExpr] --> B
+    C1[LogicalOperator] --> C
+    D1[PhysicalOperator] --> D
+    E1[Value/ListType] --> E
+    
+    style A fill:#ffebee
+    style B fill:#e8f5e8
+    style C fill:#e3f2fd
+    style D fill:#f3e5f5
+    style E fill:#fff8e1
+```
+
 ### 2.3 核心组件设计
 
 基于以上决策，我们设计了三个核心组件：
@@ -142,6 +185,60 @@ RC SubQueryExpr::get_value(const Tuple &tuple, Value &value) const {
 **组件3：错误检查机制**
 - 多层次的错误检查
 - 明确的错误码和错误信息
+
+```mermaid
+classDiagram
+    class Expression {
+        <<abstract>>
+        +type() ExprType
+        +get_value(tuple, value) RC
+    }
+    
+    class SubQueryExpr {
+        -select_sql_node_: SelectSqlNode*
+        -select_stmt_: SelectStmt*
+        -project_logical_op_: ProjectLogicalOperator*
+        -project_phy_op_: ProjectPhysicalOperator*
+        -list_type_: ListType*
+        -values_: vector~Expression~*
+        -trx_: Trx*
+        +type() ExprType
+        +get_value(tuple, value) RC
+        +open(trx) RC
+        +close() RC
+        +check(op) RC
+        +check_single() bool
+    }
+    
+    class DataType {
+        <<abstract>>
+        +compare(left, right) int
+    }
+    
+    class ListType {
+        -values: vector~Value*~
+        +add_value(value) void
+        +get_value(value) void
+        +count(value) bool
+        +size() int
+        +empty() bool
+    }
+    
+    class Value {
+        -type_: AttrType
+        -data_: union
+        +to_string() string
+    }
+    
+    Expression <|-- SubQueryExpr
+    DataType <|-- ListType
+    ListType --> Value : contains
+    SubQueryExpr --> ListType : uses
+    
+    style SubQueryExpr fill:#e1f5fe
+    style ListType fill:#f3e5f5
+    style Expression fill:#e8f5e8
+```
 
 ## 第三章：关键代码实现解析
 
@@ -468,6 +565,51 @@ DEFINE_RC(SUB_QUERY_NUILTI_TUPLE)     // 多元组错误
 DEFINE_RC(SUB_QUERY_NUILTI_VALUE)     // 多值错误
 ```
 
+```mermaid
+sequenceDiagram
+    participant Client as 客户端
+    participant Parser as SQL解析器
+    participant Binder as 表达式绑定器
+    participant LogicalGen as 逻辑计划生成器
+    participant PhysicalGen as 物理计划生成器
+    participant Executor as 执行引擎
+    participant SubQuery as 子查询表达式
+    
+    Client->>Parser: SQL查询
+    Parser->>Parser: 解析子查询语法
+    Parser->>Binder: SelectSqlNode
+    
+    Binder->>Binder: 创建SubQueryExpr
+    Binder->>Binder: 递归绑定子查询
+    Binder->>LogicalGen: 绑定完成的表达式
+    
+    LogicalGen->>LogicalGen: 检测子查询表达式
+    LogicalGen->>LogicalGen: 为子查询生成逻辑计划
+    LogicalGen->>PhysicalGen: LogicalOperator
+    
+    PhysicalGen->>PhysicalGen: 生成物理计划
+    PhysicalGen->>PhysicalGen: 绑定物理算子到SubQueryExpr
+    PhysicalGen->>Executor: PhysicalOperator
+    
+    Executor->>SubQuery: get_value(tuple)
+    
+    alt 独立子查询
+        SubQuery->>SubQuery: 检查缓存
+        alt 首次执行
+            SubQuery->>SubQuery: 执行子查询
+            SubQuery->>SubQuery: 缓存结果
+        end
+        SubQuery->>Executor: 返回缓存结果
+    else 相关子查询
+        SubQuery->>SubQuery: 注入外层上下文
+        SubQuery->>SubQuery: 执行子查询
+        SubQuery->>SubQuery: 清理上下文
+        SubQuery->>Executor: 返回结果
+    end
+    
+    Executor->>Client: 查询结果
+```
+
 ### 4.3 从教学角度看演进过程
 
 **第一阶段：建立基础**
@@ -484,6 +626,40 @@ DEFINE_RC(SUB_QUERY_NUILTI_VALUE)     // 多值错误
 - 实现结果缓存
 - 优化内存使用
 - 添加性能监控
+
+```mermaid
+graph TD
+    A[第一阶段：建立基础] --> A1[理解子查询本质]
+    A --> A2[实现执行框架]
+    A --> A3[建立错误处理]
+    
+    B[第二阶段：增加复杂性] --> B1[区分独立/相关子查询]
+    B --> B2[实现上下文传递]
+    B --> B3[完善生命周期管理]
+    
+    C[第三阶段：性能优化] --> C1[实现结果缓存]
+    C --> C2[优化内存使用]
+    C --> C3[添加性能监控]
+    
+    A --> B
+    B --> C
+    
+    A1 --> A11[SubQueryExpr设计]
+    A2 --> A21[基础执行逻辑]
+    A3 --> A31[错误码定义]
+    
+    B1 --> B11[check_single方法]
+    B2 --> B21[ValueListTuple]
+    B3 --> B31[open/close方法]
+    
+    C1 --> C11[ListType缓存]
+    C2 --> C21[资源管理]
+    C3 --> C31[执行统计]
+    
+    style A fill:#ffebee
+    style B fill:#e8f5e8
+    style C fill:#e3f2fd
+```
 
 ## 第五章：核心算法详解
 
@@ -546,6 +722,41 @@ RC SubQueryExpr::execute_correlated_subquery(const Tuple& outer_tuple, Value& va
 3. **数据注入**：将外层数据注入到内层查询的执行环境
 4. **执行清理**：执行完成后清理注入的数据，避免污染
 
+```mermaid
+flowchart TD
+    A[外层查询执行] --> B[遇到相关子查询]
+    B --> C[创建ValueListTuple]
+    C --> D[提取外层tuple数据]
+    
+    D --> E[遍历子查询物理算子树]
+    E --> F{是否为谓词算子?}
+    F -->|是| G[收集谓词算子]
+    F -->|否| H[继续遍历]
+    H --> E
+    G --> E
+    
+    E --> I[遍历完成]
+    I --> J[向所有谓词算子注入外层数据]
+    
+    J --> K[执行子查询]
+    K --> L[打开物理算子]
+    L --> M[循环获取结果]
+    M --> N{还有数据?}
+    N -->|是| O[提取Value并添加到ListType]
+    O --> M
+    N -->|否| P[关闭物理算子]
+    
+    P --> Q[清理注入的上下文数据]
+    Q --> R[从ListType获取最终结果]
+    R --> S[释放临时资源]
+    S --> T[返回结果给外层查询]
+    
+    style C fill:#e1f5fe
+    style J fill:#f3e5f5
+    style K fill:#e8f5e8
+    style Q fill:#fff3e0
+```
+
 ### 5.2 错误检查的层次化算法
 
 ```cpp
@@ -585,6 +796,37 @@ RC SubQueryExpr::check(CompOp op) {
   }
   return RC::SUCCESS;
 }
+```
+
+```mermaid
+graph TD
+    A[子查询错误检查] --> B{操作符类型}
+    
+    B -->|=, >, <, >=, <=, !=| C[标量比较检查]
+    B -->|IN, NOT IN| D[列表操作检查]
+    
+    C --> C1{检查元组数量}
+    C1 -->|> 1行| C1E[SUB_QUERY_NUILTI_TUPLE]
+    C1 -->|= 1行| C2{检查值数量}
+    
+    C2 -->|> 1值| C2E[SUB_QUERY_NUILTI_VALUE]
+    C2 -->|= 1值| C3{检查列数量}
+    
+    C3 -->|> 1列| C3E[SUB_QUERY_NUILTI_COLUMN]
+    C3 -->|= 1列| SUCCESS1[检查通过]
+    
+    D --> D1{检查列数量}
+    D1 -->|> 1列| D1E[SUB_QUERY_NUILTI_COLUMN]
+    D1 -->|= 1列| SUCCESS2[检查通过]
+    
+    style C fill:#ffebee
+    style D fill:#e8f5e8
+    style C1E fill:#ffcdd2
+    style C2E fill:#ffcdd2
+    style C3E fill:#ffcdd2
+    style D1E fill:#ffcdd2
+    style SUCCESS1 fill:#c8e6c9
+    style SUCCESS2 fill:#c8e6c9
 ```
 
 ## 第六章：测试用例分析
@@ -657,6 +899,44 @@ git checkout edu_complex_subq
 source test/case/test/primary-complex-sub-query.test;
 ```
 
+```mermaid
+graph TB
+    subgraph "miniob系统架构"
+        A[客户端 Client] --> B[网络层 Network]
+        B --> C[SQL解析层 Parser]
+        C --> D[语义分析层 Semantic]
+        D --> E[查询优化层 Optimizer]
+        E --> F[执行引擎 Executor]
+        F --> G[存储引擎 Storage]
+    end
+    
+    subgraph "子查询模块位置"
+        C --> C1[SelectSqlNode<br/>子查询语法解析]
+        D --> D1[SubQueryExpr<br/>表达式绑定]
+        D --> D2[ExpressionBinder<br/>递归绑定处理]
+        E --> E1[LogicalPlanGenerator<br/>逻辑计划生成]
+        E --> E2[PhysicalPlanGenerator<br/>物理计划生成]
+        F --> F1[SubQueryExpr::get_value<br/>执行时求值]
+        F --> F2[ListType<br/>结果管理]
+    end
+    
+    subgraph "核心数据流"
+        H[SQL查询] --> I[解析为SelectSqlNode]
+        I --> J[绑定为SubQueryExpr]
+        J --> K[生成逻辑计划]
+        K --> L[生成物理计划]
+        L --> M[执行并返回结果]
+    end
+    
+    style C1 fill:#e1f5fe
+    style D1 fill:#f3e5f5
+    style D2 fill:#f3e5f5
+    style E1 fill:#e8f5e8
+    style E2 fill:#e8f5e8
+    style F1 fill:#fff3e0
+    style F2 fill:#fff3e0
+```
+
 ### 7.2 调试技巧
 
 **1. 添加日志输出**：
@@ -691,6 +971,69 @@ gdb ./bin/observer
 1. **子查询去相关化**
 2. **结果集物化**
 3. **并行执行支持**
+
+```mermaid
+graph LR
+    subgraph "当前实现 (已完成)"
+        A1[基础子查询<br/>标量/列表]
+        A2[相关子查询<br/>上下文传递]
+        A3[错误检查<br/>多层验证]
+        A4[生命周期管理<br/>open/close]
+    end
+    
+    subgraph "短期扩展 (3-6个月)"
+        B1[EXISTS/NOT EXISTS<br/>存在性判断]
+        B2[ANY/ALL操作符<br/>量词比较]
+        B3[多列子查询<br/>元组比较]
+        B4[窗口函数集成<br/>分析查询]
+    end
+    
+    subgraph "中期优化 (6-12个月)"
+        C1[子查询去相关化<br/>性能优化]
+        C2[物化视图<br/>结果缓存]
+        C3[并行执行<br/>多线程支持]
+        C4[查询重写<br/>等价变换]
+    end
+    
+    subgraph "长期目标 (1-2年)"
+        D1[分布式子查询<br/>跨节点执行]
+        D2[智能优化器<br/>成本估算]
+        D3[流式处理<br/>实时查询]
+        D4[机器学习集成<br/>自适应优化]
+    end
+    
+    A1 --> B1
+    A2 --> B2
+    A3 --> B3
+    A4 --> B4
+    
+    B1 --> C1
+    B2 --> C2
+    B3 --> C3
+    B4 --> C4
+    
+    C1 --> D1
+    C2 --> D2
+    C3 --> D3
+    C4 --> D4
+    
+    style A1 fill:#c8e6c9
+    style A2 fill:#c8e6c9
+    style A3 fill:#c8e6c9
+    style A4 fill:#c8e6c9
+    style B1 fill:#e1f5fe
+    style B2 fill:#e1f5fe
+    style B3 fill:#e1f5fe
+    style B4 fill:#e1f5fe
+    style C1 fill:#f3e5f5
+    style C2 fill:#f3e5f5
+    style C3 fill:#f3e5f5
+    style C4 fill:#f3e5f5
+    style D1 fill:#fff3e0
+    style D2 fill:#fff3e0
+    style D3 fill:#fff3e0
+    style D4 fill:#fff3e0
+```
 
 ## 第八章：学习收获与思考
 
@@ -759,5 +1102,65 @@ miniob的子查询实现是一个优秀的教学案例，它展示了如何在�
 - **教育意义**：清晰展示了数据库系统的实现原理
 - **工程实践**：提供了可扩展、可维护的设计范例
 - **技术参考**：为其他功能的实现提供了思路
+
+```mermaid
+mindmap
+  root((子查询实现<br/>知识体系))
+    数据库理论基础
+      关系代数
+        选择操作
+        投影操作
+        连接操作
+      SQL语言规范
+        子查询语法
+        操作符语义
+        错误处理规范
+      查询处理理论
+        查询解析
+        查询优化
+        查询执行
+    
+    系统设计能力
+      架构设计
+        分层架构
+        模块化设计
+        接口设计
+      设计模式
+        表达式模式
+        访问者模式
+        策略模式
+      生命周期管理
+        资源管理
+        状态管理
+        错误恢复
+    
+    编程实现技能
+      C++编程
+        面向对象设计
+        内存管理
+        异常处理
+      算法设计
+        递归算法
+        遍历算法
+        缓存算法
+      调试技能
+        日志调试
+        GDB调试
+        性能分析
+    
+    工程实践经验
+      测试驱动开发
+        单元测试
+        集成测试
+        回归测试
+      版本控制
+        Git分支管理
+        代码审查
+        持续集成
+      文档编写
+        技术文档
+        用户手册
+        API文档
+```
 
 通过深入学习这个实现，我们不仅理解了子查询的技术细节，更重要的是掌握了数据库系统设计的核心思想和最佳实践。这些知识将为我们后续的系统开发和架构设计提供宝贵的指导。
