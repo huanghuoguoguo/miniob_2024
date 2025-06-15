@@ -921,3 +921,54 @@ RC BufferPoolManager::get_buffer_pool(int32_t id, DiskBufferPool *&bp)
   return RC::SUCCESS;
 }
 
+static BufferPoolManager *default_bpm = nullptr;
+
+void BufferPoolManager::set_instance(BufferPoolManager*bpm)
+{
+  if (default_bpm != nullptr && bpm != nullptr) {
+    LOG_ERROR("default buffer pool manager has been setted");
+    abort();
+  }
+  default_bpm = bpm;
+}
+BufferPoolManager &BufferPoolManager::instance()
+{
+  return *default_bpm;
+}
+
+RC DiskBufferPool::append_data(int64_t &offset, int64_t length, const char *data)
+{
+  RC rc = RC::SUCCESS;
+  // 计算偏移量，追加到文件末尾
+  offset = BP_PAGE_SIZE * file_header_->page_count;
+  if (lseek(file_desc_, offset, SEEK_SET) == -1) {
+    LOG_ERROR("Failed to lseek %s at offset %d :%s.", file_name_.c_str(), offset, strerror(errno));
+    return RC::IOERR_SEEK;
+  }
+
+  if (0 != writen(file_desc_, data, length)) {
+    LOG_ERROR("Failed to write text into file due to %s.", strerror(errno));
+    return RC::IOERR_WRITE;
+  }
+  file_header_->page_count += (length + BP_PAGE_SIZE - 1) / BP_PAGE_SIZE;
+
+  return rc;
+}
+
+RC DiskBufferPool::get_data(int64_t offset, int64_t length, char *data)
+{
+  if (lseek(file_desc_, offset, SEEK_SET) == -1) {
+    LOG_ERROR("Failed to lseek %s at offset %d :%s.", file_name_.c_str(), offset, strerror(errno));
+    return RC::IOERR_SEEK;
+  }
+
+  int ret = readn(file_desc_, data, length);
+  if (ret != 0) {
+    LOG_ERROR("Failed to load text from %s, file_desc:%d, due to failed to read data:%s, ret=%d, page count=%d",
+              file_name_.c_str(), file_desc_, strerror(errno), ret, file_header_->allocated_pages);
+    return RC::IOERR_READ;
+  }
+
+  return RC::SUCCESS;
+}
+

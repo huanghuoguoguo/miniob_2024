@@ -19,6 +19,7 @@ array<unique_ptr<DataType>, static_cast<int>(AttrType::MAXTYPE)> DataType::type_
     make_unique<CharType>(),
     make_unique<IntegerType>(),
     make_unique<FloatType>(),
+    make_unique<CharType>(),  // TEXTS类型使用CharType处理
     make_unique<VectorType>(),
     make_unique<DataType>(AttrType::BOOLEANS),
 };

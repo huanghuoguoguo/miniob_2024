@@ -14,6 +14,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <limits.h>
 #include <string.h>
+#include <filesystem>
 
 #include "common/defs.h"
 #include "common/lang/string.h"
@@ -41,6 +42,11 @@ Table::~Table()
   if (data_buffer_pool_ != nullptr) {
     data_buffer_pool_->close_file();
     data_buffer_pool_ = nullptr;
+  }
+
+  if (text_buffer_pool_ != nullptr) {
+    text_buffer_pool_->close_file();
+    text_buffer_pool_ = nullptr;
   }
 
   for (vector<Index *>::iterator it = indexes_.begin(); it != indexes_.end(); ++it) {
@@ -152,6 +158,13 @@ RC Table::open(Db *db, const char *meta_file, const char *base_dir)
   if (rc != RC::SUCCESS) {
     LOG_ERROR("Failed to open table %s due to init record handler failed.", base_dir);
     // don't need to remove the data_file
+    return rc;
+  }
+
+  // 初始化文本处理器
+  rc = init_text_handler(base_dir);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to open table %s due to init text handler failed.", base_dir);
     return rc;
   }
 
@@ -298,6 +311,20 @@ RC Table::make_record(int value_num, const Value *values, Record &record)
 
 RC Table::set_value_to_record(char *record_data, const Value &value, const FieldMeta *field)
 {
+  if (field->type() == AttrType::TEXTS) {
+    // 对于TEXTS类型字段，将字符串插入到文件中，并将offset和length写入record
+    // 目前是将TEXT的放入cell前 将其TYPE 设置为CHARS 所以这里 应该不会运行到
+    int64_t position[2];  // position[0] 是 offset, position[1] 是 length
+    position[0] = field->offset();
+    position[1] = value.length();
+    // 假设 `text_buffer_pool_` 是一个用于存储大文本的缓冲池
+    text_buffer_pool_->append_data(position[0], position[1], value.data());
+    
+    // 将offset和length写入record
+    memcpy(record_data + field->offset(), position, sizeof(position));
+    return RC::SUCCESS;
+  }
+  
   size_t       copy_len = field->len();
   const size_t data_len = value.length();
   if (field->type() == AttrType::CHARS) {
@@ -333,6 +360,31 @@ RC Table::init_record_handler(const char *base_dir)
   }
 
   return rc;
+}
+
+RC Table::init_text_handler(const char *base_dir)
+{
+  // 构建文本文件路径
+  std::string text_file = table_text_file(base_dir, table_meta_.name());
+
+  // 检查文本文件是否存在
+  if (!std::filesystem::exists(text_file)) {  // C++17 文件存在性检查
+    LOG_INFO("Text file %s not found. Skipping buffer pool initialization.", text_file.c_str());
+    return RC::SUCCESS;  // 如果文件不存在，返回成功状态，跳过初始化
+  }
+
+  // 获取 BufferPoolManager 实例
+  BufferPoolManager &bpm = db_->buffer_pool_manager();
+
+  // 打开文本文件并关联到 text_buffer_pool_
+  RC rc = bpm.open_file(db_->log_handler(), text_file.c_str(), text_buffer_pool_);
+  if (rc != RC::SUCCESS) {
+    LOG_ERROR("Failed to open disk buffer pool for text file:%s. rc=%d:%s", text_file.c_str(), rc, strrc(rc));
+    return rc;
+  }
+
+  LOG_INFO("Successfully initialized text buffer pool for file: %s", text_file.c_str());
+  return RC::SUCCESS;
 }
 
 RC Table::get_record_scanner(RecordFileScanner &scanner, Trx *trx, ReadWriteMode mode)

@@ -269,6 +269,10 @@ public:
   RC redo_deallocate_page(LSN lsn, PageNum page_num);
 
 public:
+  // 用于text数据的读写
+  RC append_data(int64_t &offset, int64_t length, const char *data);
+  RC get_data(int64_t offset, int64_t length, char *data);
+
   int32_t id() const { return buffer_pool_id_; }
 
   const char *filename() const { return file_name_.c_str(); }
@@ -342,6 +346,8 @@ public:
    * @param bp buffer pool 对象
    */
   RC get_buffer_pool(int32_t id, DiskBufferPool *&bp);
+  static void set_instance(BufferPoolManager*bpm);
+  static BufferPoolManager&instance();
 
 private:
   BPFrameManager frame_manager_{"BufPool"};

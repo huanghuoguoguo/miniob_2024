@@ -172,7 +172,7 @@ int TableMeta::serialize(ostream &ss) const
   table_value[FIELD_TABLE_ID]   = table_id_;
   table_value[FIELD_TABLE_NAME] = name_;
   table_value[FIELD_STORAGE_FORMAT] = static_cast<int>(storage_format_);
-
+  Json::StreamWriterBuilder writer_;
   Json::Value fields_value;
   for (const FieldMeta &field : fields_) {
     Json::Value field_value;
