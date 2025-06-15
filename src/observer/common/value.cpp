@@ -187,6 +187,9 @@ void Value::set_value(const Value &value)
     case AttrType::CHARS: {
       set_string(value.get_string().c_str());
     } break;
+    case AttrType::TEXTS: {
+      set_string(value.get_string().c_str());
+    } break;
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
     } break;
@@ -212,6 +215,9 @@ const char *Value::data() const
     case AttrType::CHARS: {
       return value_.pointer_value_;
     } break;
+    case AttrType::TEXTS: {
+      return value_.pointer_value_;
+    } break;
     default: {
       return (const char *)&value_;
     } break;
@@ -235,6 +241,14 @@ int Value::get_int() const
 {
   switch (attr_type_) {
     case AttrType::CHARS: {
+      try {
+        return (int)(stol(value_.pointer_value_));
+      } catch (exception const &ex) {
+        LOG_TRACE("failed to convert string to number. s=%s, ex=%s", value_.pointer_value_, ex.what());
+        return 0;
+      }
+    }
+    case AttrType::TEXTS: {
       try {
         return (int)(stol(value_.pointer_value_));
       } catch (exception const &ex) {
@@ -270,6 +284,14 @@ float Value::get_float() const
         return 0.0;
       }
     } break;
+    case AttrType::TEXTS: {
+      try {
+        return stof(value_.pointer_value_);
+      } catch (exception const &ex) {
+        LOG_TRACE("failed to convert string to float. s=%s, ex=%s", value_.pointer_value_, ex.what());
+        return 0.0;
+      }
+    } break;
     case AttrType::INTS: {
       return float(value_.int_value_);
     } break;
@@ -293,6 +315,24 @@ bool Value::get_boolean() const
 {
   switch (attr_type_) {
     case AttrType::CHARS: {
+      try {
+        float val = stof(value_.pointer_value_);
+        if (val >= EPSILON || val <= -EPSILON) {
+          return true;
+        }
+
+        int int_val = stol(value_.pointer_value_);
+        if (int_val != 0) {
+          return true;
+        }
+
+        return value_.pointer_value_ != nullptr;
+      } catch (exception const &ex) {
+        LOG_TRACE("failed to convert string to float or integer. s=%s, ex=%s", value_.pointer_value_, ex.what());
+        return value_.pointer_value_ != nullptr;
+      }
+    } break;
+    case AttrType::TEXTS: {
       try {
         float val = stof(value_.pointer_value_);
         if (val >= EPSILON || val <= -EPSILON) {
