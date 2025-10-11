@@ -476,6 +476,16 @@ RC Table::delete_record(const Record &record)
   return rc;
 }
 
+RC Table::update_record(const Record &record_)
+{
+  RC rc = RC::SUCCESS;
+  rc    = record_handler_->visit_record(record_.rid(), [&record_](Record &record) {
+              record.copy_data(record_.data(), record_.len());
+              return true;
+  });
+  return rc;
+}
+
 RC Table::insert_entry_of_indexes(const char *record, const RID &rid)
 {
   RC rc = RC::SUCCESS;
