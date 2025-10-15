@@ -133,6 +133,9 @@ void Value::set_data(char *data, int length)
     case AttrType::VECTORS: {
       set_vector(data, length);
     } break;
+    case AttrType::VECTORS: {
+      set_vector(data, length);
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;

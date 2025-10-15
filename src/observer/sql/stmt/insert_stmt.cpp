@@ -91,6 +91,6 @@ RC InsertStmt::create(Db *db, const InsertSqlNode &inserts, Stmt *&stmt)
 
 
   // everything alright
-  stmt = new InsertStmt(table, values, value_num);
+  stmt = new InsertStmt(table, values_data->data(), value_num);
   return RC::SUCCESS;
 }
