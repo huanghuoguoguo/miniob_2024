@@ -101,6 +101,7 @@ struct SelectSqlNode
   vector<ConditionSqlNode>       conditions;   ///< 查询条件，使用AND串联起来多个条件
   vector<unique_ptr<Expression>> group_by;     ///< group by clause
   vector<OrderBySqlNode>         order_by_list;     ///< order_by_list
+    int limit;
 };
 
 /**

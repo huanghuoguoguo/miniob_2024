@@ -364,7 +364,7 @@ RC Table::get_chunk_scanner(ChunkFileScanner &scanner, Trx *trx, ReadWriteMode m
   return rc;
 }
 
-RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name)
+RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_name,vector<ConditionSqlNode>& with_condition_sql_nodes)
 {
   if (common::is_blank(index_name) || nullptr == field_meta) {
     LOG_INFO("Invalid input arguments, table name is %s, index_name is blank or attribute_name is blank", name());
@@ -380,11 +380,20 @@ RC Table::create_index(Trx *trx, const FieldMeta *field_meta, const char *index_
     return rc;
   }
 
-  // 创建索引相关数据
-  BplusTreeIndex *index      = new BplusTreeIndex();
-  string          index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+  if (with_condition_sql_nodes.empty()) {
+    // 创建索引相关数据
 
-  rc = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
+    index = new BplusTreeIndex();
+  } else {
+    // 创建vector。。。这里还是偷懒了。
+    const char *func_name = with_condition_sql_nodes.at(2).right_expr->name();
+    const char *lists     = with_condition_sql_nodes.at(1).right_expr->name();
+    const char *probes    = with_condition_sql_nodes.at(0).right_expr->name();
+    index                 = new IvfflatIndex(std::stoi(lists), std::stoi(probes), func_name);
+  }
+
+  std::string index_file = table_index_file(base_dir_.c_str(), name(), index_name);
+  rc                     = index->create(this, index_file.c_str(), new_index_meta, *field_meta);
   if (rc != RC::SUCCESS) {
     delete index;
     LOG_ERROR("Failed to create bplus tree index. file name=%s, rc=%d:%s", index_file.c_str(), rc, strrc(rc));

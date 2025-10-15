@@ -118,6 +118,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
         NOT
         NULL_
         NULLABLE
+        LIMIT
 
 /** union 中定义各种数据类型，真实生成的代码也是union类型，所以不能有非POD类型的数据 **/
 %union {
@@ -189,6 +190,7 @@ FunctionExpr *create_aggregate_expression(const char *aggregate_name,
 %type <sql_node>            set_variable_stmt
 %type <sql_node>            help_stmt
 %type <sql_node>            exit_stmt
+%type <number>              limit_block
 %type <sql_node>            command_wrapper
 // commands should be a list but I use a single command instead
 %type <sql_node>            commands
@@ -529,7 +531,7 @@ update_stmt:      /*  update 语句的语法解析树*/
     }
     ;
 select_stmt:        /*  select 语句的语法解析树*/
-    SELECT expression_list FROM rel_list where group_by order_by
+    SELECT expression_list FROM rel_list where group_by order_by limit_block
     {
       $$ = new ParsedSqlNode(SCF_SELECT);
       if ($2 != nullptr) {
@@ -556,6 +558,17 @@ select_stmt:        /*  select 语句的语法解析树*/
         $$->selection.order_unit_list.swap(*$7);
         delete $7;
       }
+      $$->selection.limit = $8;
+          }
+    }
+    ;
+
+limit_block:
+    {
+      $$ = -1;
+    }
+    | LIMIT NUMBER {
+      $$ = $2;
     }
     ;
 calc_stmt:

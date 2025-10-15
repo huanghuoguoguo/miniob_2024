@@ -39,6 +39,7 @@ See the Mulan PSL v2 for more details. */
 #include "sql/operator/table_scan_physical_operator.h"
 #include "sql/operator/group_by_logical_operator.h"
 #include "sql/operator/group_by_physical_operator.h"
+#include <sql/operator/limit_physical_operator.h>
 #include "sql/operator/hash_group_by_physical_operator.h"
 #include "sql/operator/scalar_group_by_physical_operator.h"
 #include "sql/operator/table_scan_vec_physical_operator.h"
@@ -239,6 +240,15 @@ RC PhysicalPlanGenerator::create_plan(ProjectLogicalOperator &project_oper, uniq
     project_operator->add_child(std::move(child_phy_oper));
   }
 
+  if (project_oper.limit() > 0) {
+    std::unique_ptr<PhysicalOperator> limit_physical_operator = make_unique<LimitPhysicalOperator>(project_oper.limit());
+    if(child_phy_oper) {
+      limit_physical_operator->add_child(std::move(child_phy_oper));
+    }
+    project_operator->add_child(std::move(limit_physical_operator));
+    oper = std::move(project_operator);
+    return rc;
+  }
   oper = std::move(project_operator);
 
   LOG_TRACE("create a project physical operator");
@@ -364,6 +374,81 @@ RC PhysicalPlanGenerator::create_plan(GroupByLogicalOperator &logical_oper, uniq
   oper = std::move(group_by_oper);
   return rc;
 }
+
+RC PhysicalPlanGenerator::create_plan(OrderByLogicalOperator &logical_oper, std::unique_ptr<PhysicalOperator> &oper)
+{
+  RC rc = RC::SUCCESS;
+
+  // 获取 order by 相关的表达式和排序方向
+  std::vector<Expression *> &order_by_expressions = logical_oper.order_by_expressions();
+  std::vector<bool> &        order_by_directions  = logical_oper.order_by_directions();
+  LogicalOperator *          child_oper           = logical_oper.children().front().get();
+  // 如果子孩子就是table_get，检查是不是vector函数。
+  if (child_oper->type() == LogicalOperatorType::TABLE_GET) {
+    // 检查function
+    bool           is_vector_order = false;
+    vector<string> fields;
+    // 只考虑一个value，这里也偷懒了。
+    Value v;
+    for (auto &order_by_expression : order_by_expressions) {
+      if (order_by_expression->type() == ExprType::FUNCTION) {
+        // 目前Function只有vector函数，偷懒了
+        FunctionExpr *by_expression = static_cast<FunctionExpr *>(order_by_expression);
+        for (auto &p : by_expression->params()) {
+          if (p->type() == ExprType::FIELD) {
+            FieldExpr *field_expr = static_cast<FieldExpr *>(p.get());
+            fields.push_back(field_expr->field().meta()->name());
+            is_vector_order = true;
+          } else if (p->type() == ExprType::VALUE) {
+            ValueExpr *value_expr = static_cast<ValueExpr *>(p.get());
+            v                     = value_expr->get_value();
+          }
+        }
+      }
+    }
+    if (is_vector_order) {
+
+      TableGetLogicalOperator *table_get_logical_operator = static_cast<TableGetLogicalOperator *>(child_oper);
+      Table *                  table                      = table_get_logical_operator->table();
+      fields.insert(fields.begin(), "null_list");
+      Index *vector_index = table->find_index_by_field(fields);
+      if (vector_index) {
+        // 查询是否有以这个字段建立的索引，有的话直接将order by 算子变为vec_index_scan。
+        unique_ptr<VectorIndexScan> vector_index_scan = make_unique<VectorIndexScan>(table,
+            vector_index,
+            ReadWriteMode::READ_WRITE,
+            v);
+        oper = std::move(vector_index_scan);
+        return rc;
+      }
+
+    }
+  }
+
+
+  // 创建 OrderByPhysicalOperator
+  unique_ptr<OrderByPhysicalOperator> order_by_oper = make_unique<OrderByPhysicalOperator>(
+      std::move(order_by_expressions), std::move(order_by_directions));
+
+  // 确保 OrderByLogicalOperator 只有一个子节点
+  ASSERT(logical_oper.children().size() == 1, "Order by operator should have 1 child");
+
+  // 创建子物理操作符
+  unique_ptr<PhysicalOperator> child_physical_oper;
+  rc = create(*child_oper, child_physical_oper);
+  if (OB_FAIL(rc)) {
+    LOG_WARN("failed to create child physical operator for order by operator. rc=%s", strrc(rc));
+    return rc;
+  }
+
+  // 将子物理操作符添加到 order by 操作符中
+  order_by_oper->add_child(std::move(child_physical_oper));
+
+  // 将生成的物理计划返回
+  oper = std::move(order_by_oper);
+  return rc;
+}
+
 
 RC PhysicalPlanGenerator::create_vec_plan(TableGetLogicalOperator &table_get_oper, unique_ptr<PhysicalOperator> &oper)
 {

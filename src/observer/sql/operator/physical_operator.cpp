@@ -33,6 +33,7 @@ string physical_operator_type_name(PhysicalOperatorType type)
     case PhysicalOperatorType::PROJECT_VEC: return "PROJECT_VEC";
     case PhysicalOperatorType::TABLE_SCAN_VEC: return "TABLE_SCAN_VEC";
     case PhysicalOperatorType::EXPR_VEC: return "EXPR_VEC";
+    case PhysicalOperatorType::LIMIT: return "LIMIT";
     default: return "UNKNOWN";
   }
 }
