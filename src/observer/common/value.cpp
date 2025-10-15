@@ -125,12 +125,22 @@ void Value::set_data(char *data, int length)
       value_.bool_value_ = *(int *)data != 0;
       length_            = length;
     } break;
+    case AttrType::DATES: {
+      value_.int_value_ = *(int *)data;
+      length_           = length;
+    } break;
     default: {
       LOG_WARN("unknown data type: %d", attr_type_);
     } break;
   }
 }
-
+void Value::set_date(int val)
+{
+  reset();
+  attr_type_        = AttrType::DATES;
+  value_.int_value_ = val;
+  length_           = sizeof(val);
+}
 void Value::set_int(int val)
 {
   reset();
@@ -189,6 +199,9 @@ void Value::set_value(const Value &value)
     } break;
     case AttrType::BOOLEANS: {
       set_boolean(value.get_boolean());
+    } break;
+    case AttrType::DATES: {
+      set_date(value.get_int());
     } break;
     default: {
       ASSERT(false, "got an invalid value type");
@@ -251,6 +264,11 @@ int Value::get_int() const
     case AttrType::BOOLEANS: {
       return (int)(value_.bool_value_);
     }
+    case AttrType::DATES: {
+      // 虽然 date 类型是用 int 存的，但是目前不需要 get_date 函数
+      LOG_TRACE("failed to convert date to number. s=%d", value_.int_value_);
+      return 0;
+    }
     default: {
       LOG_WARN("unknown data type. type=%d", attr_type_);
       return 0;
@@ -279,6 +297,10 @@ float Value::get_float() const
     case AttrType::BOOLEANS: {
       return float(value_.bool_value_);
     } break;
+    case AttrType::DATES: {
+      LOG_TRACE("failed to convert date to float. s=%d", value_.int_value_);
+      return 0;
+    }
     default: {
       LOG_WARN("unknown data type. type=%d", attr_type_);
       return 0;
@@ -320,6 +342,10 @@ bool Value::get_boolean() const
     case AttrType::BOOLEANS: {
       return value_.bool_value_;
     } break;
+    case AttrType::DATES: {
+      LOG_TRACE("failed to convert date to boolean. s=%d", value_.int_value_);
+      return false;
+    }
     default: {
       LOG_WARN("unknown data type. type=%d", attr_type_);
       return false;

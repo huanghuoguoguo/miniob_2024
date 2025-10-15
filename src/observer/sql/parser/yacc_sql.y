@@ -86,6 +86,7 @@ UnboundAggregateExpr *create_aggregate_expression(const char *aggregate_name,
         TRX_COMMIT
         TRX_ROLLBACK
         INT_T
+        DATE_T
         STRING_T
         FLOAT_T
         VECTOR_T
@@ -349,6 +350,7 @@ number:
 type:
     INT_T      { $$ = static_cast<int>(AttrType::INTS); }
     | STRING_T { $$ = static_cast<int>(AttrType::CHARS); }
+    | DATE_T   { $$ = static_cast<int>(AttrType::DATES); }
     | FLOAT_T  { $$ = static_cast<int>(AttrType::FLOATS); }
     | VECTOR_T { $$ = static_cast<int>(AttrType::VECTORS); }
     ;
