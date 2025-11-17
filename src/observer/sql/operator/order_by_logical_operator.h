@@ -1,22 +1,27 @@
-#include "physical_operator.h"
+#pragma once
 
-class OrderByPhysicalOperator : public PhysicalOperator {
+#include "sql/operator/logical_operator.h"
+
+class OrderByLogicalOperator : public LogicalOperator
+{
 public:
-    OrderByPhysicalOperator(std::vector<Expression *> &&order_by_expressions,
-                            std::vector<bool> &&order_by_directions);
-    virtual ~OrderByPhysicalOperator() = default;
+  OrderByLogicalOperator(
+      std::vector<Expression *> &&order_by_exprs,
+      std::vector<bool> &&order_by_directions)
+      : order_by_expressions_(std::move(order_by_exprs)),
+        order_by_directions_(std::move(order_by_directions)) {}
 
-    PhysicalOperatorType type() const override { return PhysicalOperatorType::ORDER_BY; }
+  virtual ~OrderByLogicalOperator() = default;
 
-    RC open(Trx *trx) override;
-    RC next() override;
-    RC close() override;
+  LogicalOperatorType type() const override { return LogicalOperatorType::ORDER_BY; }
 
-    Tuple *current_tuple() override;
+  // 获取OrderBy的表达式
+  auto &order_by_expressions() { return order_by_expressions_; }
+
+  // 获取OrderBy的排序方向
+  auto &order_by_directions() { return order_by_directions_; }
 
 private:
-    std::vector<Expression *> order_by_expressions_; // 排序表达式
-    std::vector<bool> order_by_directions_; // 排序方向，true 为升序，false 为降序
-    std::vector<Tuple *> sorted_tuples_; // 存储排序后的元组
-    size_t current_index_ = 0; // 当前处理的元组索引
+  std::vector<Expression *> order_by_expressions_; ///< 用于排序的表达式,其实有继承父类的expression的数组，这个多此一举
+  std::vector<bool> order_by_directions_; ///< 每个表达式对应的排序方向，true 为升序，false 为降序
 };
